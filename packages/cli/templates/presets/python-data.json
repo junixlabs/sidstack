@@ -1,0 +1,48 @@
+{
+  "name": "python-data",
+  "displayName": "Python Data Pipeline",
+  "description": "Python data engineering with ETL pipelines, Airflow, and data quality tools",
+  "language": "python",
+  "projectType": "data-pipeline",
+  "agents": {
+    "worker": {
+      "base": "base/worker",
+      "variant": "python/worker",
+      "skills": [
+        "research-first",
+        "code-discovery",
+        "architecture-understanding"
+      ]
+    },
+    "reviewer": {
+      "base": "base/reviewer",
+      "skills": [
+        "research-first",
+        "code-discovery"
+      ]
+    }
+  },
+  "skills": {
+    "core": [
+      "research-first",
+      "code-discovery",
+      "architecture-understanding"
+    ],
+    "optional": [
+      "test-driven-development",
+      "documentation-standards",
+      "performance-optimization"
+    ]
+  },
+  "defaults": {
+    "model": "sonnet",
+    "permissionMode": "bypassPermissions"
+  },
+  "recommended": {
+    "packageManager": "pip",
+    "virtualEnv": "venv",
+    "testRunner": "pytest",
+    "linter": "ruff",
+    "typeChecker": "mypy"
+  }
+}

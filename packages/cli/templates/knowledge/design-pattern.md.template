@@ -1,0 +1,152 @@
+---
+title: "{{title}}"
+type: design-pattern
+module: "{{module}}"
+pattern: "{{pattern_name}}"
+status: draft
+created: "{{date}}"
+updated: "{{date}}"
+tags: [pattern, {{pattern_name}}, {{module}}]
+---
+
+# {{title}}
+
+## Overview
+
+Brief description of this design pattern implementation.
+
+## Pattern Details
+
+| Property | Value |
+|----------|-------|
+| Pattern Name | {{pattern_name}} |
+| Category | Creational / Structural / Behavioral |
+| Purpose | What problem it solves |
+
+## Context
+
+### Problem
+
+Describe the problem this pattern addresses in this codebase.
+
+### Forces
+
+- Constraint 1
+- Constraint 2
+- Constraint 3
+
+## Solution
+
+### Structure
+
+```mermaid
+classDiagram
+    class Interface {
+        <<interface>>
+        +method() ReturnType
+    }
+    class ConcreteA {
+        +method() ReturnType
+    }
+    class ConcreteB {
+        +method() ReturnType
+    }
+    class Client {
+        -dependency: Interface
+        +execute()
+    }
+    Interface <|.. ConcreteA
+    Interface <|.. ConcreteB
+    Client --> Interface
+```
+
+### Participants
+
+| Role | Class/Interface | Responsibility |
+|------|-----------------|----------------|
+| Interface | `InterfaceName` | Defines contract |
+| ConcreteA | `ConcreteAImpl` | Implementation A |
+| ConcreteB | `ConcreteBImpl` | Implementation B |
+| Client | `ClientClass` | Uses the pattern |
+
+## Implementation
+
+### Location
+
+```
+src/
+├── interfaces/
+│   └── interface.ts
+├── implementations/
+│   ├── concrete-a.ts
+│   └── concrete-b.ts
+└── client.ts
+```
+
+### Code Example
+
+```typescript
+// Interface
+interface {{pattern_name}}Interface {
+  method(): ReturnType;
+}
+
+// Implementation
+class ConcreteA implements {{pattern_name}}Interface {
+  method(): ReturnType {
+    // Implementation
+  }
+}
+
+// Client usage
+class Client {
+  constructor(private dependency: {{pattern_name}}Interface) {}
+
+  execute() {
+    return this.dependency.method();
+  }
+}
+```
+
+## Usage
+
+### When to Use
+
+- Situation 1
+- Situation 2
+- Situation 3
+
+### When NOT to Use
+
+- Anti-pattern situation 1
+- Anti-pattern situation 2
+
+### Current Usage in Codebase
+
+| Location | Purpose |
+|----------|---------|
+| `src/services/example.ts` | Example usage description |
+| `src/controllers/another.ts` | Another usage |
+
+## Consequences
+
+### Benefits
+
+- Benefit 1
+- Benefit 2
+- Benefit 3
+
+### Drawbacks
+
+- Drawback 1
+- Drawback 2
+
+## Related Patterns
+
+- [Related Pattern 1](./related-pattern-1.md)
+- [Alternative Pattern](./alternative-pattern.md)
+
+## References
+
+- [Gang of Four Book](https://example.com)
+- [Pattern Documentation](https://example.com)

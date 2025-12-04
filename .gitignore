@@ -1,0 +1,126 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Turbo
+.turbo/
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Tauri
+src-tauri/target/
+src-tauri/binaries/
+
+# SQLite databases
+*.db
+*.sqlite
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Local logs
+logs/
+
+# PID files
+*.pids
+
+# ==========================================
+# Private / Development-only (not for public)
+# ==========================================
+
+# SidStack workspace data
+.sidstack/
+
+# Claude Code
+.claude/
+
+# MCP local config
+.mcp.json
+
+# Website (private landing page)
+website/
+
+# OpenSpec proposals
+openspec/
+
+# Third-party AI tool configs
+.agent/
+.agents/
+.codex/
+.cursor/
+.gemini/
+.opencode/
+
+# Development artifacts
+.archive/
+.playwright-mcp/
+sidecar/
+test-mcp/
+
+# Development scripts (private)
+scripts/hooks/
+scripts/open-claude-session.sh
+scripts/progress-hook.sh
+scripts/test-mcp-tools.ts
+dev-release.sh
+start-dev.sh
+stop-dev.sh
+
+# OpenSpec agent instructions
+AGENTS.md
+
+# Legacy packages
+packages/orchestrator/
+
+# Legacy CLI prompts (old multi-agent model)
+packages/cli/prompts/ba-agent.md
+packages/cli/prompts/bm-agent.md
+packages/cli/prompts/da-agent.md
+packages/cli/prompts/dev-agent.md
+packages/cli/prompts/devops-agent.md
+packages/cli/prompts/qa-agent.md
+packages/cli/prompts/orchestrator.md
+packages/cli/prompts/project-reviewer.md
+packages/cli/prompts/onboarding.md
+
+# Duplicate templates (use packages/shared/templates instead)
+src-tauri/templates/knowledge/
+
+# Legacy ADRs
+docs/ADRs/005-langgraph-orchestration.md
+
+# Legacy presets and skills
+packages/cli/templates/presets/go-microservices.json
+packages/cli/templates/skills/core/file-locking-protocol.md
+packages/cli/templates/skills/core/progress-reporting.md
+
+# API server data (session artifacts)
+packages/api-server/data/

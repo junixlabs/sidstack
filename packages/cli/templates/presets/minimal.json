@@ -1,0 +1,34 @@
+{
+  "name": "minimal",
+  "displayName": "Minimal Setup",
+  "description": "Minimal agent setup with only essential skills. Good for simple projects or custom configurations.",
+  "language": "any",
+  "projectType": "general",
+  "agents": {
+    "worker": {
+      "base": "base/worker",
+      "skills": [
+        "research-first",
+        "code-discovery"
+      ]
+    },
+    "reviewer": {
+      "base": "base/reviewer",
+      "skills": [
+        "research-first"
+      ]
+    }
+  },
+  "skills": {
+    "core": [
+      "research-first",
+      "code-discovery"
+    ],
+    "optional": []
+  },
+  "defaults": {
+    "model": "sonnet",
+    "permissionMode": "bypassPermissions"
+  },
+  "recommended": {}
+}

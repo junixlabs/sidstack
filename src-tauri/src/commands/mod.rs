@@ -1,0 +1,14 @@
+pub mod git;
+pub mod workspace;
+pub mod file;
+pub mod agent;
+pub mod tray;
+pub mod crash;
+pub mod window;
+pub mod claude;
+pub mod team;
+pub mod openspec;
+pub mod orchestrator;
+pub mod session;
+pub mod slash;
+pub mod test_room;

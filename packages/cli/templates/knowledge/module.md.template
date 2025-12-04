@@ -1,0 +1,178 @@
+---
+title: "{{title}}"
+type: module
+module_id: "{{module_id}}"
+status: active
+owner: "{{owner}}"
+created: "{{date}}"
+updated: "{{date}}"
+tags: [module, {{module_id}}]
+---
+
+# {{title}}
+
+## Overview
+
+Brief description of this module's purpose and responsibility.
+
+## Module Details
+
+| Property | Value |
+|----------|-------|
+| Module ID | `{{module_id}}` |
+| Status | active |
+| Owner | {{owner}} |
+| Location | `{{source_path}}` |
+
+## Purpose
+
+### What It Does
+
+- Core functionality 1
+- Core functionality 2
+- Core functionality 3
+
+### What It Doesn't Do
+
+- Out of scope item 1
+- Out of scope item 2
+
+## Architecture
+
+### Dependencies
+
+```mermaid
+graph TD
+    {{module_id}}[{{title}}]
+    {{module_id}} --> dep1[Dependency 1]
+    {{module_id}} --> dep2[Dependency 2]
+    consumer1[Consumer 1] --> {{module_id}}
+    consumer2[Consumer 2] --> {{module_id}}
+```
+
+| Dependency | Purpose |
+|------------|---------|
+| `shared` | Common utilities |
+| `database` | Data persistence |
+
+### Dependents
+
+| Module | How It Uses This Module |
+|--------|------------------------|
+| `consumer-1` | Uses exported service |
+| `consumer-2` | Subscribes to events |
+
+## Public API
+
+### Exports
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `MainService` | class | Primary service |
+| `HelperUtil` | function | Utility function |
+| `SomeType` | type | Type definition |
+
+### Services
+
+| Service | Methods | Description |
+|---------|---------|-------------|
+| `MainService` | `create()`, `update()`, `delete()` | CRUD operations |
+
+### Events
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `item.created` | `{ id, data }` | Emitted on creation |
+| `item.updated` | `{ id, changes }` | Emitted on update |
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `MODULE_ENABLED` | No | true | Enable/disable module |
+| `MODULE_LOG_LEVEL` | No | info | Logging level |
+
+### Config File
+
+```yaml
+# .sidstack/config.yaml
+{{module_id}}:
+  enabled: true
+  options:
+    setting1: value1
+    setting2: value2
+```
+
+## File Structure
+
+```
+{{source_path}}/
+├── index.ts              # Public exports
+├── service.ts            # Main service
+├── types.ts              # Type definitions
+├── utils/                # Utility functions
+│   ├── helper1.ts
+│   └── helper2.ts
+├── handlers/             # Event/request handlers
+│   └── handler.ts
+└── __tests__/            # Tests
+    └── service.test.ts
+```
+
+## Development
+
+### Local Setup
+
+```bash
+# Build the module
+pnpm build --filter={{module_id}}
+
+# Run tests
+pnpm test --filter={{module_id}}
+
+# Watch mode
+pnpm dev --filter={{module_id}}
+```
+
+### Testing
+
+| Test Type | Command | Coverage |
+|-----------|---------|----------|
+| Unit | `pnpm test:unit` | > 80% |
+| Integration | `pnpm test:integration` | Key flows |
+
+## Governance
+
+### Rules
+
+#### Critical
+
+- Rule 1: Always validate input
+- Rule 2: Handle errors gracefully
+
+#### Recommended
+
+- Use TypeScript strict mode
+- Document all public APIs
+
+### Gates
+
+| Gate | Command | Purpose |
+|------|---------|---------|
+| Type Check | `pnpm typecheck` | No type errors |
+| Lint | `pnpm lint` | Code style |
+| Test | `pnpm test` | All tests pass |
+
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | {{date}} | Initial release |
+
+## Related
+
+- [API Documentation](../api/module-endpoints.md)
+- [Business Logic](../business-logic/module-logic.md)
+- [Design Patterns](../patterns/module-patterns.md)

@@ -1,0 +1,143 @@
+---
+title: "{{title}}"
+type: database-table
+module: "{{module}}"
+table: "{{table_name}}"
+database: "{{database_type}}"
+status: draft
+created: "{{date}}"
+updated: "{{date}}"
+tags: [database, {{database_type}}, {{module}}]
+---
+
+# {{title}}
+
+## Overview
+
+Brief description of this database table/collection.
+
+## Table Details
+
+| Property | Value |
+|----------|-------|
+| Table Name | `{{table_name}}` |
+| Database | {{database_type}} |
+| Primary Key | `id` |
+| Created | {{date}} |
+
+## Schema
+
+### Columns
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | UUID | No | gen_random_uuid() | Primary key |
+| `created_at` | TIMESTAMP | No | NOW() | Creation timestamp |
+| `updated_at` | TIMESTAMP | No | NOW() | Last update timestamp |
+| `field1` | VARCHAR(255) | No | - | Description |
+| `field2` | INTEGER | Yes | 0 | Description |
+| `status` | ENUM | No | 'active' | Record status |
+
+### Indexes
+
+| Index Name | Columns | Type | Purpose |
+|------------|---------|------|---------|
+| `pk_{{table_name}}` | `id` | PRIMARY | Primary key lookup |
+| `idx_{{table_name}}_status` | `status` | BTREE | Filter by status |
+| `idx_{{table_name}}_created` | `created_at` | BTREE | Sort by creation |
+
+### Constraints
+
+| Constraint | Type | Columns | Description |
+|------------|------|---------|-------------|
+| `pk_{{table_name}}` | PRIMARY KEY | `id` | Primary key |
+| `fk_{{table_name}}_user` | FOREIGN KEY | `user_id` | References users(id) |
+| `chk_{{table_name}}_status` | CHECK | `status` | Valid status values |
+
+## Relationships
+
+```mermaid
+erDiagram
+    {{table_name}} ||--o{ related_table : has
+    {{table_name}} }o--|| parent_table : belongs_to
+    {{table_name}} {
+        uuid id PK
+        timestamp created_at
+        timestamp updated_at
+        varchar field1
+        int field2
+        enum status
+    }
+```
+
+### References
+
+| Table | Type | Cardinality | On Delete |
+|-------|------|-------------|-----------|
+| `users` | belongs_to | Many-to-One | CASCADE |
+| `items` | has_many | One-to-Many | SET NULL |
+
+## Queries
+
+### Common Queries
+
+#### Find by ID
+
+```sql
+SELECT * FROM {{table_name}} WHERE id = $1;
+```
+
+#### Find Active Records
+
+```sql
+SELECT * FROM {{table_name}}
+WHERE status = 'active'
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2;
+```
+
+#### Count by Status
+
+```sql
+SELECT status, COUNT(*) as count
+FROM {{table_name}}
+GROUP BY status;
+```
+
+### Query Performance
+
+| Query | Est. Time | Index Used |
+|-------|-----------|------------|
+| Find by ID | < 1ms | pk_{{table_name}} |
+| Find Active | < 10ms | idx_{{table_name}}_status |
+
+## Migration History
+
+| Version | Date | Change |
+|---------|------|--------|
+| 001 | {{date}} | Initial creation |
+| 002 | - | Added field2 column |
+| 003 | - | Added status index |
+
+## Data Lifecycle
+
+### Creation
+
+- Created via: API endpoint / Service method
+- Required fields: field1
+- Default values: status = 'active'
+
+### Updates
+
+- Updated via: API endpoint / Service method
+- Triggers: updated_at auto-update
+
+### Deletion
+
+- Strategy: Soft delete (status = 'deleted') / Hard delete
+- Cascade: Related items deleted/nullified
+
+## Related
+
+- [Business Logic](../business-logic/related-feature.md)
+- [API Endpoint](../api/related-endpoint.md)

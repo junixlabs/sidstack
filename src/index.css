@@ -1,0 +1,577 @@
+/* ===== Web Fonts ===== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* ===== Design Tokens ===== */
+/* Simplified monochrome design system - no gradients, minimal colors */
+:root {
+  /* Typography Scale (8px aligned) */
+  --text-2xs: 11px;  /* Increased from 10px for better readability */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-lg: 14px;
+  --text-xl: 16px;
+  --text-2xl: 18px;
+
+  /* Line Heights */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Font Weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Spacing Scale (4px base, 8px grid) */
+  --space-0: 0;
+  --space-px: 1px;
+  --space-half: 2px;
+  --space-1: 4px;
+  --space-1-half: 6px;
+  --space-2: 8px;
+  --space-2-half: 10px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Border Radius - Minimal */
+  --radius-none: 0;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 12px;
+  --radius-full: 9999px;
+
+  /* Glass & Void Tokens */
+  --glass-surface: rgba(18, 18, 18, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
+  --neon-blue: #3b82f6;
+  --neon-cyan: #06b6d4;
+  --neon-amber: #f59e0b;
+  --neon-glow: 0 0 10px rgba(59, 130, 246, 0.5);
+
+  /* Surface Colors - Dark Theme (Neutral gray scale) */
+  --surface-0: #09090b;  /* Deepest background (Void) */
+  --surface-1: #18181b;  /* Primary background */
+  --surface-2: #27272a;  /* Elevated surfaces */
+  --surface-3: #3f3f46;  /* Interactive hover */
+  --surface-4: #52525b;  /* Active/pressed */
+
+  /* Border Colors - Simple gray */
+  --border-default: #333333;
+  --border-muted: #282828;
+  --border-emphasis: #444444;
+
+  /* Text Colors - Simple gray scale */
+  --text-primary: #e0e0e0;
+  --text-secondary: #999999;
+  --text-muted: #777777;  /* Improved contrast: 4.5:1 on surface-1 */
+  --text-placeholder: #555555;
+
+  /* Single accent color - neutral blue */
+  --accent-primary: #5c9fd4;
+  --accent-primary-hover: #4a8bc4;
+
+  /* Semantic Colors - Muted, not neon */
+  --color-success: #5cb85c;
+  --color-warning: #d4a84a;
+  --color-error: #d45c5c;
+  --color-info: #5c9fd4;
+
+  /* Opacity Scale Convention (use Tailwind utilities):
+   * opacity-0   (0%)   - Hidden
+   * opacity-20  (20%)  - Subtle hints (handles, hairlines)
+   * opacity-40  (40%)  - Muted (disabled, inactive icons)
+   * opacity-50  (50%)  - Secondary (hover hints, faded text)
+   * opacity-70  (70%)  - Default (secondary content)
+   * opacity-100 (100%) - Full (primary content, active)
+   * For backgrounds: use /10, /15, /20, /25 suffixes on color values
+   */
+
+  /* Module Group Colors */
+  --group-core: #5c9fd4;
+  --group-core-bg: rgba(92, 159, 212, 0.06);
+  --group-core-border: rgba(92, 159, 212, 0.20);
+  --group-features: #5cb85c;
+  --group-features-bg: rgba(92, 184, 92, 0.06);
+  --group-features-border: rgba(92, 184, 92, 0.20);
+  --group-agents: #d4a84a;
+  --group-agents-bg: rgba(212, 168, 74, 0.06);
+  --group-agents-border: rgba(212, 168, 74, 0.20);
+  --group-ui: #a78bfa;
+  --group-ui-bg: rgba(167, 139, 250, 0.06);
+  --group-ui-border: rgba(167, 139, 250, 0.20);
+
+  /* Task Status Colors */
+  --status-pending: var(--text-muted);
+  --status-in-progress: #60a5fa;      /* blue-400 */
+  --status-completed: #4ade80;        /* green-400 */
+  --status-blocked: #fbbf24;          /* amber-400 */
+  --status-failed: #f87171;           /* red-400 */
+  --status-cancelled: var(--text-muted);
+
+  /* Task Priority Colors */
+  --priority-high: #ef4444;           /* red-500 */
+  --priority-high-bg: rgba(239, 68, 68, 0.2);
+  --priority-medium: #f59e0b;         /* amber-500 */
+  --priority-medium-bg: rgba(245, 158, 11, 0.2);
+  --priority-low: #64748b;            /* slate-500 */
+  --priority-low-bg: rgba(100, 116, 139, 0.2);
+
+  /* Task Type Colors */
+  --task-feature: #3b82f6;            /* blue-500 */
+  --task-feature-bg: rgba(59, 130, 246, 0.2);
+  --task-bugfix: #f43f5e;             /* rose-500 */
+  --task-bugfix-bg: rgba(244, 63, 94, 0.2);
+  --task-refactor: #8b5cf6;           /* violet-500 */
+  --task-refactor-bg: rgba(139, 92, 246, 0.2);
+  --task-test: #10b981;               /* emerald-500 */
+  --task-test-bg: rgba(16, 185, 129, 0.2);
+  --task-docs: #64748b;               /* slate-500 */
+  --task-docs-bg: rgba(100, 116, 139, 0.2);
+  --task-infra: #f97316;              /* orange-500 */
+  --task-infra-bg: rgba(249, 115, 22, 0.2);
+  --task-security: #ec4899;           /* pink-500 */
+  --task-security-bg: rgba(236, 72, 153, 0.2);
+  --task-perf: #06b6d4;               /* cyan-500 */
+  --task-perf-bg: rgba(6, 182, 212, 0.2);
+  --task-debt: #f59e0b;               /* amber-500 */
+  --task-debt-bg: rgba(245, 158, 11, 0.2);
+  --task-spike: #6366f1;              /* indigo-500 */
+  --task-spike-bg: rgba(99, 102, 241, 0.2);
+
+  /* Kanban Column Colors */
+  --kanban-pending: rgba(100, 116, 139, 0.2);
+  --kanban-pending-text: #94a3b8;
+  --kanban-pending-border: rgba(100, 116, 139, 0.3);
+  --kanban-in-progress: rgba(59, 130, 246, 0.2);
+  --kanban-in-progress-text: #93c5fd;
+  --kanban-in-progress-border: rgba(59, 130, 246, 0.3);
+  --kanban-blocked: rgba(245, 158, 11, 0.2);
+  --kanban-blocked-text: #fcd34d;
+  --kanban-blocked-border: rgba(245, 158, 11, 0.3);
+  --kanban-completed: rgba(16, 185, 129, 0.2);
+  --kanban-completed-text: #6ee7b7;
+  --kanban-completed-border: rgba(16, 185, 129, 0.3);
+
+  /* Knowledge Status Colors */
+  --knowledge-draft: var(--text-muted);
+  --knowledge-draft-bg: rgba(148, 163, 184, 0.15);
+  --knowledge-implemented: #4ade80;
+  --knowledge-implemented-bg: rgba(74, 222, 128, 0.15);
+  --knowledge-deprecated: #f87171;
+  --knowledge-deprecated-bg: rgba(248, 113, 113, 0.15);
+
+  /* Knowledge Severity Colors */
+  --knowledge-severity-error: #ef4444;
+  --knowledge-severity-error-bg: rgba(239, 68, 68, 0.15);
+  --knowledge-severity-warning: #fbbf24;
+  --knowledge-severity-warning-bg: rgba(251, 191, 36, 0.15);
+  --knowledge-severity-info: #60a5fa;
+  --knowledge-severity-info-bg: rgba(96, 165, 250, 0.15);
+
+  /* Shadow Tokens - Subtle, no glow */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.35);
+
+  /* Focus Ring - Simple */
+  --focus-ring: 0 0 0 2px var(--accent-primary);
+
+  /* Transition Tokens */
+  --transition-fast: 100ms ease;
+  --transition-normal: 150ms ease;
+  --transition-slow: 200ms ease;
+
+  /* Legacy variable mappings */
+  --color-background: var(--surface-1);
+  --color-surface: var(--surface-2);
+  --color-surface-hover: var(--surface-3);
+  --color-border: var(--border-default);
+  --color-border-muted: var(--border-muted);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent-primary);
+  --color-accent-hover: var(--accent-primary-hover);
+}
+
+/* Light Theme - Neutral gray scale */
+[data-theme="light"] {
+  /* Surface Colors */
+  --surface-0: #ffffff;
+  --surface-1: #f5f5f5;
+  --surface-2: #ffffff;
+  --surface-3: #eeeeee;
+  --surface-4: #e0e0e0;
+
+  /* Border Colors */
+  --border-default: #d5d5d5;
+  --border-muted: #e5e5e5;
+  --border-emphasis: #c0c0c0;
+
+  /* Text Colors */
+  --text-primary: #1a1a1a;
+  --text-secondary: #555555;
+  --text-muted: #666666;  /* Improved contrast for light theme */
+  --text-placeholder: #999999;
+
+  /* Single accent - neutral blue */
+  --accent-primary: #3b82c4;
+  --accent-primary-hover: #2a6da8;
+
+  /* Semantic Colors - Muted */
+  --color-success: #4a9f4a;
+  --color-warning: #c49a3a;
+  --color-error: #c44a4a;
+  --color-info: #3b82c4;
+
+  /* Module Group Colors - Light Theme */
+  --group-core: #3b82c4;
+  --group-core-bg: rgba(59, 130, 196, 0.06);
+  --group-core-border: rgba(59, 130, 196, 0.20);
+  --group-features: #4a9f4a;
+  --group-features-bg: rgba(74, 159, 74, 0.06);
+  --group-features-border: rgba(74, 159, 74, 0.20);
+  --group-agents: #c49a3a;
+  --group-agents-bg: rgba(196, 154, 58, 0.06);
+  --group-agents-border: rgba(196, 154, 58, 0.20);
+  --group-ui: #7c3aed;
+  --group-ui-bg: rgba(124, 58, 237, 0.06);
+  --group-ui-border: rgba(124, 58, 237, 0.20);
+
+  /* Task Status Colors - Light Theme */
+  --status-pending: var(--text-muted);
+  --status-in-progress: #2563eb;      /* blue-600 */
+  --status-completed: #16a34a;        /* green-600 */
+  --status-blocked: #d97706;          /* amber-600 */
+  --status-failed: #dc2626;           /* red-600 */
+  --status-cancelled: var(--text-muted);
+
+  /* Task Priority Colors - Light Theme */
+  --priority-high: #dc2626;           /* red-600 */
+  --priority-high-bg: rgba(220, 38, 38, 0.15);
+  --priority-medium: #d97706;         /* amber-600 */
+  --priority-medium-bg: rgba(217, 119, 6, 0.15);
+  --priority-low: #475569;            /* slate-600 */
+  --priority-low-bg: rgba(71, 85, 105, 0.15);
+
+  /* Task Type Colors - Light Theme */
+  --task-feature: #2563eb;
+  --task-feature-bg: rgba(37, 99, 235, 0.15);
+  --task-bugfix: #e11d48;
+  --task-bugfix-bg: rgba(225, 29, 72, 0.15);
+  --task-refactor: #7c3aed;
+  --task-refactor-bg: rgba(124, 58, 237, 0.15);
+  --task-test: #059669;
+  --task-test-bg: rgba(5, 150, 105, 0.15);
+  --task-docs: #475569;
+  --task-docs-bg: rgba(71, 85, 105, 0.15);
+  --task-infra: #ea580c;
+  --task-infra-bg: rgba(234, 88, 12, 0.15);
+  --task-security: #db2777;
+  --task-security-bg: rgba(219, 39, 119, 0.15);
+  --task-perf: #0891b2;
+  --task-perf-bg: rgba(8, 145, 178, 0.15);
+  --task-debt: #d97706;
+  --task-debt-bg: rgba(217, 119, 6, 0.15);
+  --task-spike: #4f46e5;
+  --task-spike-bg: rgba(79, 70, 229, 0.15);
+
+  /* Kanban Column Colors - Light Theme */
+  --kanban-pending: rgba(71, 85, 105, 0.15);
+  --kanban-pending-text: #475569;
+  --kanban-pending-border: rgba(71, 85, 105, 0.3);
+  --kanban-in-progress: rgba(37, 99, 235, 0.15);
+  --kanban-in-progress-text: #2563eb;
+  --kanban-in-progress-border: rgba(37, 99, 235, 0.3);
+  --kanban-blocked: rgba(217, 119, 6, 0.15);
+  --kanban-blocked-text: #d97706;
+  --kanban-blocked-border: rgba(217, 119, 6, 0.3);
+  --kanban-completed: rgba(5, 150, 105, 0.15);
+  --kanban-completed-text: #059669;
+  --kanban-completed-border: rgba(5, 150, 105, 0.3);
+
+  /* Knowledge Status Colors - Light Theme */
+  --knowledge-draft: var(--text-muted);
+  --knowledge-draft-bg: rgba(71, 85, 105, 0.12);
+  --knowledge-implemented: #16a34a;
+  --knowledge-implemented-bg: rgba(22, 163, 74, 0.12);
+  --knowledge-deprecated: #dc2626;
+  --knowledge-deprecated-bg: rgba(220, 38, 38, 0.12);
+
+  /* Knowledge Severity Colors - Light Theme */
+  --knowledge-severity-error: #dc2626;
+  --knowledge-severity-error-bg: rgba(220, 38, 38, 0.12);
+  --knowledge-severity-warning: #d97706;
+  --knowledge-severity-warning-bg: rgba(217, 119, 6, 0.12);
+  --knowledge-severity-info: #2563eb;
+  --knowledge-severity-info-bg: rgba(37, 99, 235, 0.12);
+
+  /* Shadow Tokens - Subtle */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.1);
+
+  /* Legacy mappings */
+  --color-background: var(--surface-1);
+  --color-surface: var(--surface-2);
+  --color-surface-hover: var(--surface-3);
+  --color-border: var(--border-default);
+  --color-border-muted: var(--border-muted);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent-primary);
+  --color-accent-hover: var(--accent-primary-hover);
+}
+
+/* ===== Base Styles ===== */
+/* NOTE: Do not add unlayered CSS resets here!
+   Tailwind v4 uses CSS Cascade Layers. Unlayered styles ALWAYS override
+   layered Tailwind utilities regardless of specificity.
+   Tailwind's preflight already provides proper resets via @layer base. */
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-size: var(--text-base);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-normal);
+  letter-spacing: -0.011em;
+  background-color: var(--surface-0);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+}
+
+/* ===== Scrollbar Styling ===== */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--surface-4);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ===== Code Styling ===== */
+code,
+pre {
+  font-family: "JetBrains Mono", "Fira Code", "SF Mono", Consolas, monospace;
+}
+
+/* ===== Selection ===== */
+::selection {
+  background-color: rgba(59, 130, 246, 0.3);
+}
+
+/* ===== Focus Visible ===== */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ===== Radix UI Animations ===== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes zoomOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.95); }
+}
+
+@keyframes slideInFromTop {
+  from { transform: translateY(-10px); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slideInFromBottom {
+  from { transform: translateY(10px); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slideInFromLeft {
+  from { transform: translateX(-10px); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideInFromRight {
+  from { transform: translateX(10px); }
+  to { transform: translateX(0); }
+}
+
+.animate-in {
+  animation-duration: 150ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: forwards;
+}
+
+.animate-out {
+  animation-duration: 100ms;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+
+.fade-in-0 { animation-name: fadeIn; }
+.fade-out-0 { animation-name: fadeOut; }
+.zoom-in-95 { animation-name: zoomIn; }
+.zoom-out-95 { animation-name: zoomOut; }
+.slide-in-from-top-2 { animation-name: slideInFromTop; }
+.slide-in-from-bottom-2 { animation-name: slideInFromBottom; }
+.slide-in-from-left-2 { animation-name: slideInFromLeft; }
+.slide-in-from-right-2 { animation-name: slideInFromRight; }
+
+/* ===== Reduced Motion Support ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-in,
+  .animate-out {
+    animation: none !important;
+  }
+
+  .animate-pulse {
+    animation: none !important;
+  }
+}
+
+/* ===== High Contrast Mode Support ===== */
+@media (prefers-contrast: more) {
+  :root {
+    /* Enhanced contrast colors */
+    --text-primary: #ffffff;
+    --text-secondary: #d0d0d0;
+    --text-muted: #a0a0a0;
+    --border-default: #606060;
+    --border-emphasis: #808080;
+    --accent-blue: #4da6ff;
+    --accent-green: #4dff4d;
+    --accent-red: #ff4d4d;
+    --accent-yellow: #ffcc00;
+  }
+
+  [data-theme="light"] {
+    --text-primary: #000000;
+    --text-secondary: #202020;
+    --text-muted: #404040;
+    --border-default: #000000;
+    --border-emphasis: #000000;
+    --accent-blue: #0055cc;
+    --accent-green: #006600;
+    --accent-red: #cc0000;
+    --accent-yellow: #996600;
+  }
+
+  /* Enhance focus visibility */
+  :focus-visible {
+    outline: 3px solid currentColor;
+    outline-offset: 3px;
+  }
+
+  /* Ensure minimum contrast for interactive elements */
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    border: 2px solid currentColor;
+  }
+}
+
+/* ===== Forced Colors Mode (Windows High Contrast) ===== */
+@media (forced-colors: active) {
+  /* Let the browser handle colors in forced colors mode */
+  *,
+  *::before,
+  *::after {
+    forced-color-adjust: auto;
+  }
+
+  /* Ensure focus is visible */
+  :focus-visible {
+    outline: 3px solid CanvasText;
+  }
+}
+
+/* ===== xterm.js Overrides ===== */
+
+/* NOTE: Minimal overrides - let xterm handle its own sizing */
+/* Previously had !important overrides that caused conflicts with TUI apps */
+
+/* Only override scrollbar to match app theme */
+.xterm-viewport {
+  overflow-y: auto;
+}
+
+/* Ensure xterm accessibility textarea stays hidden */
+.xterm-accessibility,
+.xterm-helper-textarea,
+.xterm-accessibility-tree {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 1px !important;
+  width: 1px !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+}

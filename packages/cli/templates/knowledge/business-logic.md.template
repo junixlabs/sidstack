@@ -1,0 +1,78 @@
+---
+title: "{{title}}"
+type: business-logic
+module: "{{module}}"
+status: draft
+created: "{{date}}"
+updated: "{{date}}"
+tags: [business-logic, {{module}}]
+---
+
+# {{title}}
+
+## Overview
+
+Brief description of this business logic component.
+
+## Context
+
+### Problem Statement
+
+What problem does this logic solve?
+
+### Business Rules
+
+List the core business rules:
+
+1. Rule 1: Description
+2. Rule 2: Description
+3. Rule 3: Description
+
+## State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initial
+    Initial --> Processing : trigger_event
+    Processing --> Complete : success
+    Processing --> Failed : error
+    Complete --> [*]
+    Failed --> [*]
+```
+
+## Key Scenarios
+
+### Scenario: Happy Path
+
+- **GIVEN** initial conditions
+- **WHEN** action is performed
+- **THEN** expected outcome
+
+### Scenario: Error Handling
+
+- **GIVEN** edge case conditions
+- **WHEN** error occurs
+- **THEN** graceful degradation
+
+## Implementation Notes
+
+### Location
+
+- File: `{{source_file}}`
+- Function/Class: `{{function_name}}`
+
+### Dependencies
+
+- Depends on: List dependencies
+- Used by: List consumers
+
+### Constraints
+
+- Performance requirements
+- Data validation rules
+- Security considerations
+
+## Related
+
+- [Related Feature](./related-feature.md)
+- [API Documentation](../api/related-endpoint.md)

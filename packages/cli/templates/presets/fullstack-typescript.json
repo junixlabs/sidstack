@@ -1,0 +1,55 @@
+{
+  "name": "fullstack-typescript",
+  "displayName": "Full-Stack TypeScript",
+  "description": "Full-stack TypeScript with React/Next.js frontend and Node.js backend in a monorepo",
+  "language": "typescript",
+  "projectType": "fullstack",
+  "agents": {
+    "worker": {
+      "base": "base/worker",
+      "variant": "typescript/worker",
+      "skills": [
+        "research-first",
+        "code-discovery",
+        "architecture-understanding",
+        "security-awareness"
+      ]
+    },
+    "reviewer": {
+      "base": "base/reviewer",
+      "variant": "typescript/reviewer",
+      "skills": [
+        "research-first",
+        "code-discovery",
+        "test-driven-development"
+      ]
+    }
+  },
+  "skills": {
+    "core": [
+      "research-first",
+      "code-discovery",
+      "architecture-understanding"
+    ],
+    "optional": [
+      "test-driven-development",
+      "documentation-standards",
+      "security-awareness",
+      "performance-optimization"
+    ]
+  },
+  "defaults": {
+    "model": "sonnet",
+    "permissionMode": "bypassPermissions"
+  },
+  "recommended": {
+    "packageManager": "pnpm",
+    "monorepo": "turborepo",
+    "frontend": "next.js",
+    "backend": "fastify",
+    "testRunner": "vitest",
+    "e2eRunner": "playwright",
+    "linter": "eslint",
+    "formatter": "prettier"
+  }
+}

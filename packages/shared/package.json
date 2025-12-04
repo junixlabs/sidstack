@@ -1,0 +1,43 @@
+{
+  "name": "@sidstack/shared",
+  "version": "0.3.0",
+  "description": "Shared types and utilities for SidStack",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./knowledge": {
+      "types": "./dist/knowledge/index.d.ts",
+      "default": "./dist/knowledge/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "js-yaml": "^4.1.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/js-yaml": "^4.0.9",
+    "@vitest/coverage-v8": "^1.4.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.1"
+  }
+}
