@@ -1,0 +1,52 @@
+{
+  "name": "typescript-backend",
+  "displayName": "TypeScript Backend",
+  "description": "Full-stack TypeScript backend development with Node.js, Express/Fastify, and modern tooling",
+  "language": "typescript",
+  "projectType": "backend-api",
+  "agents": {
+    "worker": {
+      "base": "base/worker",
+      "variant": "typescript/worker",
+      "skills": [
+        "research-first",
+        "code-discovery",
+        "architecture-understanding",
+        "security-awareness"
+      ]
+    },
+    "reviewer": {
+      "base": "base/reviewer",
+      "variant": "typescript/reviewer",
+      "skills": [
+        "research-first",
+        "code-discovery",
+        "test-driven-development"
+      ]
+    }
+  },
+  "skills": {
+    "core": [
+      "research-first",
+      "code-discovery",
+      "architecture-understanding"
+    ],
+    "optional": [
+      "test-driven-development",
+      "documentation-standards",
+      "security-awareness",
+      "performance-optimization"
+    ]
+  },
+  "defaults": {
+    "model": "sonnet",
+    "permissionMode": "bypassPermissions"
+  },
+  "recommended": {
+    "packageManager": "pnpm",
+    "testRunner": "vitest",
+    "linter": "eslint",
+    "formatter": "prettier",
+    "buildTool": "tsup"
+  }
+}

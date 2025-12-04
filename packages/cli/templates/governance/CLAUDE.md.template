@@ -1,0 +1,242 @@
+# {projectName} - Claude Code Instructions
+
+## SidStack Governance
+
+This project uses **SidStack** for AI agent governance, task management, and quality enforcement.
+
+**CRITICAL:** You MUST follow these protocols in every session. SidStack MCP tools are available - use them.
+
+---
+
+## Session Start Protocol
+
+**Every session, do these steps FIRST:**
+
+1. **Check tasks:** `task_list({ projectId: "{projectName}" })` - see pending/in-progress work
+2. **Resume or create:** If in-progress task exists, continue it. If user requests implementation, create a task.
+3. **Check training context:** `training_context_get({ projectId: "{projectName}" })` - load applicable lessons/rules
+
+**NEVER start implementation without an active task.**
+
+---
+
+## Task Management (MANDATORY)
+
+### When to CREATE a task
+- User explicitly requests a code change, feature, bugfix, refactor, or deployment
+- User says "implement", "build", "fix", "add", "create", "migrate", "update" (action verbs targeting code)
+- The work involves modifying files in the codebase
+
+### When NOT to create a task
+- Questions, discussions, or exploratory conversations ("what is...", "how does...", "why...")
+- Research or read-only analysis ("check", "show me", "list", "explain")
+- Planning or brainstorming (unless user explicitly says "create a task for this")
+- Reviewing or auditing without changes
+
+### Workflow
+
+| Action | MCP Tool | When |
+|--------|----------|------|
+| List tasks | `task_list` | Session start, before new work |
+| Create task | `task_create` | Before implementation work (not questions/discussions) |
+| Start work | `task_update` (status: `in_progress`) | When beginning implementation |
+| Track progress | `task_update` (progress: 0-100) | During implementation |
+| Complete task | `task_update` (status: `completed`) | After quality gates pass |
+| Break down | `task_breakdown` | For complex tasks (>3 steps) |
+
+### Task Creation Requirements
+Every task MUST have:
+- **Title**: `[TYPE] clear imperative description` (e.g. `[bugfix] Fix login timeout on slow connections`)
+- **Description**: Problem statement, root cause (if known), and solution approach
+- **Acceptance criteria**: At least 1 specific, verifiable criterion
+
+```
+task_create({
+  projectId: "{projectName}",
+  title: "[feature] Clear action description",
+  description: "Problem: ... Solution: ...",
+  taskType: "feature|bugfix|refactor|test|docs|infra",
+  priority: "low|medium|high",
+  acceptanceCriteria: [{ description: "Specific verifiable outcome" }]
+})
+```
+
+---
+
+## Quality Gates (MANDATORY before completing ANY task)
+
+```bash
+pnpm typecheck   # 0 new errors
+pnpm lint        # 0 errors
+pnpm test        # All pass
+```
+
+After quality gates pass, verify runtime:
+- Start the app and test the changed feature
+- Confirm no regressions in related features
+
+**NEVER mark a task completed if quality gates fail.**
+
+---
+
+## Feature Map: When to Use What
+
+| Situation | SidStack Feature | MCP Tool |
+|-----------|-----------------|----------|
+| Starting any work | Task Management | `task_create`, `task_update` |
+| Risky/large change | Impact Analysis | `impact_analyze` |
+| Bug found during work | Training Room | `incident_create` |
+| Bug fix completed | Lesson Detection | `lesson_create` (ask user first) |
+| Reusable pattern found | Skill Creation | `skill_create` (ask user first) |
+| Recurring mistake | Rule Creation | `rule_create` (ask user first) |
+| Need project context | Knowledge API | `knowledge_context`, `knowledge_search` |
+| Parallel work needed | Session Manager | `session_launch` |
+| External ticket intake | Ticket Queue | `ticket_create`, `ticket_list` |
+
+---
+
+## Impact Analysis (for risky changes)
+
+**MUST run impact analysis when:**
+- Modifying core modules
+- Changing database schema
+- Breaking API contracts
+- Touching security-sensitive code
+- Affecting multiple modules
+
+```
+impact_analyze({
+  description: "What you plan to change",
+  taskId: "current-task-id"
+})
+```
+
+Check gate status before proceeding:
+```
+impact_check_gate({ analysisId: "analysis-id" })
+```
+
+Gate statuses:
+- `blocked` - STOP, resolve blockers first
+- `warning` - Proceed with caution
+- `clear` - Safe to proceed
+
+---
+
+## Training Room (Lessons-Learned System)
+
+### Auto-Detection Triggers
+After fixing bugs or solving problems, check these triggers:
+
+| Trigger | Action |
+|---------|--------|
+| Bug took >30min to debug | Ask user: "Create a lesson?" |
+| Type/config mismatch found | Ask user: "Create a checklist?" |
+| Reusable pattern discovered | Ask user: "Document as skill?" |
+| Preventable error occurred | Ask user: "Create a rule?" |
+| Same error happened before | Ask user: "Create enforcement rule?" |
+
+### Training Flow
+```
+incident_create → lesson_create → skill_create → rule_create
+```
+
+### Available Tools
+- `incident_create` - Log what went wrong
+- `lesson_create` - Document what was learned
+- `skill_create` - Create reusable procedure/checklist
+- `rule_create` - Create enforcement rule (must/should/may)
+- `training_context_get` - Get applicable lessons for current work
+- `training_feedback_submit` - Log training effectiveness
+
+**Always ask user before creating lessons/skills/rules.**
+
+---
+
+## Knowledge System
+
+Build and use project knowledge:
+
+| Tool | Purpose |
+|------|---------|
+| `knowledge_list` | Browse all knowledge documents |
+| `knowledge_search` | Search knowledge by query |
+| `knowledge_context` | Build context for task/module |
+| `knowledge_get` | Get specific document |
+| `knowledge_modules` | List modules with stats |
+
+**Before implementing a feature:** Check knowledge for existing patterns and business rules.
+
+---
+
+## Session Management
+
+For parallel work or fresh context:
+
+```
+session_launch({
+  workspacePath: "/path/to/project",
+  taskId: "task-to-work-on",
+  prompt: "Clear instructions for the new session"
+})
+```
+
+Track sessions: `session_list`, `session_get`, `session_stats`
+
+---
+
+## Agent Roles
+
+| Role | Responsibility | When |
+|------|---------------|------|
+| **Orchestrator** | Task breakdown, delegation only | Complex multi-part requests |
+| **Worker** | All implementation work | Features, bugs, design, tests, docs |
+| **Reviewer** | Independent verification | Code review, security audit |
+
+Spawn agents: `/sidstack:agent worker [task]` or `/sidstack:agent reviewer [task]`
+
+---
+
+## Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/sidstack` | Project intelligence hub (dashboard, tasks, tickets, impact, governance, focus, analyze) |
+| `/sidstack:agent worker [task]` | Spawn governed Worker agent |
+| `/sidstack:agent reviewer [task]` | Spawn Reviewer agent |
+| `/sidstack:knowledge` | Knowledge system (build, explore, search, init) |
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `.sidstack/governance.md` | Governance overview |
+| `.sidstack/principles/` | Quality standards (code, testing, security, collaboration) |
+| `.sidstack/skills/capabilities/` | Step-by-step workflow skills |
+| `.sidstack/skills/shared/` | Handoff protocols, lesson detection |
+| `.sidstack/workflows/` | End-to-end process guides |
+| `.sidstack/modules/` | Module graph definitions |
+
+---
+
+## Enforcement Summary
+
+### MUST (Violations = task rejection)
+- Create/check tasks before implementation
+- Run quality gates before completing tasks
+- Run impact analysis for risky changes
+- Follow applicable training rules
+
+### SHOULD (Best practice)
+- Build knowledge context before implementing
+- Log incidents when bugs are found
+- Suggest lessons after complex debugging
+- Use session manager for parallel work
+- Track progress during implementation
+
+### MAY (Optional but encouraged)
+- Create skills for reusable patterns
+- Document design patterns in knowledge
+- Use ticket queue for external requests

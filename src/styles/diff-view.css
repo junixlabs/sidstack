@@ -1,0 +1,192 @@
+/**
+ * Git Diff View Custom Styles
+ *
+ * Custom theme for @git-diff-view/react to match dark mode design.
+ * Override default styles for better integration with Agent Manager UI.
+ */
+
+/* Import base styles from the library */
+@import "@git-diff-view/react/styles/diff-view.css";
+
+/* =============================================================================
+   Dark Theme Overrides
+   ============================================================================= */
+
+/* Container background */
+.diff-view-wrapper {
+  --diff-bg-color: #18181b; /* zinc-900 */
+  --diff-border-color: #3f3f46; /* zinc-700 */
+  --diff-text-color: #e4e4e7; /* zinc-200 */
+  --diff-line-number-color: #71717a; /* zinc-500 */
+}
+
+/* Line additions */
+.diff-view-wrapper .diff-add-line {
+  background-color: rgba(34, 197, 94, 0.15); /* green-500/15 */
+}
+
+.diff-view-wrapper .diff-add-line .diff-code {
+  background-color: rgba(34, 197, 94, 0.1);
+}
+
+.diff-view-wrapper .diff-add-line-number {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #4ade80; /* green-400 */
+}
+
+/* Line deletions */
+.diff-view-wrapper .diff-del-line {
+  background-color: rgba(239, 68, 68, 0.15); /* red-500/15 */
+}
+
+.diff-view-wrapper .diff-del-line .diff-code {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.diff-view-wrapper .diff-del-line-number {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #f87171; /* red-400 */
+}
+
+/* Word-level highlighting */
+.diff-view-wrapper .diff-add-word {
+  background-color: rgba(34, 197, 94, 0.4);
+  border-radius: 2px;
+}
+
+.diff-view-wrapper .diff-del-word {
+  background-color: rgba(239, 68, 68, 0.4);
+  border-radius: 2px;
+}
+
+/* Context lines */
+.diff-view-wrapper .diff-context-line {
+  background-color: transparent;
+}
+
+.diff-view-wrapper .diff-context-line .diff-line-number {
+  color: #52525b; /* zinc-600 */
+}
+
+/* Expand section (collapsed context) */
+.diff-view-wrapper .diff-expand-section {
+  background-color: #27272a; /* zinc-800 */
+  border-color: #3f3f46; /* zinc-700 */
+  color: #a1a1aa; /* zinc-400 */
+}
+
+.diff-view-wrapper .diff-expand-section:hover {
+  background-color: #3f3f46; /* zinc-700 */
+  color: #e4e4e7; /* zinc-200 */
+}
+
+/* Hunk header */
+.diff-view-wrapper .diff-hunk-header {
+  background-color: rgba(59, 130, 246, 0.1); /* blue-500/10 */
+  border-color: #3f3f46; /* zinc-700 */
+  color: #93c5fd; /* blue-300 */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Line numbers gutter */
+.diff-view-wrapper .diff-line-number-content {
+  background-color: #18181b; /* zinc-900 */
+  border-right: 1px solid #27272a; /* zinc-800 */
+}
+
+/* Code content */
+.diff-view-wrapper .diff-code-content {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* Split view separator */
+.diff-view-wrapper .diff-split-line {
+  border-color: #3f3f46; /* zinc-700 */
+}
+
+/* Scrollbar styling */
+.diff-view-wrapper::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.diff-view-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.diff-view-wrapper::-webkit-scrollbar-thumb {
+  background-color: #3f3f46; /* zinc-700 */
+  border-radius: 4px;
+}
+
+.diff-view-wrapper::-webkit-scrollbar-thumb:hover {
+  background-color: #52525b; /* zinc-600 */
+}
+
+/* =============================================================================
+   Custom Additions
+   ============================================================================= */
+
+/* Active hunk highlight */
+.diff-view-wrapper .diff-hunk.active {
+  outline: 1px solid rgba(59, 130, 246, 0.5); /* blue-500/50 */
+  outline-offset: -1px;
+}
+
+/* File header (if using) */
+.diff-file-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #27272a; /* zinc-800 */
+  border-bottom: 1px solid #3f3f46; /* zinc-700 */
+}
+
+.diff-file-header .file-icon {
+  width: 16px;
+  height: 16px;
+  color: #71717a; /* zinc-500 */
+}
+
+.diff-file-header .file-path {
+  font-size: 14px;
+  color: #e4e4e7; /* zinc-200 */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.diff-file-header .file-stats {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.diff-file-header .file-stats .additions {
+  color: #4ade80; /* green-400 */
+}
+
+.diff-file-header .file-stats .deletions {
+  color: #f87171; /* red-400 */
+}
+
+/* Empty state */
+.diff-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #71717a; /* zinc-500 */
+}
+
+.diff-empty-state .icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.diff-empty-state .message {
+  font-size: 14px;
+}
