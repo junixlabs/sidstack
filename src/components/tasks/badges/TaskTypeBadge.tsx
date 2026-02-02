@@ -38,7 +38,7 @@ export function TaskTypeBadge({ taskType, showIcon = false }: TaskTypeBadgeProps
 
   return (
     <span
-      className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium uppercase flex-shrink-0 flex items-center gap-1 border")}
+      className={cn("text-[11px] px-1.5 py-0.5 rounded font-medium uppercase flex-shrink-0 flex items-center gap-1 border")}
       style={{
         backgroundColor: config.bgVar,
         color: config.textVar,

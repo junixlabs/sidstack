@@ -165,6 +165,7 @@ function getBlockTitle(viewType: BlockViewType): string {
     "training-room": "Training Room",
     "task-manager": "Task Manager",
     "worktree-status": "Worktree Status",
+    "worktree-overview": "Worktree Overview",
     "ticket-queue": "Ticket Queue",
     "project-hub": "Project Hub",
   };

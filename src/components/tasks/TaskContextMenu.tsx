@@ -1,6 +1,7 @@
 import {
   Copy,
   ExternalLink,
+  GitBranch,
   History,
   FileCode,
   MoreHorizontal,
@@ -17,6 +18,8 @@ interface TaskContextMenuProps {
   onClose: () => void;
   onViewProgressHistory?: (taskId: string) => void;
   onLaunchSession?: (taskId: string) => void;
+  branches?: string[];
+  onAssignBranch?: (taskId: string, branch: string) => void;
 }
 
 interface MenuItem {
@@ -33,6 +36,8 @@ export function TaskContextMenu({
   onClose,
   onViewProgressHistory,
   onLaunchSession,
+  branches,
+  onAssignBranch,
 }: TaskContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
@@ -92,6 +97,35 @@ export function TaskContextMenu({
       },
     },
   ];
+
+  // Add branch assignment items if branches are available
+  if (branches && branches.length > 0 && onAssignBranch) {
+    menuItems.push(
+      { label: "", icon: null, onClick: () => {}, divider: true },
+    );
+    // Show current branch if assigned
+    if (task.branch) {
+      menuItems.push({
+        label: `Branch: ${task.branch}`,
+        icon: <GitBranch className="w-3.5 h-3.5" />,
+        onClick: () => {},
+        disabled: true,
+      });
+    }
+    // Add available branches
+    for (const branch of branches.slice(0, 5)) {
+      if (branch !== task.branch) {
+        menuItems.push({
+          label: `Assign to ${branch}`,
+          icon: <GitBranch className="w-3.5 h-3.5" />,
+          onClick: () => {
+            onAssignBranch(task.id, branch);
+            onClose();
+          },
+        });
+      }
+    }
+  }
 
   // Actionable items only (skip dividers)
   const actionableItems = menuItems.filter((item) => !item.divider);
@@ -198,7 +232,7 @@ export function TaskContextMenu({
       }}
     >
       {/* Header with task type */}
-      <div className="px-3 py-1.5 text-[10px] uppercase text-[var(--text-muted)] border-b border-[var(--border-muted)]">
+      <div className="px-3 py-1.5 text-[11px] uppercase text-[var(--text-muted)] border-b border-[var(--border-muted)]">
         {task.taskType || "Task"} Actions
       </div>
 

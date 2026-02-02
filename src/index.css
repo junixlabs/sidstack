@@ -99,6 +99,41 @@
    * For backgrounds: use /10, /15, /20, /25 suffixes on color values
    */
 
+  /* Feature Card Colors (GettingStarted modal) */
+  --feature-tasks: #60a5fa;
+  --feature-knowledge: #c084fc;
+  --feature-training: #fbbf24;
+  --feature-impact: #f87171;
+  --feature-tickets: #22d3ee;
+
+  /* Document Type Colors (KnowledgeBrowser) */
+  --doc-type-spec: #8b5cf6;
+  --doc-type-decision: #10b981;
+  --doc-type-proposal: #a855f7;
+  --doc-type-guide: #3b82f6;
+  --doc-type-reference: #6366f1;
+  --doc-type-template: #64748b;
+  --doc-type-checklist: #22c55e;
+  --doc-type-pattern: #ec4899;
+  --doc-type-skill: #f472b6;
+  --doc-type-principle: #f97316;
+  --doc-type-rule: #ef4444;
+  --doc-type-module: #8b5cf6;
+  --doc-type-index: #94a3b8;
+
+  /* Document Status Colors */
+  --doc-status-draft: #64748b;
+  --doc-status-active: #22c55e;
+  --doc-status-review: #f59e0b;
+  --doc-status-archived: #94a3b8;
+
+  /* HTTP Method Colors */
+  --http-get: #22c55e;
+  --http-post: #f59e0b;
+  --http-put: #3b82f6;
+  --http-patch: #8b5cf6;
+  --http-delete: #ef4444;
+
   /* Module Group Colors */
   --group-core: #5c9fd4;
   --group-core-bg: rgba(92, 159, 212, 0.06);
@@ -237,6 +272,41 @@
   --color-warning: #c49a3a;
   --color-error: #c44a4a;
   --color-info: #3b82c4;
+
+  /* Feature Card Colors - Light Theme */
+  --feature-tasks: #2563eb;
+  --feature-knowledge: #7c3aed;
+  --feature-training: #d97706;
+  --feature-impact: #dc2626;
+  --feature-tickets: #0891b2;
+
+  /* Document Type Colors - Light Theme */
+  --doc-type-spec: #7c3aed;
+  --doc-type-decision: #059669;
+  --doc-type-proposal: #7c3aed;
+  --doc-type-guide: #2563eb;
+  --doc-type-reference: #4f46e5;
+  --doc-type-template: #475569;
+  --doc-type-checklist: #16a34a;
+  --doc-type-pattern: #db2777;
+  --doc-type-skill: #db2777;
+  --doc-type-principle: #ea580c;
+  --doc-type-rule: #dc2626;
+  --doc-type-module: #7c3aed;
+  --doc-type-index: #64748b;
+
+  /* Document Status Colors - Light Theme */
+  --doc-status-draft: #475569;
+  --doc-status-active: #16a34a;
+  --doc-status-review: #d97706;
+  --doc-status-archived: #64748b;
+
+  /* HTTP Method Colors - Light Theme */
+  --http-get: #16a34a;
+  --http-post: #d97706;
+  --http-put: #2563eb;
+  --http-patch: #7c3aed;
+  --http-delete: #dc2626;
 
   /* Module Group Colors - Light Theme */
   --group-core: #3b82c4;

@@ -6,26 +6,31 @@
  */
 
 import { create } from "zustand";
+import type {
+  IncidentType,
+  IncidentSeverity,
+  IncidentStatus,
+  LessonStatus,
+  SkillType,
+  SkillStatus,
+  RuleLevel,
+  RuleEnforcement,
+  RuleStatus,
+  FeedbackOutcome,
+} from "@/types/trainingRoom";
 
-// ============================================================================
-// Types
-// ============================================================================
-
-// Types matching database schema
-export type IncidentType = "mistake" | "failure" | "confusion" | "slow" | "other";
-export type IncidentSeverity = "low" | "medium" | "high" | "critical";
-export type IncidentStatus = "open" | "analyzed" | "lesson_created" | "closed";
-
-export type LessonStatus = "draft" | "reviewed" | "approved" | "archived";
-
-export type SkillType = "procedure" | "checklist" | "template" | "rule";
-export type SkillStatus = "draft" | "active" | "deprecated";
-
-export type RuleLevel = "must" | "should" | "may";
-export type RuleEnforcement = "block" | "warn" | "log";
-export type RuleStatus = "draft" | "active" | "deprecated";
-
-export type FeedbackOutcome = "success" | "failure" | "partial" | "skipped";
+export type {
+  IncidentType,
+  IncidentSeverity,
+  IncidentStatus,
+  LessonStatus,
+  SkillType,
+  SkillStatus,
+  RuleLevel,
+  RuleEnforcement,
+  RuleStatus,
+  FeedbackOutcome,
+};
 
 export interface IncidentContext {
   taskId?: string;

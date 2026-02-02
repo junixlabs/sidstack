@@ -4,6 +4,7 @@
 export { KnowledgeBrowserBlockView } from "./KnowledgeBrowserBlockView";
 export { TaskManagerBlockView } from "./TaskManagerBlockView";
 export { WorktreeStatusBlockView } from "./WorktreeStatusBlockView";
+export { WorktreeOverviewBlockView } from "./WorktreeOverviewBlockView";
 export { TicketQueueBlockView } from "./TicketQueueBlockView";
 export { SettingsBlockView } from "./SettingsBlockView";
 export { TrainingRoomBlockView } from "./TrainingRoomBlockView";
@@ -13,6 +14,7 @@ export { default as ProjectHubBlockView } from "./ProjectHubBlockView";
 import "./KnowledgeBrowserBlockView"; // Unified knowledge browser via REST API
 import "./TaskManagerBlockView";
 import "./WorktreeStatusBlockView";
+import "./WorktreeOverviewBlockView";
 import "./TicketQueueBlockView";
 import "./SettingsBlockView";
 import "./TrainingRoomBlockView";

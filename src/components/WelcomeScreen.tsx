@@ -1,9 +1,9 @@
-import { FolderOpen, BookOpen, Map, Clock, Sparkles, Network, FlaskConical } from "lucide-react";
+import { FolderOpen, BookOpen, Map, Clock, Sparkles, Network, FlaskConical, ArrowRight } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 // Import bundled changelog for "What's New" section
-import changelogMd from "@/docs/changelog.md?raw";
+import changelogMd from "../../CHANGELOG.md?raw";
 import { cn } from "@/lib/utils";
 
 import { Logo } from "./Logo";
@@ -16,13 +16,13 @@ interface WelcomeScreenProps {
 // Parse changelog to extract the latest version info
 function parseLatestChanges(changelog: string): { version: string; changes: string[] } {
   const lines = changelog.split("\n");
-  let version = "1.0.0";
+  let version = "0.0.0";
   const changes: string[] = [];
   let inLatestVersion = false;
   let changeCount = 0;
 
   for (const line of lines) {
-    // Find version header like "## [1.0.0] - 2026-01-21"
+    // Find version header like "## [0.4.0] - 2026-02-02"
     const versionMatch = line.match(/^## \[([^\]]+)\]/);
     if (versionMatch) {
       if (inLatestVersion) break; // Stop at next version
@@ -31,16 +31,24 @@ function parseLatestChanges(changelog: string): { version: string; changes: stri
       continue;
     }
 
-    // Collect bullet points from latest version
-    if (inLatestVersion && line.startsWith("- ") && changeCount < 5) {
-      // Clean up markdown formatting
-      const cleanLine = line
-        .replace(/^- \*\*([^*]+)\*\*/, "$1") // Remove bold markers
-        .replace(/^- /, "")
-        .trim();
-      if (cleanLine) {
-        changes.push(cleanLine);
+    if (!inLatestVersion || changeCount >= 5) continue;
+
+    // Collect top-level bullet points: "- **Bold:** description" format
+    if (line.startsWith("- ")) {
+      // Extract "**Title:** description" → "Title: description"
+      const boldMatch = line.match(/^- \*\*([^*]+)\*\*\s*(.*)/);
+      if (boldMatch) {
+        const title = boldMatch[1].replace(/:$/, ""); // Remove trailing colon from title
+        const desc = boldMatch[2].replace(/^:\s*/, "").trim(); // Remove leading colon from desc
+        changes.push(desc ? `${title} - ${desc}` : title);
         changeCount++;
+      } else {
+        // Plain bullet: "- Some text"
+        const cleanLine = line.replace(/^- /, "").trim();
+        if (cleanLine) {
+          changes.push(cleanLine);
+          changeCount++;
+        }
       }
     }
   }
@@ -71,7 +79,7 @@ export function WelcomeScreen({ onOpenProject, onShowDocs }: WelcomeScreenProps)
   const { version, changes } = parseLatestChanges(changelogMd);
 
   return (
-    <div className="h-full flex items-center justify-center bg-[var(--surface-0)]">
+    <div className="h-full w-full flex items-center justify-center bg-[var(--surface-0)]">
       <div className="max-w-2xl w-full px-8 py-12">
         {/* Logo and Title */}
         <div className="text-center mb-10">
@@ -82,8 +90,28 @@ export function WelcomeScreen({ onOpenProject, onShowDocs }: WelcomeScreenProps)
             Welcome to SidStack
           </h1>
           <p className="text-[var(--text-secondary)] text-lg">
-            Lightweight Orchestrator-to-Agents Platform
+            AI-Powered Project Intelligence Platform
           </p>
+        </div>
+
+        {/* How It Works */}
+        <div className="mb-10">
+          <div className="flex items-center justify-center gap-3 text-sm">
+            <div className="text-center px-4">
+              <div className="text-[var(--text-primary)] font-medium">Your Project</div>
+              <div className="text-xs text-[var(--text-muted)]">Knowledge, tasks, rules</div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+            <div className="text-center px-4">
+              <div className="text-[var(--accent-primary)] font-medium">SidStack MCP</div>
+              <div className="text-xs text-[var(--text-muted)]">20 tools for Claude Code</div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+            <div className="text-center px-4">
+              <div className="text-[var(--text-primary)] font-medium">Claude Code</div>
+              <div className="text-xs text-[var(--text-muted)]">Works with full context</div>
+            </div>
+          </div>
         </div>
 
         {/* Features Grid */}
@@ -94,8 +122,8 @@ export function WelcomeScreen({ onOpenProject, onShowDocs }: WelcomeScreenProps)
               className={cn(
                 "p-4 rounded-lg border transition-all duration-200 cursor-default",
                 hoveredFeature === index
-                  ? "bg-[var(--surface-2)] border-[var(--border-default)]"
-                  : "bg-[var(--surface-1)] border-[var(--border-muted)]"
+                  ? "bg-[var(--surface-2)] border-[var(--border-emphasis)]"
+                  : "bg-[var(--surface-1)] border-[var(--border-default)]"
               )}
               onMouseEnter={() => setHoveredFeature(index)}
               onMouseLeave={() => setHoveredFeature(null)}
@@ -133,7 +161,7 @@ export function WelcomeScreen({ onOpenProject, onShowDocs }: WelcomeScreenProps)
         </div>
 
         {/* What's New Section */}
-        <div className="bg-[var(--surface-1)] rounded-lg border border-[var(--border-muted)] p-5">
+        <div className="bg-[var(--surface-1)] rounded-lg border border-[var(--border-default)] p-5">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-4 h-4 text-[var(--accent-primary)]" />
             <h2 className="font-medium text-[var(--text-primary)]">
@@ -144,19 +172,19 @@ export function WelcomeScreen({ onOpenProject, onShowDocs }: WelcomeScreenProps)
             {changes.map((change, index) => (
               <li
                 key={index}
-                className="text-sm text-[var(--text-secondary)] flex items-start gap-2"
+                className="text-sm text-[var(--text-secondary)] flex items-center gap-2"
               >
-                <span className="text-[var(--accent-primary)] mt-1">•</span>
+                <span className="text-[var(--accent-primary)]">•</span>
                 <span>{change}</span>
               </li>
             ))}
           </ul>
           <button
             onClick={onShowDocs}
-            className="mt-4 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors flex items-center gap-1"
+            className="mt-4 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors flex items-center gap-1"
           >
             <Map className="w-3 h-3" />
-            View full roadmap
+            View changelog
           </button>
         </div>
 
@@ -164,7 +192,7 @@ export function WelcomeScreen({ onOpenProject, onShowDocs }: WelcomeScreenProps)
         <div className="mt-8 text-center">
           <p className="text-xs text-[var(--text-muted)] flex items-center justify-center gap-2">
             <Clock className="w-3 h-3" />
-            Press <kbd className="px-1.5 py-0.5 bg-[var(--surface-2)] rounded text-[10px] font-mono">Cmd+O</kbd> to open a project
+            Press <kbd className="px-1.5 py-0.5 bg-[var(--surface-2)] rounded text-[11px] font-mono text-[var(--text-primary)]">Cmd+O</kbd> to open a project
           </p>
         </div>
       </div>

@@ -22,7 +22,7 @@ export function StatusBadge({ status, small = false }: StatusBadgeProps) {
     <span
       className={cn(
         "rounded",
-        small ? "text-[10px] px-1 py-0.5" : "text-xs px-1.5 py-0.5"
+        small ? "text-[11px] px-1 py-0.5" : "text-xs px-1.5 py-0.5"
       )}
       style={{
         backgroundColor: config.bgVar,

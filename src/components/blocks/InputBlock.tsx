@@ -43,7 +43,7 @@ export const InputBlock = memo(function InputBlock({ block }: InputBlockProps) {
 
         {/* Content */}
         <div className="flex-1 min-w-0 pt-0.5">
-          <div className="text-[10px] text-[var(--text-muted)] mb-1 font-medium uppercase tracking-wide">
+          <div className="text-[11px] text-[var(--text-muted)] mb-1 font-medium uppercase tracking-wide">
             You
           </div>
           <div className={cn(

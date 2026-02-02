@@ -207,6 +207,7 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
 
   // Block navigation
   const {
+    navigateToBlockView,
     navigateToSpecsBrowser,
     navigateToKnowledgeBrowser,
   } = useBlockNavigation();
@@ -416,13 +417,7 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
                   {
                     label: "Import from Tickets",
                     onClick: () => {
-                      // Navigate to ticket queue - use keyboard shortcut simulation
-                      const event = new KeyboardEvent("keydown", {
-                        key: "4",
-                        metaKey: true,
-                        bubbles: true,
-                      });
-                      window.dispatchEvent(event);
+                      navigateToBlockView("ticket-queue");
                     },
                     icon: <Inbox className="w-4 h-4" />,
                     variant: "outline",

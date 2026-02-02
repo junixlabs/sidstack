@@ -170,7 +170,7 @@ export function ResumeTeamsDialog({
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-[var(--text-muted)]" />
                         <span className="font-medium">{team.name}</span>
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-[11px]">
                           {team.memberCount} members
                         </Badge>
                         {isResuming && (

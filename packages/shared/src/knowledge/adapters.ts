@@ -181,8 +181,8 @@ export class SidStackAdapter implements KnowledgeAdapter {
       }
     }
 
-    // Default to 'concept' for unknown folders
-    return 'concept';
+    // Default to 'guide' for unknown folders
+    return 'guide';
   }
 }
 

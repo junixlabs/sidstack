@@ -57,7 +57,7 @@ export function KeyboardShortcutsDialog({
         <div className="px-4 py-3 space-y-4 max-h-[60vh] overflow-y-auto">
           {SHORTCUT_GROUPS.map((group) => (
             <div key={group.title}>
-              <h3 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">
+              <h3 className="text-[11px] uppercase tracking-wider text-[var(--text-muted)] mb-2">
                 {group.title}
               </h3>
               <div className="space-y-1.5">

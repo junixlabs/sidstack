@@ -12,7 +12,7 @@ pub struct CrashLog {
 
 fn get_crash_log_path() -> PathBuf {
     let mut path = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
-    path.push("sidstack-agent-manager");
+    path.push("sidstack");
     path.push("crash.log");
     path
 }

@@ -29,6 +29,10 @@ import {
   handleKnowledgeSearch,
   handleKnowledgeContext,
   handleKnowledgeModules,
+  handleKnowledgeCreate,
+  handleKnowledgeUpdate,
+  handleKnowledgeDelete,
+  handleKnowledgeHealth,
 } from './handlers/knowledge.js';
 
 import {
@@ -53,6 +57,10 @@ const MVP_TOOLS = new Set([
   'knowledge_list',
   'knowledge_get',
   'knowledge_modules',
+  'knowledge_create',
+  'knowledge_update',
+  'knowledge_delete',
+  'knowledge_health',
 
   // Tasks (workflow)
   'task_create',
@@ -74,7 +82,13 @@ const MVP_TOOLS = new Set([
 
   // Training (learning)
   'lesson_create',
+  'lesson_list',
   'rule_check',
+  'incident_create',
+  'incident_list',
+  'skill_create',
+  'skill_list',
+  'training_context_get',
 
   // Sessions (role-based launch)
   'session_launch',
@@ -157,10 +171,24 @@ export async function handleToolCall(
         return wrapResult(handleKnowledgeContext(args as any));
       case 'knowledge_modules':
         return wrapResult(handleKnowledgeModules(args as any));
+      case 'knowledge_create':
+        return wrapResult(handleKnowledgeCreate(args as any));
+      case 'knowledge_update':
+        return wrapResult(handleKnowledgeUpdate(args as any));
+      case 'knowledge_delete':
+        return wrapResult(handleKnowledgeDelete(args as any));
+      case 'knowledge_health':
+        return wrapResult(handleKnowledgeHealth(args as any));
 
-      // Training Room tools (subset)
+      // Training Room tools
       case 'lesson_create':
+      case 'lesson_list':
       case 'rule_check':
+      case 'incident_create':
+      case 'incident_list':
+      case 'skill_create':
+      case 'skill_list':
+      case 'training_context_get':
         return wrapResult(handleTrainingRoomTool(name, args as any));
 
       // OKR tools

@@ -10,6 +10,8 @@ export * from './types';
 // Parser utilities
 export {
   parseFrontmatter,
+  serializeFrontmatter,
+  generateDocumentFrontmatter,
   extractTitle,
   extractSummary,
   countWords,

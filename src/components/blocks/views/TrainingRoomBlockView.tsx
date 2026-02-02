@@ -203,8 +203,8 @@ export const TrainingRoomBlockView = memo(function TrainingRoomBlockView(
 
       {/* Error display */}
       {error && (
-        <div className="p-3 bg-red-500/10 border-b border-red-500/20">
-          <div className="flex items-center gap-2 text-sm text-red-400">
+        <div className="p-3 bg-[var(--color-error)]/10 border-b border-[var(--color-error)]/20">
+          <div className="flex items-center gap-2 text-sm text-[var(--color-error)]">
             <AlertTriangle className="w-4 h-4" />
             {error}
             <Button variant="ghost" size="sm" onClick={clearError}>
@@ -230,7 +230,7 @@ export const TrainingRoomBlockView = memo(function TrainingRoomBlockView(
               {tab.icon}
               <span className="text-xs">{tab.label}</span>
               {tab.count !== undefined && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">
+                <Badge variant="secondary" className="text-[11px] px-1.5 py-0 ml-1">
                   {tab.count}
                 </Badge>
               )}
@@ -279,6 +279,7 @@ const IncidentsTab = memo(function IncidentsTab({ moduleId: _moduleId, projectPa
     deleteIncident,
     selectIncident,
     setIncidentStatusFilter,
+    fetchIncidents,
     filters,
   } = useTrainingRoomStore();
 
@@ -296,9 +297,12 @@ const IncidentsTab = memo(function IncidentsTab({ moduleId: _moduleId, projectPa
 
   const handleCreate = async () => {
     if (!formData.title) return;
-    await createIncident(formData);
-    setFormData({ title: "", description: "", type: "mistake", severity: "medium" });
-    setShowForm(false);
+    const result = await createIncident(formData);
+    if (result) {
+      setFormData({ title: "", description: "", type: "mistake", severity: "medium" });
+      setShowForm(false);
+      if (currentSession) fetchIncidents(currentSession.id);
+    }
   };
 
   const statusFilters: { value: IncidentStatus | undefined; label: string }[] = [
@@ -313,7 +317,7 @@ const IncidentsTab = memo(function IncidentsTab({ moduleId: _moduleId, projectPa
     low: "bg-[var(--surface-2)] text-[var(--text-muted)]",
     medium: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
     high: "bg-[var(--color-error)]/15 text-[var(--color-error)]",
-    critical: "bg-red-500/20 text-red-400",
+    critical: "bg-[var(--color-error)]/20 text-[var(--color-error)]",
   };
 
   const statusIcons: Record<string, React.ReactNode> = {
@@ -433,20 +437,24 @@ const IncidentsTab = memo(function IncidentsTab({ moduleId: _moduleId, projectPa
               {incidents.map((incident) => (
                 <div
                   key={incident.id}
+                  role="button"
+                  tabIndex={0}
                   className={cn(
                     "p-3 cursor-pointer hover:bg-muted/50 transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]",
                     selectedIncident?.id === incident.id && "bg-muted/50 border-l-2 border-l-[var(--accent-primary)]"
                   )}
                   onClick={() => selectIncident(incident.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectIncident(incident.id); } }}
                 >
                   <div className="flex items-start gap-2">
                     {statusIcons[incident.status]}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <Badge className={cn("text-[10px] px-1.5 py-0", severityColors[incident.severity])}>
+                        <Badge className={cn("text-[11px] px-1.5 py-0", severityColors[incident.severity])}>
                           {incident.severity}
                         </Badge>
-                        <span className="text-[10px] text-muted-foreground">{incident.type}</span>
+                        <span className="text-[11px] text-muted-foreground">{incident.type}</span>
                       </div>
                       <h4 className="text-sm font-medium mt-1 line-clamp-1">{incident.title}</h4>
                       {incident.description && (
@@ -498,10 +506,13 @@ const IncidentDetailPanel = memo(function IncidentDetailPanel({
 
   const handleCreateLesson = async () => {
     if (!currentSession) return;
+    // Extract root cause from incident context if available
+    const context = incident.context;
+    const rootCause = context?.errorMessage || '';
     await createLesson({
       title: `Lesson from: ${incident.title}`,
       problem: incident.description || incident.title,
-      rootCause: "",
+      rootCause,
       solution: incident.resolution || "",
       incidentIds: [incident.id],
     });
@@ -600,6 +611,7 @@ const LessonsTab = memo(function LessonsTab({ moduleId: _moduleId, projectPath: 
     approveLesson,
     selectLesson,
     setLessonStatusFilter,
+    fetchLessons,
     filters,
   } = useTrainingRoomStore();
 
@@ -617,9 +629,12 @@ const LessonsTab = memo(function LessonsTab({ moduleId: _moduleId, projectPath: 
 
   const handleCreate = async () => {
     if (!formData.title || !formData.problem || !formData.solution) return;
-    await createLesson(formData);
-    setFormData({ title: "", problem: "", rootCause: "", solution: "" });
-    setShowForm(false);
+    const result = await createLesson(formData);
+    if (result) {
+      setFormData({ title: "", problem: "", rootCause: "", solution: "" });
+      setShowForm(false);
+      if (currentSession) fetchLessons(currentSession.id);
+    }
   };
 
   const statusFilters: { value: LessonStatus | undefined; label: string }[] = [
@@ -721,17 +736,21 @@ const LessonsTab = memo(function LessonsTab({ moduleId: _moduleId, projectPath: 
               {lessons.map((lesson) => (
                 <div
                   key={lesson.id}
+                  role="button"
+                  tabIndex={0}
                   className={cn(
                     "p-3 cursor-pointer hover:bg-muted/50 transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]",
                     selectedLesson?.id === lesson.id && "bg-muted/50 border-l-2 border-l-[var(--accent-primary)]"
                   )}
                   onClick={() => selectLesson(lesson.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectLesson(lesson.id); } }}
                 >
                   <div className="flex items-start gap-2">
                     <BookOpen className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <Badge className={cn("text-[10px] px-1.5 py-0", statusColors[lesson.status])}>
+                        <Badge className={cn("text-[11px] px-1.5 py-0", statusColors[lesson.status])}>
                           {lesson.status}
                         </Badge>
                       </div>
@@ -857,7 +876,7 @@ const LessonDetailPanel = memo(function LessonDetailPanel({
 // Skills Tab
 // =============================================================================
 
-const SkillsTab = memo(function SkillsTab({ moduleId: _moduleId, projectPath: _projectPath }: TabProps) {
+const SkillsTab = memo(function SkillsTab({ moduleId, projectPath }: TabProps) {
   const {
     isLoading,
     createSkill,
@@ -866,6 +885,7 @@ const SkillsTab = memo(function SkillsTab({ moduleId: _moduleId, projectPath: _p
     deprecateSkill,
     selectSkill,
     setSkillStatusFilter,
+    fetchSkills,
     filters,
   } = useTrainingRoomStore();
 
@@ -882,9 +902,12 @@ const SkillsTab = memo(function SkillsTab({ moduleId: _moduleId, projectPath: _p
 
   const handleCreate = async () => {
     if (!formData.name || !formData.content) return;
-    await createSkill(formData);
-    setFormData({ name: "", description: "", content: "", type: "procedure" });
-    setShowForm(false);
+    const result = await createSkill(formData);
+    if (result) {
+      setFormData({ name: "", description: "", content: "", type: "procedure" });
+      setShowForm(false);
+      fetchSkills(moduleId, projectPath);
+    }
   };
 
   const statusFilters: { value: SkillStatus | undefined; label: string }[] = [
@@ -988,22 +1011,26 @@ const SkillsTab = memo(function SkillsTab({ moduleId: _moduleId, projectPath: _p
               {skills.map((skill) => (
                 <div
                   key={skill.id}
+                  role="button"
+                  tabIndex={0}
                   className={cn(
                     "p-3 cursor-pointer hover:bg-muted/50 transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]",
                     selectedSkill?.id === skill.id && "bg-muted/50 border-l-2 border-l-[var(--accent-primary)]"
                   )}
                   onClick={() => selectSkill(skill.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectSkill(skill.id); } }}
                 >
                   <div className="flex items-start gap-2">
                     <Sparkles className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <Badge className={cn("text-[10px] px-1.5 py-0", statusColors[skill.status])}>
+                        <Badge className={cn("text-[11px] px-1.5 py-0", statusColors[skill.status])}>
                           {skill.status}
                         </Badge>
-                        <span className="text-[10px] text-muted-foreground">{skill.type}</span>
+                        <span className="text-[11px] text-muted-foreground">{skill.type}</span>
                         {skill.usageCount > 0 && (
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-[11px] text-muted-foreground">
                             {skill.usageCount} uses
                           </span>
                         )}
@@ -1065,7 +1092,7 @@ const SkillDetailPanel = memo(function SkillDetailPanel({
       description: skill.description,
       content: skill.content,
       level: "should",
-      enforcement: "warn",
+      enforcement: "manual",
       skillIds: [skill.id],
     });
   };
@@ -1136,7 +1163,7 @@ const SkillDetailPanel = memo(function SkillDetailPanel({
 // Rules Tab
 // =============================================================================
 
-const RulesTab = memo(function RulesTab({ moduleId: _moduleId, projectPath: _projectPath }: TabProps) {
+const RulesTab = memo(function RulesTab({ moduleId, projectPath }: TabProps) {
   const {
     isLoading,
     createRule,
@@ -1144,6 +1171,7 @@ const RulesTab = memo(function RulesTab({ moduleId: _moduleId, projectPath: _pro
     deprecateRule,
     selectRule,
     setRuleStatusFilter,
+    fetchRules,
     filters,
   } = useTrainingRoomStore();
 
@@ -1156,19 +1184,21 @@ const RulesTab = memo(function RulesTab({ moduleId: _moduleId, projectPath: _pro
     description: "",
     content: "",
     level: "should" as const,
-    enforcement: "warn" as const,
+    enforcement: "manual" as const,
   });
 
   const handleCreate = async () => {
     if (!formData.name || !formData.content) return;
-    await createRule(formData);
-    setFormData({ name: "", description: "", content: "", level: "should", enforcement: "warn" });
-    setShowForm(false);
+    const result = await createRule(formData);
+    if (result) {
+      setFormData({ name: "", description: "", content: "", level: "should", enforcement: "manual" });
+      setShowForm(false);
+      fetchRules(moduleId, projectPath);
+    }
   };
 
   const statusFilters: { value: RuleStatus | undefined; label: string }[] = [
     { value: undefined, label: "All" },
-    { value: "draft", label: "Draft" },
     { value: "active", label: "Active" },
     { value: "deprecated", label: "Deprecated" },
   ];
@@ -1247,9 +1277,9 @@ const RulesTab = memo(function RulesTab({ moduleId: _moduleId, projectPath: _pro
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="block">Block</SelectItem>
-                  <SelectItem value="warn">Warn</SelectItem>
-                  <SelectItem value="log">Log</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="hook">Hook</SelectItem>
+                  <SelectItem value="gate">Gate</SelectItem>
                 </SelectContent>
               </Select>
               <div className="flex-1" />
@@ -1279,20 +1309,24 @@ const RulesTab = memo(function RulesTab({ moduleId: _moduleId, projectPath: _pro
               {rules.map((rule) => (
                 <div
                   key={rule.id}
+                  role="button"
+                  tabIndex={0}
                   className={cn(
                     "p-3 cursor-pointer hover:bg-muted/50 transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]",
                     selectedRule?.id === rule.id && "bg-muted/50 border-l-2 border-l-[var(--accent-primary)]"
                   )}
                   onClick={() => selectRule(rule.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectRule(rule.id); } }}
                 >
                   <div className="flex items-start gap-2">
                     <Scale className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <Badge className={cn("text-[10px] px-1.5 py-0", levelColors[rule.level])}>
+                        <Badge className={cn("text-[11px] px-1.5 py-0", levelColors[rule.level])}>
                           {rule.level.toUpperCase()}
                         </Badge>
-                        <span className="text-[10px] text-muted-foreground">{rule.enforcement}</span>
+                        <span className="text-[11px] text-muted-foreground">{rule.enforcement}</span>
                       </div>
                       <h4 className="text-sm font-medium mt-1 line-clamp-1">{rule.name}</h4>
                       {rule.description && (
@@ -1481,7 +1515,7 @@ const AnalyticsTab = memo(function AnalyticsTab({ moduleId, projectPath }: TabPr
               const count = stats.incidents.bySeverity[severity] || 0;
               const percent = stats.incidents.total > 0 ? (count / stats.incidents.total) * 100 : 0;
               const colors: Record<string, string> = {
-                critical: "bg-red-500",
+                critical: "bg-[var(--color-error)]",
                 high: "bg-[var(--color-error)]",
                 medium: "bg-[var(--color-warning)]",
                 low: "bg-[var(--text-muted)]",

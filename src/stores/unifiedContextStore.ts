@@ -301,10 +301,70 @@ export const useUnifiedContextStore = create<UnifiedContextStore>()(
       // Suggestions (stub for future implementation)
       // =======================================================================
 
-      loadSuggestions: async (_taskId) => {
-        // TODO: Implement suggestion generation algorithm
-        // For now, suggestions are empty
-        set({ suggestions: [] });
+      loadSuggestions: async (taskId) => {
+        const { knowledgeLinks, dismissedPaths } = get();
+
+        try {
+          // Fetch task details to extract keywords
+          const taskRes = await fetch(`http://localhost:19432/api/tasks/${taskId}`);
+          if (!taskRes.ok) {
+            set({ suggestions: [] });
+            return;
+          }
+          const task = await taskRes.json();
+
+          // Extract keywords from task title + description
+          const text = `${task.title || ''} ${task.description || ''}`;
+          const words = text
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, ' ')
+            .split(/\s+/)
+            .filter((w: string) => w.length > 2);
+
+          // Remove common stop words
+          const stopWords = new Set(['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'has', 'have', 'from', 'with', 'this', 'that', 'will', 'been', 'they', 'than', 'its']);
+          const keywords = words.filter((w: string) => !stopWords.has(w)).slice(0, 5);
+
+          if (keywords.length === 0) {
+            set({ suggestions: [] });
+            return;
+          }
+
+          // Search knowledge base using keywords
+          const query = keywords.join(' ');
+          const searchRes = await fetch(
+            `http://localhost:19432/api/knowledge/search?q=${encodeURIComponent(query)}&limit=5&projectPath=${encodeURIComponent(task.projectId || '')}`
+          );
+
+          if (!searchRes.ok) {
+            set({ suggestions: [] });
+            return;
+          }
+
+          const searchData = await searchRes.json();
+          const results = searchData.results || [];
+
+          // Filter out already-linked and dismissed docs
+          const linkedPaths = new Set(knowledgeLinks.filter(l => l.taskId === taskId).map(l => l.knowledgePath));
+          const filtered = results.filter((doc: any) =>
+            !linkedPaths.has(doc.sourcePath || doc.path || '') &&
+            !dismissedPaths.has(doc.sourcePath || doc.path || '')
+          );
+
+          // Convert to suggestions
+          const suggestions: LinkSuggestion[] = filtered.slice(0, 5).map((doc: any, i: number) => ({
+            id: `suggestion-${taskId}-${doc.id || i}`,
+            path: doc.sourcePath || doc.path || doc.id,
+            type: 'knowledge' as const,
+            reason: `Matches keywords: ${keywords.slice(0, 3).join(', ')}`,
+            confidence: Math.max(0.3, 1 - (i * 0.15)),
+          }));
+
+          set({ suggestions });
+        } catch (error) {
+          console.error('Failed to load suggestions:', error);
+          set({ suggestions: [] });
+        }
       },
 
       acceptSuggestion: async (suggestion) => {

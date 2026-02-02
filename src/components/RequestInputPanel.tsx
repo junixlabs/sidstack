@@ -224,7 +224,7 @@ export function RequestInputPanel({
         <span className={cn("text-[14px] font-medium", isDark ? "text-[var(--text-primary)]" : "text-gray-900")}>
           New Request
         </span>
-        <Badge variant="outline" className={cn("text-[10px]", isDark ? "border-[var(--border-default)] text-[var(--text-secondary)]" : "border-gray-300 text-gray-600")}>
+        <Badge variant="outline" className={cn("text-[11px]", isDark ? "border-[var(--border-default)] text-[var(--text-secondary)]" : "border-gray-300 text-gray-600")}>
           O2A
         </Badge>
         <div className="flex-1" />
@@ -311,7 +311,7 @@ export function RequestInputPanel({
               )}
               {submitted ? "Created!" : "Submit Request"}
             </Button>
-            <span className={cn("text-[10px] ml-auto", isDark ? "text-[var(--text-muted)]" : "text-gray-400")}>
+            <span className={cn("text-[11px] ml-auto", isDark ? "text-[var(--text-muted)]" : "text-gray-400")}>
               ⌘+Enter to {preview ? "submit" : "analyze"}
             </span>
           </div>
@@ -358,7 +358,7 @@ export function RequestInputPanel({
                   variant="outline"
                   onClick={handleLaunchAllAgents}
                   disabled={isLaunching || launchedRoles.length === preview.analysis.suggestedRoles.length}
-                  className="text-[10px] h-6"
+                  className="text-[11px] h-6"
                 >
                   <Rocket className="w-3 h-3 mr-1" />
                   Launch All
@@ -383,7 +383,7 @@ export function RequestInputPanel({
                           {role}
                         </span>
                         {subtask && (
-                          <p className={cn("text-[10px] truncate", isDark ? "text-[var(--text-muted)]" : "text-gray-500")}>
+                          <p className={cn("text-[11px] truncate", isDark ? "text-[var(--text-muted)]" : "text-gray-500")}>
                             {subtask.title}
                           </p>
                         )}
@@ -393,7 +393,7 @@ export function RequestInputPanel({
                         variant={isLaunched ? "ghost" : "outline"}
                         onClick={() => handleLaunchAgent(role)}
                         disabled={isLaunching || isLaunched}
-                        className={cn("text-[10px] h-6", isLaunched && "opacity-50")}
+                        className={cn("text-[11px] h-6", isLaunched && "opacity-50")}
                       >
                         {isLaunched ? (
                           <>
@@ -424,7 +424,7 @@ export function RequestInputPanel({
                 New Request
               </Button>
               {launchedRoles.length > 0 && (
-                <span className={cn("text-[10px]", isDark ? "text-[var(--text-muted)]" : "text-gray-400")}>
+                <span className={cn("text-[11px]", isDark ? "text-[var(--text-muted)]" : "text-gray-400")}>
                   {launchedRoles.length} agent(s) launched
                 </span>
               )}
@@ -465,14 +465,14 @@ function TaskBreakdownPreview({ preview, isDark }: TaskBreakdownPreviewProps) {
     <div className="space-y-4">
       {/* Analysis Summary */}
       <div className="flex flex-wrap gap-2">
-        <Badge variant="outline" className={cn("text-[10px]", priorityColors[breakdown.parentTask.priority])}>
+        <Badge variant="outline" className={cn("text-[11px]", priorityColors[breakdown.parentTask.priority])}>
           {breakdown.parentTask.priority} priority
         </Badge>
-        <Badge variant="outline" className={cn("text-[10px]", isDark ? "border-[var(--border-default)] text-[var(--text-muted)]" : "border-gray-300 text-gray-500")}>
+        <Badge variant="outline" className={cn("text-[11px]", isDark ? "border-[var(--border-default)] text-[var(--text-muted)]" : "border-gray-300 text-gray-500")}>
           Intent: {analysis.intent}
         </Badge>
         {analysis.affectedAreas.map((area) => (
-          <Badge key={area} variant="outline" className={cn("text-[10px]", roleColors[area] || roleColors.default)}>
+          <Badge key={area} variant="outline" className={cn("text-[11px]", roleColors[area] || roleColors.default)}>
             {area}
           </Badge>
         ))}
@@ -508,7 +508,7 @@ function TaskBreakdownPreview({ preview, isDark }: TaskBreakdownPreviewProps) {
               <span className={cn("text-[12px] flex-1", isDark ? "text-[var(--text-primary)]" : "text-gray-900")}>
                 {subtask.title}
               </span>
-              <Badge className={cn("text-[10px] px-1.5", roleColors[subtask.suggestedRole] || roleColors.default)}>
+              <Badge className={cn("text-[11px] px-1.5", roleColors[subtask.suggestedRole] || roleColors.default)}>
                 <User className="w-2.5 h-2.5 mr-0.5" />
                 {subtask.suggestedRole}
               </Badge>
@@ -523,7 +523,7 @@ function TaskBreakdownPreview({ preview, isDark }: TaskBreakdownPreviewProps) {
           Will delegate to:
         </span>
         {analysis.suggestedRoles.map((role) => (
-          <Badge key={role} variant="outline" className={cn("text-[10px]", roleColors[role] || roleColors.default)}>
+          <Badge key={role} variant="outline" className={cn("text-[11px]", roleColors[role] || roleColors.default)}>
             {role}
           </Badge>
         ))}

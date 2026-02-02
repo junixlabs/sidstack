@@ -1,5 +1,66 @@
 # Changelog
 
+## [0.4.0] - 2026-02-02
+
+### Added
+- **Ticket → Delivery Flow:** Complete end-to-end pipeline from ticket intake to task completion
+  - Auto-complete linked ticket when task is completed (MCP + API)
+  - Ticket-to-task conversion with type mapping (bug→bugfix, feature→feature, etc.)
+  - Full E2E integration test covering the entire ticket lifecycle
+- **Knowledge System Enhancements:**
+  - Knowledge API routes (list, search, get, modules, context)
+  - Improved knowledge parser with better frontmatter handling
+  - Knowledge service with enhanced search and context building
+  - New knowledge adapter types and exports
+- **Worktree Management:**
+  - Enhanced WorktreeStatusBlockView with overview mode
+  - WorktreeOverviewBlockView component
+  - Git worktree commands in Tauri backend
+  - Improved worktree list UI with tooltips and context menus
+- **UI/UX Improvements:**
+  - CreateTaskDialog component for Project Hub
+  - Improved dialog component with better accessibility
+  - Enhanced block navigation with useBlockNavigation hook
+  - Better empty states and badge components
+  - Improved onboarding modal and progress tracking
+  - Settings panel enhancements
+- **CLI Improvements:**
+  - Refactored init command with modular prompts, verification, and prerequisites
+  - Improved doctor command diagnostics
+  - Enhanced update command
+- **Testing:**
+  - Ticket handler smoke tests (11 tests) for MCP server
+  - Ticket integration tests (14 tests) for API server
+  - Entity reference smoke tests
+- **VS Code Extension:** Initial extension scaffold
+- **Training Room:** Enhanced training room handlers with feedback support
+- **OKR System:** Added Happy Flow objectives (Ticket→Delivery, OKRs→Delivery)
+
+### Fixed
+- API server: feature/bugfix/security tasks now correctly reject when missing acceptance criteria
+- Task create/update: added `branch` field support for git branch tracking
+- Session context builder: improved context injection and role-based filtering
+- Knowledge store: better error handling and state management
+- Unified context store: improved suggestion and linked content handling
+
+### Changed
+- Bumped Tauri app version
+- Improved CLAUDE.md governance instructions
+- Enhanced npm publish workflow
+- Updated task and ticket stores with better type safety
+
+## [0.3.2] - 2026-02-02
+
+### Fixed
+- Regenerate oclif manifest with correct version 0.3.2 (was generated at 0.3.0 before version bump, causing version mismatch warning when running via npx)
+
+## [0.3.1] - 2026-02-02
+
+### Changed
+- Bump all packages to v0.3.1 for npm publish
+- Add oclif manifest to CLI package
+- Update shared package dependencies
+
 ## [0.3.0] - Initial Public Release - 2026-02-02
 
 ### Added

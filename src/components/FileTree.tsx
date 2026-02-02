@@ -495,7 +495,7 @@ function FileTreeNodeComponent({
 
             {/* Status indicator */}
             {node.status && (
-              <span className={clsx("text-[10px] flex-shrink-0", statusColor)}>
+              <span className={clsx("text-[11px] flex-shrink-0", statusColor)}>
                 {node.status === "added" && "A"}
                 {node.status === "modified" && "M"}
                 {node.status === "deleted" && "D"}

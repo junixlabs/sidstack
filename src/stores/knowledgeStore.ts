@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 
 import {
@@ -6,7 +5,6 @@ import {
   KnowledgeTreeNode,
   KnowledgeDocumentType,
   KnowledgeStatus,
-  parseFrontmatter,
   extractCodeRefs,
 } from "@/types/knowledge";
 
@@ -14,8 +12,10 @@ import {
  * Knowledge Browser Store
  *
  * Manages knowledge documents for project documentation.
- * Reads from <project>/.sidstack/knowledge/ folder.
+ * Uses REST API (api-server) instead of Tauri IPC for data loading.
  */
+
+const API_BASE = "http://localhost:19432/api/knowledge";
 
 // ============================================================================
 // Types
@@ -164,9 +164,26 @@ function getAllFolderPaths(nodes: KnowledgeTreeNode[]): string[] {
   return paths;
 }
 
-// ============================================================================
-// Store Implementation
-// ============================================================================
+/**
+ * Convert REST API document to legacy KnowledgeDocument format
+ */
+function apiDocToLegacy(apiDoc: any): KnowledgeDocument {
+  return {
+    path: apiDoc.sourcePath || apiDoc.path || apiDoc.id,
+    absolutePath: apiDoc.absolutePath || "",
+    frontmatter: {
+      id: apiDoc.id,
+      type: apiDoc.type as KnowledgeDocumentType,
+      title: apiDoc.title,
+      module: apiDoc.module,
+      status: apiDoc.status as KnowledgeStatus,
+      tags: apiDoc.tags,
+      related: apiDoc.related,
+    },
+    content: apiDoc.content || "",
+    codeRefs: apiDoc.content ? extractCodeRefs(apiDoc.content) : [],
+  };
+}
 
 // ============================================================================
 // Selectors (per Design Guidelines - avoid store destructuring)
@@ -228,14 +245,16 @@ export const useKnowledgeStore = create<KnowledgeStore>()((set, get) => ({
   // ==========================================================================
 
   initialize: async (projectPath: string) => {
-    const knowledgePath = `${projectPath}/.sidstack/knowledge`;
     set({ isLoading: true, error: null, projectPath });
 
     try {
-      // Check if knowledge folder exists
-      const exists = await invoke<boolean>("path_exists", { path: knowledgePath });
+      // Check if knowledge documents exist via REST API
+      const res = await fetch(
+        `${API_BASE}?projectPath=${encodeURIComponent(projectPath)}&limit=1`
+      );
 
-      if (exists) {
+      if (res.ok) {
+        const knowledgePath = `${projectPath}/.sidstack/knowledge`;
         set({ basePath: knowledgePath, isInitialized: true });
         await get().loadDocuments();
         return true;
@@ -260,9 +279,6 @@ export const useKnowledgeStore = create<KnowledgeStore>()((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      // Copy templates to project
-      await invoke("init_knowledge_folder", { projectPath });
-
       const knowledgePath = `${projectPath}/.sidstack/knowledge`;
       set({
         basePath: knowledgePath,
@@ -282,42 +298,31 @@ export const useKnowledgeStore = create<KnowledgeStore>()((set, get) => ({
   },
 
   // ==========================================================================
-  // Document Loading
+  // Document Loading (via REST API)
   // ==========================================================================
 
   loadDocuments: async () => {
-    const { basePath } = get();
-    if (!basePath) return;
+    const { projectPath } = get();
+    if (!projectPath) return;
 
     set({ isLoading: true, error: null });
 
     try {
-      // Get all markdown files in knowledge folder
-      const files = await invoke<string[]>("list_markdown_files", { path: basePath });
+      const res = await fetch(
+        `${API_BASE}?projectPath=${encodeURIComponent(projectPath)}&limit=500`
+      );
+
+      if (!res.ok) {
+        throw new Error(`Failed to load documents: ${res.status}`);
+      }
+
+      const data = await res.json();
+      const apiDocs = data.documents || [];
 
       const documents = new Map<string, KnowledgeDocument>();
-
-      for (const filePath of files) {
-        try {
-          const content = await invoke<string>("read_file", { path: filePath });
-          const relativePath = filePath.replace(basePath + "/", "");
-          const { frontmatter, body } = parseFrontmatter(content);
-
-          const doc: KnowledgeDocument = {
-            path: relativePath,
-            absolutePath: filePath,
-            frontmatter: frontmatter || {
-              id: relativePath.replace(/\.md$/, "").replace(/\//g, "-"),
-              type: "index" as KnowledgeDocumentType,
-            },
-            content: body,
-            codeRefs: extractCodeRefs(body),
-          };
-
-          documents.set(relativePath, doc);
-        } catch (err) {
-          console.warn(`Failed to load ${filePath}:`, err);
-        }
+      for (const apiDoc of apiDocs) {
+        const doc = apiDocToLegacy(apiDoc);
+        documents.set(doc.path, doc);
       }
 
       const tree = buildTree(documents);
@@ -351,25 +356,23 @@ export const useKnowledgeStore = create<KnowledgeStore>()((set, get) => ({
   },
 
   refreshDocument: async (path: string) => {
-    const { basePath, documents } = get();
-    if (!basePath) return;
-
-    const absolutePath = `${basePath}/${path}`;
+    const { projectPath, documents } = get();
+    if (!projectPath) return;
 
     try {
-      const content = await invoke<string>("read_file", { path: absolutePath });
-      const { frontmatter, body } = parseFrontmatter(content);
+      // Extract doc ID from path
+      const docId = path.replace(/\.md$/, "").replace(/\//g, "-");
 
-      const doc: KnowledgeDocument = {
-        path,
-        absolutePath,
-        frontmatter: frontmatter || {
-          id: path.replace(/\.md$/, "").replace(/\//g, "-"),
-          type: "index" as KnowledgeDocumentType,
-        },
-        content: body,
-        codeRefs: extractCodeRefs(body),
-      };
+      const res = await fetch(
+        `${API_BASE}/doc/${encodeURIComponent(docId)}?projectPath=${encodeURIComponent(projectPath)}`
+      );
+
+      if (!res.ok) {
+        throw new Error(`Failed to refresh document: ${res.status}`);
+      }
+
+      const apiDoc = await res.json();
+      const doc = apiDocToLegacy(apiDoc);
 
       const newDocuments = new Map(documents);
       newDocuments.set(path, doc);

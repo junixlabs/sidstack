@@ -270,7 +270,7 @@ export const BlockFrame = memo(function BlockFrame({
               </TooltipTrigger>
               <TooltipContent side="bottom" className="bg-[var(--surface-1)] border-[var(--border-muted)]">
                 <span className="text-[var(--text-primary)]">Focus</span>
-                <kbd className="ml-2 px-1.5 py-0.5 bg-[var(--surface-2)] rounded text-[10px] text-[var(--text-secondary)]">
+                <kbd className="ml-2 px-1.5 py-0.5 bg-[var(--surface-2)] rounded text-[11px] text-[var(--text-secondary)]">
                   ⌘{blockIndex}
                 </kbd>
               </TooltipContent>
@@ -333,7 +333,7 @@ export const BlockFrame = memo(function BlockFrame({
               </TooltipTrigger>
               <TooltipContent side="bottom" className="bg-[var(--surface-1)] border-[var(--border-muted)]">
                 <span className="text-[var(--text-primary)]">{isMaximized ? "Restore" : "Maximize"}</span>
-                <kbd className="ml-2 px-1.5 py-0.5 bg-[var(--surface-2)] rounded text-[10px] text-[var(--text-secondary)]">[⌘Enter]</kbd>
+                <kbd className="ml-2 px-1.5 py-0.5 bg-[var(--surface-2)] rounded text-[11px] text-[var(--text-secondary)]">[⌘Enter]</kbd>
               </TooltipContent>
             </Tooltip>
 
@@ -354,7 +354,7 @@ export const BlockFrame = memo(function BlockFrame({
               </TooltipTrigger>
               <TooltipContent side="bottom" className="bg-[var(--surface-1)] border-[var(--border-muted)]">
                 <span className="text-[var(--text-primary)]">Close</span>
-                <kbd className="ml-2 px-1.5 py-0.5 bg-[var(--surface-2)] rounded text-[10px] text-[var(--text-secondary)]">[⌘W]</kbd>
+                <kbd className="ml-2 px-1.5 py-0.5 bg-[var(--surface-2)] rounded text-[11px] text-[var(--text-secondary)]">[⌘W]</kbd>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -375,14 +375,14 @@ export const BlockFrame = memo(function BlockFrame({
           <ContextMenuItem onClick={onSplitHorizontal} className="text-[var(--text-primary)] focus:bg-[var(--surface-2)] focus:text-[var(--text-primary)]">
             <SplitSquareHorizontal className="w-4 h-4 mr-2" />
             <span className="flex-1">Split Right</span>
-            <kbd className="ml-auto text-[10px] text-[var(--text-muted)]">[⌘\]</kbd>
+            <kbd className="ml-auto text-[11px] text-[var(--text-muted)]">[⌘\]</kbd>
           </ContextMenuItem>
         )}
         {onSplitVertical && (
           <ContextMenuItem onClick={onSplitVertical} className="text-[var(--text-primary)] focus:bg-[var(--surface-2)] focus:text-[var(--text-primary)]">
             <SplitSquareVertical className="w-4 h-4 mr-2" />
             <span className="flex-1">Split Down</span>
-            <kbd className="ml-auto text-[10px] text-[var(--text-muted)]">[⌘⇧\]</kbd>
+            <kbd className="ml-auto text-[11px] text-[var(--text-muted)]">[⌘⇧\]</kbd>
           </ContextMenuItem>
         )}
         {(onSplitHorizontal || onSplitVertical) && onDuplicate && (
@@ -409,12 +409,12 @@ export const BlockFrame = memo(function BlockFrame({
               <span className="flex-1">Maximize</span>
             </>
           )}
-          <kbd className="ml-auto text-[10px] text-[var(--text-muted)]">[⌘Enter]</kbd>
+          <kbd className="ml-auto text-[11px] text-[var(--text-muted)]">[⌘Enter]</kbd>
         </ContextMenuItem>
         <ContextMenuItem onClick={handleClose} className="text-[var(--text-secondary)] focus:bg-[var(--surface-2)] focus:text-[var(--text-secondary)]">
           <X className="w-4 h-4 mr-2" />
           <span className="flex-1">Close</span>
-          <kbd className="ml-auto text-[10px] text-[var(--text-muted)]">[⌘W]</kbd>
+          <kbd className="ml-auto text-[11px] text-[var(--text-muted)]">[⌘W]</kbd>
         </ContextMenuItem>
       </ContextMenuContent>
       </ContextMenu>

@@ -20,7 +20,7 @@ export function PriorityBadge({ priority, showLow = false }: PriorityBadgeProps)
 
   return (
     <span
-      className={cn("text-[10px] px-1 py-0.5 rounded font-medium flex-shrink-0")}
+      className={cn("text-[11px] px-1 py-0.5 rounded font-medium flex-shrink-0")}
       style={{ backgroundColor: config.bgVar, color: config.textVar }}
     >
       {config.label}

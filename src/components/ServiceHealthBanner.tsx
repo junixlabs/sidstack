@@ -154,7 +154,7 @@ export function ServiceHealthBanner({ className }: ServiceHealthBannerProps) {
                 <span className="font-medium">{service.name}</span>
                 <span className="text-[var(--text-muted)] ml-2">— {service.description}</span>
               </div>
-              <code className="text-[10px] text-[var(--text-secondary)] font-mono">
+              <code className="text-[11px] text-[var(--text-secondary)] font-mono">
                 {service.url.replace("http://", "").replace("ws://", "")}
               </code>
             </div>
@@ -178,7 +178,7 @@ export function ServiceHealthBanner({ className }: ServiceHealthBannerProps) {
 
         {/* Last check time */}
         {lastCheck && (
-          <div className="mt-1.5 text-[10px] text-[var(--text-muted)]">
+          <div className="mt-1.5 text-[11px] text-[var(--text-muted)]">
             Last checked: {lastCheck.toLocaleTimeString()}
           </div>
         )}

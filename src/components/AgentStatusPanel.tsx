@@ -89,7 +89,7 @@ const AgentCard = memo(function AgentCard({
             {agent.id}
           </span>
           {isOrchestrator && (
-            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--surface-3)] text-[var(--text-secondary)] rounded">
+            <span className="px-1.5 py-0.5 text-[11px] font-medium bg-[var(--surface-3)] text-[var(--text-secondary)] rounded">
               Orchestrator
             </span>
           )}
@@ -102,7 +102,7 @@ const AgentCard = memo(function AgentCard({
       {/* Role badge */}
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[11px] text-[var(--text-muted)]">Role:</span>
-        <span className="px-1.5 py-0.5 text-[10px] bg-[var(--surface-3)] text-[var(--text-secondary)] rounded capitalize">
+        <span className="px-1.5 py-0.5 text-[11px] bg-[var(--surface-3)] text-[var(--text-secondary)] rounded capitalize">
           {agent.role}
         </span>
         <span className="text-[11px] text-[var(--text-muted)] ml-auto">
@@ -113,7 +113,7 @@ const AgentCard = memo(function AgentCard({
       {/* Progress bar (if working) */}
       {agent.status === "working" && (
         <div className="mb-2">
-          <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] mb-1">
+          <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-1">
             <span>{agent.current_task || "Working..."}</span>
             <span>{agent.progress}%</span>
           </div>
@@ -134,7 +134,7 @@ const AgentCard = memo(function AgentCard({
       )}
 
       {/* Last activity */}
-      <div className="text-[10px] text-[var(--text-muted)] mt-1">
+      <div className="text-[11px] text-[var(--text-muted)] mt-1">
         Last active: {formatTimeAgo(agent.last_activity)}
       </div>
     </div>
@@ -162,19 +162,19 @@ function SummaryStats({
     <div className="grid grid-cols-4 gap-2 mb-4">
       <div className="p-2 rounded bg-[var(--surface-2)] text-center">
         <div className="text-lg font-bold text-[var(--text-primary)]">{totalAgents}</div>
-        <div className="text-[10px] text-[var(--text-muted)]">Total</div>
+        <div className="text-[11px] text-[var(--text-muted)]">Total</div>
       </div>
       <div className="p-2 rounded bg-[var(--surface-2)] text-center">
         <div className="text-lg font-bold text-[var(--text-secondary)]">{workingCount}</div>
-        <div className="text-[10px] text-[var(--text-muted)]">Working</div>
+        <div className="text-[11px] text-[var(--text-muted)]">Working</div>
       </div>
       <div className="p-2 rounded bg-[var(--surface-2)] text-center">
         <div className="text-lg font-bold text-[var(--text-secondary)]">{blockedCount}</div>
-        <div className="text-[10px] text-[var(--text-muted)]">Blocked</div>
+        <div className="text-[11px] text-[var(--text-muted)]">Blocked</div>
       </div>
       <div className="p-2 rounded bg-[var(--surface-2)] text-center">
         <div className="text-lg font-bold text-[var(--text-secondary)]">{unhealthyCount}</div>
-        <div className="text-[10px] text-[var(--text-muted)]">Unhealthy</div>
+        <div className="text-[11px] text-[var(--text-muted)]">Unhealthy</div>
       </div>
     </div>
   );

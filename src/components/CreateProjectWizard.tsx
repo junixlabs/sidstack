@@ -321,7 +321,7 @@ export function CreateProjectWizard({
                           <Badge
                             key={tag}
                             variant="secondary"
-                            className="text-[10px] px-1.5 py-0"
+                            className="text-[11px] px-1.5 py-0"
                           >
                             {tag}
                           </Badge>

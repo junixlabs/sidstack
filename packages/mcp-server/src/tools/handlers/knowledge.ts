@@ -15,8 +15,11 @@
 import {
   createKnowledgeService,
   type DocumentType,
+  type DocumentStatus,
+  type CreateDocumentInput,
+  type UpdateDocumentInput,
 } from '@sidstack/shared';
-import { buildSessionContext, type ContextBuilderOptions } from '@sidstack/shared';
+import { buildSessionContext, createSessionContextOptions } from '@sidstack/shared';
 import { SidStackDB, getDB } from '@sidstack/shared';
 
 // =============================================================================
@@ -65,7 +68,7 @@ export const knowledgeTools = [
           type: 'array',
           items: {
             type: 'string',
-            enum: ['index', 'business-logic', 'api-endpoint', 'design-pattern', 'database-table', 'module', 'governance', 'spec', 'decision', 'proposal', 'guide', 'skill', 'principle', 'rule', 'tutorial', 'reference', 'explanation', 'concept', 'template', 'checklist', 'pattern'],
+            enum: ['index', 'business-logic', 'api-endpoint', 'design-pattern', 'database-table', 'module', 'governance', 'spec', 'decision', 'proposal', 'guide', 'skill', 'principle', 'rule', 'reference', 'template', 'checklist', 'pattern'],
           },
           description: 'Filter by document type(s)',
         },
@@ -126,7 +129,7 @@ export const knowledgeTools = [
           type: 'array',
           items: {
             type: 'string',
-            enum: ['index', 'business-logic', 'api-endpoint', 'design-pattern', 'database-table', 'module', 'governance', 'spec', 'decision', 'proposal', 'guide', 'skill', 'principle', 'rule', 'tutorial', 'reference', 'explanation', 'concept', 'template', 'checklist', 'pattern'],
+            enum: ['index', 'business-logic', 'api-endpoint', 'design-pattern', 'database-table', 'module', 'governance', 'spec', 'decision', 'proposal', 'guide', 'skill', 'principle', 'rule', 'reference', 'template', 'checklist', 'pattern'],
           },
           description: 'Filter by document type(s)',
         },
@@ -183,6 +186,164 @@ export const knowledgeTools = [
         projectPath: {
           type: 'string',
           description: 'Path to the project directory',
+        },
+      },
+      required: ['projectPath'],
+    },
+  },
+  {
+    name: 'knowledge_create',
+    description: 'Create a new knowledge document. Writes a markdown file with YAML frontmatter to .sidstack/knowledge/.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: {
+          type: 'string',
+          description: 'Path to the project directory',
+        },
+        title: {
+          type: 'string',
+          description: 'Document title',
+        },
+        type: {
+          type: 'string',
+          enum: ['spec', 'decision', 'proposal', 'guide', 'reference', 'template', 'checklist', 'pattern', 'skill', 'principle', 'rule', 'module', 'index'],
+          description: 'Document type',
+        },
+        content: {
+          type: 'string',
+          description: 'Document content (markdown)',
+        },
+        module: {
+          type: 'string',
+          description: 'Module ID to link to',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for the document',
+        },
+        status: {
+          type: 'string',
+          enum: ['draft', 'active', 'review', 'archived'],
+          description: 'Document status (default: draft)',
+        },
+        owner: {
+          type: 'string',
+          description: 'Document owner',
+        },
+        category: {
+          type: 'string',
+          description: 'Subfolder under knowledge/ (overrides type-based default)',
+        },
+        related: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Related document IDs',
+        },
+        dependsOn: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Dependency document IDs',
+        },
+      },
+      required: ['projectPath', 'title', 'type', 'content'],
+    },
+  },
+  {
+    name: 'knowledge_update',
+    description: 'Update an existing knowledge document. Merges updates into frontmatter and optionally replaces content.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: {
+          type: 'string',
+          description: 'Path to the project directory',
+        },
+        docId: {
+          type: 'string',
+          description: 'Document ID to update',
+        },
+        title: {
+          type: 'string',
+          description: 'New title',
+        },
+        content: {
+          type: 'string',
+          description: 'New content (markdown)',
+        },
+        status: {
+          type: 'string',
+          enum: ['draft', 'active', 'review', 'archived'],
+          description: 'New status',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'New tags',
+        },
+        module: {
+          type: 'string',
+          description: 'New module ID',
+        },
+        owner: {
+          type: 'string',
+          description: 'New owner',
+        },
+        related: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'New related document IDs',
+        },
+        dependsOn: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'New dependency document IDs',
+        },
+      },
+      required: ['projectPath', 'docId'],
+    },
+  },
+  {
+    name: 'knowledge_delete',
+    description: 'Delete (archive) a knowledge document. By default moves to .sidstack/.archive/.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: {
+          type: 'string',
+          description: 'Path to the project directory',
+        },
+        docId: {
+          type: 'string',
+          description: 'Document ID to delete',
+        },
+        archive: {
+          type: 'boolean',
+          description: 'If true (default), move to archive instead of permanent delete',
+          default: true,
+        },
+      },
+      required: ['projectPath', 'docId'],
+    },
+  },
+  {
+    name: 'knowledge_health',
+    description: 'Run health checks on the knowledge base. Detects stale docs, missing metadata, broken links, orphaned docs, and overdue reviews.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: {
+          type: 'string',
+          description: 'Path to the project directory',
+        },
+        checks: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['stale', 'missing-metadata', 'broken-link', 'orphaned', 'overdue-review'],
+          },
+          description: 'Specific checks to run (default: all)',
         },
       },
       required: ['projectPath'],
@@ -344,66 +505,16 @@ export async function handleKnowledgeContext(args: {
   const database = await getDatabase();
   const service = getService(args.projectPath);
 
-  const options: ContextBuilderOptions = {
+  const options = createSessionContextOptions({
+    db: database,
+    knowledgeService: service,
     workspacePath: args.projectPath,
     taskId: args.taskId,
     moduleId: args.moduleId,
     specId: args.specId,
     ticketId: args.ticketId,
     maxContextLength: args.maxLength || 8000,
-
-    // Data loaders
-    getTask: database ? async (id) => database.getTask(id) : undefined,
-    getTicket: database ? async (id) => database.getTicket(id) : undefined,
-
-    // Module knowledge loader - direct filesystem
-    getModuleKnowledge: async (modId) => {
-      try {
-        const response = await service.listDocuments({
-          module: modId,
-          limit: 10,
-        });
-
-        if (response.documents.length === 0) {
-          return null;
-        }
-
-        return {
-          moduleId: modId,
-          name: modId,
-          docs: response.documents.map(d => {
-            const t = d.type as string;
-            const mappedType = t === 'reference' ? 'api' : t === 'pattern' ? 'pattern' : t === 'module' ? 'general' : 'general';
-            return {
-              title: d.title,
-              path: d.sourcePath,
-              content: d.content || d.summary || '',
-              type: mappedType as 'business-logic' | 'api' | 'pattern' | 'database' | 'general',
-            };
-          }),
-        };
-      } catch {
-        return null;
-      }
-    },
-
-    // Spec content loader - direct filesystem
-    getSpecContent: async (specId) => {
-      try {
-        const doc = await service.getDocument(specId);
-        if (!doc) return null;
-
-        return {
-          specId: doc.id,
-          title: doc.title,
-          content: doc.content || doc.summary || '',
-          status: doc.status,
-        };
-      } catch {
-        return null;
-      }
-    },
-  };
+  });
 
   try {
     const context = await buildSessionContext(options);
@@ -450,6 +561,143 @@ export async function handleKnowledgeModules(args: {
       modules: [],
       totalModules: 0,
       totalDocuments: 0,
+    };
+  }
+}
+
+export async function handleKnowledgeCreate(args: {
+  projectPath: string;
+  title: string;
+  type: string;
+  content: string;
+  module?: string;
+  tags?: string[];
+  status?: string;
+  owner?: string;
+  category?: string;
+  related?: string[];
+  dependsOn?: string[];
+}) {
+  try {
+    const service = getService(args.projectPath);
+    const input: CreateDocumentInput = {
+      title: args.title,
+      type: args.type as CreateDocumentInput['type'],
+      content: args.content,
+      module: args.module,
+      tags: args.tags,
+      status: args.status as DocumentStatus | undefined,
+      owner: args.owner,
+      category: args.category,
+      related: args.related,
+      dependsOn: args.dependsOn,
+    };
+
+    const doc = await service.createDocument(input);
+
+    return {
+      success: true,
+      document: {
+        id: doc.id,
+        type: doc.type,
+        title: doc.title,
+        path: doc.sourcePath,
+        status: doc.status,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create document',
+    };
+  }
+}
+
+export async function handleKnowledgeUpdate(args: {
+  projectPath: string;
+  docId: string;
+  title?: string;
+  content?: string;
+  status?: string;
+  tags?: string[];
+  module?: string;
+  owner?: string;
+  related?: string[];
+  dependsOn?: string[];
+}) {
+  try {
+    const service = getService(args.projectPath);
+    const updates: UpdateDocumentInput = {};
+
+    if (args.title !== undefined) updates.title = args.title;
+    if (args.content !== undefined) updates.content = args.content;
+    if (args.status !== undefined) updates.status = args.status as DocumentStatus;
+    if (args.tags !== undefined) updates.tags = args.tags;
+    if (args.module !== undefined) updates.module = args.module;
+    if (args.owner !== undefined) updates.owner = args.owner;
+    if (args.related !== undefined) updates.related = args.related;
+    if (args.dependsOn !== undefined) updates.dependsOn = args.dependsOn;
+
+    const doc = await service.updateDocument(args.docId, updates);
+
+    return {
+      success: true,
+      document: {
+        id: doc.id,
+        type: doc.type,
+        title: doc.title,
+        path: doc.sourcePath,
+        status: doc.status,
+        updatedAt: doc.updatedAt,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update document',
+    };
+  }
+}
+
+export async function handleKnowledgeDelete(args: {
+  projectPath: string;
+  docId: string;
+  archive?: boolean;
+}) {
+  try {
+    const service = getService(args.projectPath);
+    const archive = args.archive !== false; // default true
+    await service.deleteDocument(args.docId, archive);
+
+    return {
+      success: true,
+      docId: args.docId,
+      action: archive ? 'archived' : 'deleted',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete document',
+    };
+  }
+}
+
+export async function handleKnowledgeHealth(args: {
+  projectPath: string;
+  checks?: string[];
+}) {
+  try {
+    const service = getService(args.projectPath);
+    const result = await service.healthCheck(args.checks);
+
+    return {
+      success: true,
+      ...result,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to run health check',
     };
   }
 }

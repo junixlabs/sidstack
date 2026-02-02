@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronDown, MoreHorizontal } from "lucide-react";
+import { ChevronRight, ChevronDown, GitBranch, MoreHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { Task } from "@/stores/taskStore";
@@ -101,6 +101,14 @@ export function TaskRow({
         {task.title}
       </span>
 
+      {/* Branch badge */}
+      {task.branch && (
+        <span className="text-[11px] px-1.5 py-0.5 bg-purple-500/15 text-purple-400 rounded border border-purple-500/25 flex items-center gap-0.5 flex-shrink-0" title={`Branch: ${task.branch}`}>
+          <GitBranch className="w-2.5 h-2.5" />
+          {task.branch.length > 20 ? `${task.branch.substring(0, 20)}...` : task.branch}
+        </span>
+      )}
+
       {/* Collapsed child count */}
       {hasChildren && !isExpanded && childCount > 0 && (
         <span className="text-xs text-[var(--text-muted)] flex-shrink-0">
@@ -132,7 +140,7 @@ export function TaskRow({
               }}
             />
           </div>
-          <span className="text-[10px] text-[var(--text-muted)] w-7 text-right tabular-nums">
+          <span className="text-[11px] text-[var(--text-muted)] w-7 text-right tabular-nums">
             {task.progress}%
           </span>
         </div>
@@ -140,7 +148,7 @@ export function TaskRow({
 
       {/* Assigned agent */}
       {task.assignedAgent && (
-        <span className="text-[10px] px-1.5 py-0.5 bg-sky-500/20 text-sky-300 rounded border border-sky-500/30 flex-shrink-0">
+        <span className="text-[11px] px-1.5 py-0.5 bg-sky-500/20 text-sky-300 rounded border border-sky-500/30 flex-shrink-0">
           @{task.assignedAgent}
         </span>
       )}

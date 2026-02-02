@@ -7,6 +7,7 @@ import { Play, Plus, FileCode, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { showSuccess, showError } from '@/lib/toast';
 import { useProjectHubStore } from '@/stores/projectHubStore';
+import { CreateTaskDialog } from './CreateTaskDialog';
 import type { CapabilityDefinition } from '@sidstack/shared';
 
 const API_BASE = 'http://localhost:19432';
@@ -19,7 +20,7 @@ export function CapabilityActions({ capability }: CapabilityActionsProps) {
   const projectPath = useProjectHubStore((s) => s.projectPath);
   const projectId = projectPath.split('/').pop() || 'default';
   const [isLaunching, setIsLaunching] = useState(false);
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const handleLaunchSession = async () => {
     setIsLaunching(true);
@@ -41,34 +42,6 @@ export function CapabilityActions({ capability }: CapabilityActionsProps) {
       showError('Failed to launch session', err.message);
     } finally {
       setIsLaunching(false);
-    }
-  };
-
-  const handleCreateTask = async () => {
-    setIsCreatingTask(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          title: `[${capability.name}] New task`,
-          description: `Task for capability: ${capability.name}`,
-          moduleId: capability.modules?.[0],
-          tags: capability.tags,
-          taskType: 'feature',
-          createdBy: 'ui',
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.error || `HTTP ${res.status}`);
-      }
-      showSuccess('Task created', `Pre-filled for ${capability.name}`);
-    } catch (err: any) {
-      showError('Failed to create task', err.message);
-    } finally {
-      setIsCreatingTask(false);
     }
   };
 
@@ -107,16 +80,22 @@ export function CapabilityActions({ capability }: CapabilityActionsProps) {
       <Button
         variant="secondary"
         size="sm"
-        onClick={handleCreateTask}
-        disabled={isCreatingTask}
+        onClick={() => setShowCreateDialog(true)}
       >
-        {isCreatingTask ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <Plus className="w-3.5 h-3.5" />
-        )}
+        <Plus className="w-3.5 h-3.5" />
         Task
       </Button>
+      <CreateTaskDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        projectId={projectId}
+        defaults={{
+          title: `[${capability.name}] `,
+          description: `Task for capability: ${capability.name}`,
+          moduleId: capability.modules?.[0],
+          tags: capability.tags,
+        }}
+      />
       <Button
         variant="ghost"
         size="icon-sm"

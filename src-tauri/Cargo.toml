@@ -1,12 +1,16 @@
 [package]
-name = "sidstack-agent-manager"
-version = "0.3.0"
-description = "SidStack Agent Manager - Lightweight tool for managing AI agents"
+name = "sidstack"
+version = "0.4.0"
+description = "SidStack - AI-Powered Project Intelligence Platform"
 authors = ["SidStack Team"]
 edition = "2021"
 
+[[bin]]
+name = "SidStack"
+path = "src/main.rs"
+
 [lib]
-name = "sidstack_agent_manager_lib"
+name = "sidstack_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

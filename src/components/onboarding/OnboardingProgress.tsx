@@ -3,8 +3,8 @@ import {
   Circle,
   Layers,
   BookOpen,
-  Terminal,
-  CheckSquare,
+  Inbox,
+  GraduationCap,
   Trophy,
 } from "lucide-react";
 import { memo, useMemo } from "react";
@@ -26,8 +26,8 @@ interface MilestoneConfig {
 const MILESTONES: MilestoneConfig[] = [
   { key: "projectHubViewed", label: "View Project Hub", icon: <Layers className="w-3 h-3" /> },
   { key: "knowledgeBrowsed", label: "Browse Knowledge", icon: <BookOpen className="w-3 h-3" /> },
-  { key: "sessionLaunched", label: "Launch Session", icon: <Terminal className="w-3 h-3" /> },
-  { key: "taskCreated", label: "Create Task", icon: <CheckSquare className="w-3 h-3" /> },
+  { key: "ticketQueueViewed", label: "Visit Ticket Queue", icon: <Inbox className="w-3 h-3" /> },
+  { key: "trainingRoomVisited", label: "Visit Training Room", icon: <GraduationCap className="w-3 h-3" /> },
 ];
 
 interface OnboardingProgressProps {
@@ -39,10 +39,8 @@ export const OnboardingProgress = memo(function OnboardingProgress({
   className,
   compact = false,
 }: OnboardingProgressProps) {
-  const { milestones, isOnboardingComplete } = useOnboardingStore();
-  const isComplete = isOnboardingComplete();
+  const { milestones } = useOnboardingStore();
 
-  // Filter to only show key milestones (not projectOpened/taskCompleted which are more advanced)
   const activeMilestones = useMemo(() => {
     return MILESTONES.map(m => ({
       ...m,
@@ -54,16 +52,9 @@ export const OnboardingProgress = memo(function OnboardingProgress({
   const totalCount = activeMilestones.length;
   const progressPercent = Math.round((completedCount / totalCount) * 100);
 
-  // Show brief celebration when all milestones complete
-  if (isComplete) {
-    return (
-      <div className={cn("px-2 py-1.5", className)}>
-        <div className="flex items-center gap-2 text-xs text-[var(--color-success)]">
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          {!compact && <span className="font-medium">Onboarding complete</span>}
-        </div>
-      </div>
-    );
+  // Hide when all displayed milestones are complete
+  if (completedCount === totalCount) {
+    return null;
   }
 
   // Compact mode - just show progress bar
@@ -79,7 +70,7 @@ export const OnboardingProgress = memo(function OnboardingProgress({
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
-              <span className="text-[10px] text-[var(--text-muted)]">
+              <span className="text-[11px] text-[var(--text-muted)]">
                 {completedCount}/{totalCount}
               </span>
             </div>

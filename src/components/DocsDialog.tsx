@@ -1,4 +1,5 @@
 import { BookOpen, FileText, Map, Clock, X } from "lucide-react";
+import pkg from "../../package.json";
 import { useState } from "react";
 
 import {
@@ -6,7 +7,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import aboutMd from "@/docs/about.md?raw";
-import changelogMd from "@/docs/changelog.md?raw";
+import changelogMd from "../../CHANGELOG.md?raw";
 import roadmapMd from "@/docs/roadmap.md?raw";
 import userGuideMd from "@/docs/user-guide.md?raw";
 import { cn } from "@/lib/utils";
@@ -59,7 +60,7 @@ export function DocsDialog({ open, onOpenChange }: DocsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[80vh] p-0 flex flex-col">
+      <DialogContent hideClose className="max-w-4xl h-[80vh] p-0 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-muted)]">
           <div className="flex items-center gap-2">
@@ -70,7 +71,8 @@ export function DocsDialog({ open, onOpenChange }: DocsDialogProps) {
           </div>
           <button
             onClick={() => onOpenChange(false)}
-            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)] transition-colors"
+            aria-label="Close"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -87,7 +89,7 @@ export function DocsDialog({ open, onOpenChange }: DocsDialogProps) {
                 className={cn(
                   "w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors",
                   activeSection === section.id
-                    ? "bg-[var(--surface-2)] text-[var(--text-primary)] border-l-2 border-blue-500"
+                    ? "bg-[var(--surface-2)] text-[var(--text-primary)] border-l-2 border-[var(--accent-primary)]"
                     : "text-[var(--text-secondary)] hover:bg-[var(--surface-1)] hover:text-[var(--text-primary)]"
                 )}
               >
@@ -100,14 +102,14 @@ export function DocsDialog({ open, onOpenChange }: DocsDialogProps) {
           {/* Content */}
           <div className="flex-1 overflow-auto p-6 bg-[var(--surface-0)]">
             {currentDoc && (
-              <MarkdownPreview content={currentDoc.content} />
+              <MarkdownPreview content={currentDoc.content.replace(/\{\{version\}\}/g, pkg.version)} />
             )}
           </div>
         </div>
 
         {/* Footer */}
         <div className="px-4 py-2 border-t border-[var(--border-muted)] text-xs text-[var(--text-muted)]">
-          SidStack v1.0.0 | Press Esc to close
+          SidStack v{pkg.version} | Press Esc to close
         </div>
       </DialogContent>
     </Dialog>

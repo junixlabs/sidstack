@@ -20,7 +20,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<TrayIcon, Box<dyn std::error::Error
 
     let tray = TrayIconBuilder::new()
         .menu(&menu)
-        .tooltip("SidStack Agent Manager")
+        .tooltip("SidStack")
         .on_menu_event(move |app, event| {
             match event.id.as_ref() {
                 "show" => {
@@ -66,7 +66,7 @@ pub async fn update_tray_tooltip(
 ) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
         let tooltip = format!(
-            "SidStack Agent Manager\n{} active task{}\n{} connected agent{}",
+            "SidStack\n{} active task{}\n{} connected agent{}",
             active_tasks,
             if active_tasks == 1 { "" } else { "s" },
             connected_agents,

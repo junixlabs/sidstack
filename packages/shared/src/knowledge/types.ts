@@ -23,11 +23,9 @@ export type DocumentType =
   | "proposal"       // Change proposal
 
   // Docs (reference, area-specific)
-  | "tutorial"       // Step-by-step learning
-  | "guide"          // How-to guide, task-oriented
+  // Removed: concept, explanation, tutorial → merged into 'guide'
+  | "guide"          // How-to guide, task-oriented (also covers tutorials, concepts, explanations)
   | "reference"      // API reference, schema docs
-  | "explanation"    // Understanding concepts
-  | "concept"        // Explanation, architecture overview (alias)
 
   // Resources (reusable)
   | "template"       // Document template
@@ -203,6 +201,57 @@ export interface KnowledgeContext {
 }
 
 // =============================================================================
+// CRUD Input Types
+// =============================================================================
+
+/**
+ * Input for creating a new knowledge document
+ */
+export interface CreateDocumentInput {
+  title: string;
+  type: DocumentType;
+  content: string;
+  module?: string;
+  tags?: string[];
+  status?: DocumentStatus;
+  owner?: string;
+  related?: string[];
+  dependsOn?: string[];
+  category?: string; // subfolder under knowledge/
+}
+
+/**
+ * Input for updating an existing knowledge document
+ */
+export interface UpdateDocumentInput {
+  title?: string;
+  content?: string;
+  status?: DocumentStatus;
+  tags?: string[];
+  module?: string;
+  owner?: string;
+  related?: string[];
+  dependsOn?: string[];
+}
+
+/**
+ * Health check result for knowledge base
+ */
+export interface HealthIssue {
+  severity: 'error' | 'warning' | 'info';
+  category: 'stale' | 'missing-metadata' | 'broken-link' | 'orphaned' | 'overdue-review' | 'duplicate';
+  docId: string;
+  docTitle: string;
+  message: string;
+}
+
+export interface HealthCheckResult {
+  totalDocuments: number;
+  issues: HealthIssue[];
+  summary: { errors: number; warnings: number; info: number };
+}
+
+// =============================================================================
 // Statistics
 // =============================================================================
 
@@ -285,20 +334,14 @@ export const DOCUMENT_TYPE_CONFIG: Record<DocumentType, {
     description: 'Change proposal',
   },
 
-  // Docs (Diátaxis-inspired)
-  tutorial: {
-    label: 'Tutorial',
-    icon: 'GraduationCap',
-    color: '#06b6d4',
-    folder: 'tutorials',
-    description: 'Step-by-step learning guide',
-  },
+  // Docs
+  // Removed: tutorial, explanation, concept → merged into 'guide'
   guide: {
     label: 'Guide',
     icon: 'BookOpen',
     color: '#3b82f6',
     folder: 'guides',
-    description: 'Task-oriented how-to',
+    description: 'How-to guide, tutorial, or concept explanation',
   },
   reference: {
     label: 'Reference',
@@ -306,20 +349,6 @@ export const DOCUMENT_TYPE_CONFIG: Record<DocumentType, {
     color: '#6366f1',
     folder: 'references',
     description: 'API or technical reference',
-  },
-  explanation: {
-    label: 'Explanation',
-    icon: 'HelpCircle',
-    color: '#14b8a6',
-    folder: 'concepts',
-    description: 'Understanding-oriented content',
-  },
-  concept: {
-    label: 'Concept',
-    icon: 'Lightbulb',
-    color: '#f59e0b',
-    folder: 'concepts',
-    description: 'Architecture overview',
   },
 
   // Resources
@@ -417,10 +446,8 @@ export const DEFAULT_FOLDERS = [
   'specs',
   'decisions',
   'proposals',
-  'tutorials',
   'guides',
   'references',
-  'concepts',
   'templates',
   'checklists',
   'patterns',

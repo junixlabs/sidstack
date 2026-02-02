@@ -40,7 +40,7 @@ export function SpecTasksBadge({ specPath, className }: SpecTasksBadgeProps) {
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-muted animate-pulse",
+          "inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] rounded bg-muted animate-pulse",
           className
         )}
       >
@@ -63,7 +63,7 @@ export function SpecTasksBadge({ specPath, className }: SpecTasksBadgeProps) {
     <button
       onClick={handleClick}
       className={cn(
-        "inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded",
+        "inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded",
         "bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)] transition-colors",
         className
       )}

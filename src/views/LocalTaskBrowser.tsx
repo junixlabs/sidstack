@@ -211,7 +211,7 @@ export function LocalTaskBrowser({ isDark = true, className }: LocalTaskBrowserP
             >
               <span className="flex items-center gap-2">
                 Orchestrator
-                <Badge variant="secondary" className="text-[10px] px-1.5">{taskStats.total}</Badge>
+                <Badge variant="secondary" className="text-[11px] px-1.5">{taskStats.total}</Badge>
               </span>
             </TabsTrigger>
           </TabsList>
@@ -302,7 +302,7 @@ const MiniStat = memo(function MiniStat({ isDark, label, value, color }: { isDar
       <div className={cn("text-lg font-bold tabular-nums", color ? colorClasses[color as keyof typeof colorClasses] : (isDark ? "text-[var(--text-primary)]" : "text-gray-900"))}>
         {value}
       </div>
-      <div className={cn("text-[10px] uppercase tracking-wider", isDark ? "text-[var(--text-muted)]" : "text-gray-500")}>{label}</div>
+      <div className={cn("text-[11px] uppercase tracking-wider", isDark ? "text-[var(--text-muted)]" : "text-gray-500")}>{label}</div>
     </div>
   );
 });
@@ -373,7 +373,7 @@ const TaskCard = memo(function TaskCard({ task, isDark, isExpanded, onToggle, le
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className={cn("text-[13px] font-medium truncate", isDark ? "text-[var(--text-primary)]" : "text-gray-900")}>{task.title}</span>
-              <Badge variant={task.status === "completed" ? "success" : task.status === "in_progress" ? "primary" : task.status === "blocked" ? "destructive" : "secondary"} className="text-[10px] px-1.5">
+              <Badge variant={task.status === "completed" ? "success" : task.status === "in_progress" ? "primary" : task.status === "blocked" ? "destructive" : "secondary"} className="text-[11px] px-1.5">
                 {task.status.replace("_", " ")}
               </Badge>
             </div>
@@ -385,16 +385,16 @@ const TaskCard = memo(function TaskCard({ task, isDark, isExpanded, onToggle, le
           {/* Meta */}
           <div className="flex items-center gap-2 flex-shrink-0">
             {task.assignedAgent && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-[11px]">
                 <Users className="w-2.5 h-2.5 mr-1" />
                 {task.assignedAgent}
               </Badge>
             )}
-            <Badge variant="outline" className={cn("text-[10px]", priorityColor)}>
+            <Badge variant="outline" className={cn("text-[11px]", priorityColor)}>
               {task.priority}
             </Badge>
             {task.progress > 0 && task.progress < 100 && (
-              <span className={cn("text-[10px]", isDark ? "text-[var(--text-muted)]" : "text-gray-500")}>{task.progress}%</span>
+              <span className={cn("text-[11px]", isDark ? "text-[var(--text-muted)]" : "text-gray-500")}>{task.progress}%</span>
             )}
           </div>
         </button>

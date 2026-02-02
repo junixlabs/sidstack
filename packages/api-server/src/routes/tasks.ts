@@ -63,6 +63,7 @@ tasksRouter.post('/', async (req, res) => {
       taskType: providedTaskType,
       moduleId,
       acceptanceCriteria: rawCriteria,
+      branch,
     } = req.body;
 
     if (!title) {
@@ -102,7 +103,14 @@ tasksRouter.post('/', async (req, res) => {
       completed: false,
     }));
 
-    // Note: acceptance criteria checked in validation field below
+    // Reject feature/bugfix/security tasks without acceptance criteria
+    if (governance.requiredCriteria && acceptanceCriteria.length === 0) {
+      return res.status(400).json({
+        error: `${taskType} tasks require acceptance criteria`,
+        hint: 'Add acceptanceCriteria array with at least one criterion.',
+      });
+    }
+
     const criteriaValid = !governance.requiredCriteria || acceptanceCriteria.length > 0;
 
     // Ensure project exists
@@ -126,6 +134,7 @@ tasksRouter.post('/', async (req, res) => {
       createdBy,
       taskType,
       moduleId,
+      branch,
       governance: JSON.stringify(governance),
       acceptanceCriteria: JSON.stringify(acceptanceCriteria),
       validation: JSON.stringify({
@@ -159,7 +168,7 @@ tasksRouter.post('/', async (req, res) => {
 tasksRouter.patch('/:id', async (req, res) => {
   try {
     const db = await getDB();
-    const { status, progress, notes, moduleId, assignedAgent } = req.body;
+    const { status, progress, notes, moduleId, assignedAgent, branch } = req.body;
     const taskId = req.params.id;
 
     // Validate subtasks when completing a task
@@ -194,7 +203,7 @@ tasksRouter.patch('/:id', async (req, res) => {
       }
     }
 
-    const task = db.updateTask(taskId, { status, progress, notes, moduleId, assignedAgent });
+    const task = db.updateTask(taskId, { status, progress, notes, moduleId, assignedAgent, branch });
 
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
@@ -417,11 +426,24 @@ tasksRouter.post('/:id/complete', async (req, res) => {
       }),
     });
 
+    // Auto-complete linked ticket if this task was created from a ticket
+    let linkedTicketCompleted: string | undefined;
+    try {
+      const linkedTicket = db.getTicketByTaskId(taskId);
+      if (linkedTicket && linkedTicket.status !== 'completed' && linkedTicket.status !== 'rejected') {
+        db.updateTicket(linkedTicket.id, { status: 'completed' });
+        linkedTicketCompleted = linkedTicket.id;
+      }
+    } catch {
+      // Non-blocking: ticket completion failure should not affect task completion
+    }
+
     res.json({
       task: updatedTask,
       validation: validationResult.validation,
       forcedCompletion: force && !validationResult.canComplete,
       violationId,
+      linkedTicketCompleted,
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to complete task' });

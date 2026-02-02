@@ -278,8 +278,8 @@ function formatTrainingContext(context: TrainingContext): string {
       const emoji = rule.level === 'must' ? '🔴' : rule.level === 'should' ? '🟡' : '🟢';
       sections.push(`${i + 1}. ${emoji} **[${rule.level.toUpperCase()}]** ${rule.name}`);
       sections.push(`   ${rule.content}`);
-      if (rule.enforcement === 'block') {
-        sections.push(`   _Enforcement: Blocking - violations will be flagged_`);
+      if (rule.enforcement === 'gate') {
+        sections.push(`   _Enforcement: Gate - violations will block completion_`);
       }
       sections.push('');
     });
@@ -336,6 +336,110 @@ function formatSpecContext(spec: SpecContent): string {
   }
 
   return sections.join('\n');
+}
+
+/**
+ * Format auto-learning instructions for Claude session injection.
+ * Tells the agent when and how to capture incidents, lessons, and skills.
+ */
+function formatAutoLearnInstructions(moduleId: string): string {
+  return `## Auto-Learning Protocol
+
+During this session, proactively capture knowledge when you encounter these situations:
+
+### When to create an Incident
+- You encounter an error that takes multiple attempts to fix
+- You find a bug caused by a misunderstanding of the codebase
+- A build/test failure is caused by a non-obvious reason
+- You discover an undocumented constraint or behavior
+
+→ Call \`incident_create\` with: projectPath, moduleId, type (mistake|failure|confusion|slow), severity, title, description, context
+
+### When to create a Lesson
+- After resolving an incident, you identify the root cause and prevention
+- You notice a pattern across multiple similar issues
+- You discover a project-specific convention not documented anywhere
+
+→ Call \`lesson_create\` with: projectPath, moduleId, title, problem, rootCause, solution
+
+### When to create a Skill
+- You develop a reusable procedure for a recurring task
+- You create a checklist that would help future sessions
+- You find an effective debugging approach for this codebase
+
+→ Call \`skill_create\` with: projectPath, name, type (procedure|checklist|template), content
+
+### Important
+- Only create entries for genuinely useful insights, not trivial fixes
+- Be concise - focus on what would help a future agent in the same situation
+- Link to the current module: ${moduleId}`;
+}
+
+// ============================================================================
+// Relevance Scoring
+// ============================================================================
+
+const STOP_WORDS = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+  'should', 'may', 'might', 'shall', 'can', 'need', 'must', 'ought',
+  'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as',
+  'into', 'through', 'during', 'before', 'after', 'above', 'below',
+  'and', 'but', 'or', 'nor', 'not', 'so', 'yet', 'both', 'either',
+  'neither', 'each', 'every', 'all', 'any', 'few', 'more', 'most',
+  'other', 'some', 'such', 'no', 'only', 'own', 'same', 'than',
+  'too', 'very', 'just', 'because', 'if', 'when', 'while', 'this',
+  'that', 'these', 'those', 'it', 'its', 'we', 'they', 'them',
+]);
+
+/**
+ * Extract keywords from text, removing stop words
+ */
+export function extractKeywords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !STOP_WORDS.has(word));
+}
+
+/**
+ * Score a document's relevance to a set of keywords
+ */
+export function scoreDocRelevance(
+  doc: { title: string; summary?: string; content: string; tags?: string[]; module?: string },
+  keywords: string[]
+): number {
+  if (keywords.length === 0) return 0;
+
+  let score = 0;
+  const titleLower = doc.title.toLowerCase();
+  const summaryLower = (doc.summary || '').toLowerCase();
+  const moduleLower = (doc.module || '').toLowerCase();
+  const tagsLower = (doc.tags || []).map(t => t.toLowerCase());
+  const contentLower = doc.content.toLowerCase();
+
+  for (const keyword of keywords) {
+    // Title match (highest weight)
+    if (titleLower.includes(keyword)) score += 10;
+    // Module match
+    if (moduleLower.includes(keyword)) score += 6;
+    // Tags match
+    if (tagsLower.some(t => t.includes(keyword))) score += 4;
+    // Summary match
+    if (summaryLower.includes(keyword)) score += 3;
+    // Content match (lowest weight)
+    if (contentLower.includes(keyword)) score += 1;
+  }
+
+  return score;
+}
+
+/**
+ * Rough token estimate: ~4 chars per token
+ */
+function estimateTokens(chars: number): number {
+  return Math.ceil(chars / 4);
 }
 
 // ============================================================================
@@ -412,12 +516,29 @@ export async function buildSessionContext(
     }
   }
 
+  // Auto-learning instructions (when training tools are available)
+  if (options.includeTraining && options.moduleId) {
+    contextParts.push('\n---\n');
+    contextParts.push(formatAutoLearnInstructions(options.moduleId));
+    entities.push('auto-learn');
+  }
+
   // Build final prompt
   let prompt = contextParts.join('\n');
 
-  // Truncate if too long
+  // Truncate at section boundaries if too long
   if (prompt.length > maxLength) {
-    prompt = prompt.slice(0, maxLength) + '\n\n...[Context truncated due to size limits]';
+    const sections = prompt.split('\n---\n');
+    let truncated = '';
+    for (const section of sections) {
+      if (truncated.length + section.length + 5 > maxLength) {
+        break;
+      }
+      if (truncated) truncated += '\n---\n';
+      truncated += section;
+    }
+    prompt = truncated || prompt.slice(0, maxLength);
+    prompt += `\n\n...[Context truncated. ~${estimateTokens(prompt.length)} tokens used]`;
   }
 
   return {
@@ -438,6 +559,102 @@ export async function buildSessionContext(
  */
 export function hasContextEntities(options: Partial<ContextBuilderOptions>): boolean {
   return !!(options.taskId || options.moduleId || options.specId || options.ticketId);
+}
+
+/**
+ * Create ContextBuilderOptions with data loaders wired to db + KnowledgeService.
+ *
+ * Factory that removes boilerplate so callers (MCP handler, API server, etc.)
+ * don't duplicate data-loader wiring for buildSessionContext().
+ */
+export function createSessionContextOptions(params: {
+  db: any;
+  knowledgeService: any;
+  workspacePath: string;
+  taskId?: string;
+  moduleId?: string;
+  specId?: string;
+  ticketId?: string;
+  includeTraining?: boolean;
+  agentRole?: string;
+  taskType?: string;
+  maxContextLength?: number;
+}): ContextBuilderOptions {
+  const { db, knowledgeService, workspacePath } = params;
+
+  return {
+    workspacePath,
+    taskId: params.taskId,
+    moduleId: params.moduleId,
+    specId: params.specId,
+    ticketId: params.ticketId,
+    includeTraining: params.includeTraining,
+    agentRole: params.agentRole,
+    taskType: params.taskType,
+    maxContextLength: params.maxContextLength ?? 8000,
+
+    // Data loaders
+    getTask: db ? async (id: string) => db.getTask(id) : undefined,
+    getTicket: db ? async (id: string) => db.getTicket(id) : undefined,
+
+    // Module knowledge loader - direct filesystem via KnowledgeService
+    getModuleKnowledge: knowledgeService
+      ? async (modId: string) => {
+          try {
+            const response = await knowledgeService.listDocuments({
+              module: modId,
+              limit: 10,
+            });
+            if (response.documents.length === 0) return null;
+            return {
+              moduleId: modId,
+              name: modId,
+              docs: response.documents.map((d: any) => {
+                const t = d.type as string;
+                const mappedType = t === 'reference' ? 'api' : t === 'pattern' ? 'pattern' : 'general';
+                return {
+                  title: d.title,
+                  path: d.sourcePath,
+                  content: d.content || d.summary || '',
+                  type: mappedType as 'business-logic' | 'api' | 'pattern' | 'database' | 'general',
+                };
+              }),
+            };
+          } catch {
+            return null;
+          }
+        }
+      : undefined,
+
+    // Spec content loader - direct filesystem via KnowledgeService
+    getSpecContent: knowledgeService
+      ? async (specId: string) => {
+          try {
+            const doc = await knowledgeService.getDocument(specId);
+            if (!doc) return null;
+            return {
+              specId: doc.id,
+              title: doc.title,
+              content: doc.content || doc.summary || '',
+              status: doc.status,
+            };
+          } catch {
+            return null;
+          }
+        }
+      : undefined,
+
+    // Training context loader - from db
+    getTrainingContext: db
+      ? async (modId: string, role?: string, taskType?: string) => {
+          try {
+            return db.getTrainingContext(modId, workspacePath, role, taskType);
+          } catch {
+            return null;
+          }
+        }
+      : undefined,
+  };
 }
 
 /**

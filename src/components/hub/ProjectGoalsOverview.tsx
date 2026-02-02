@@ -217,7 +217,7 @@ function MaturityTag({ maturity }: { maturity: string }) {
     optimized: 'bg-[var(--color-info)]/20 text-[var(--color-info)]',
   };
   return (
-    <span className={cn('text-[10px] px-1.5 py-0.5 rounded flex-shrink-0', colors[maturity] || 'bg-[var(--surface-3)] text-[var(--text-muted)]')}>
+    <span className={cn('text-[11px] px-1.5 py-0.5 rounded flex-shrink-0', colors[maturity] || 'bg-[var(--surface-3)] text-[var(--text-muted)]')}>
       {maturity}
     </span>
   );

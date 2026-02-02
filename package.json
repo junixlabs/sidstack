@@ -1,6 +1,6 @@
 {
   "name": "sidstack",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "SidStack - Lightweight AI Agent Orchestration Platform",
@@ -14,7 +14,18 @@
   "bugs": {
     "url": "https://github.com/junixlabs/sidstack/issues"
   },
-  "keywords": ["ai", "claude", "mcp", "task-management", "knowledge-base", "impact-analysis", "tauri", "agent", "governance", "developer-tools"],
+  "keywords": [
+    "ai",
+    "claude",
+    "mcp",
+    "task-management",
+    "knowledge-base",
+    "impact-analysis",
+    "tauri",
+    "agent",
+    "governance",
+    "developer-tools"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",

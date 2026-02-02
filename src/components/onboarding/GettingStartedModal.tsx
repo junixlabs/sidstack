@@ -1,12 +1,13 @@
 import {
   CheckSquare,
   BookOpen,
-  Layers,
   ArrowRight,
   Sparkles,
-  Shield,
   GraduationCap,
   Ticket,
+  Terminal,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useState, useCallback } from "react";
 
@@ -28,67 +29,52 @@ import { useOnboardingStore } from "@/stores/onboardingStore";
 const VALUE_PROPOSITIONS = [
   {
     icon: CheckSquare,
-    title: "Task Management",
+    title: "Task Manager",
     description: "Organize and track tasks with Kanban, tree, and list views",
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/10",
+    color: "text-[var(--feature-tasks)]",
+    bgColor: "bg-[var(--feature-tasks)]/10",
     viewId: "task-manager",
-    shortcut: "3",
+    shortcut: "2",
   },
   {
     icon: BookOpen,
     title: "Knowledge Browser",
     description: "Browse and search project knowledge, patterns, and APIs",
-    color: "text-purple-400",
-    bgColor: "bg-purple-500/10",
-    viewId: "knowledge-browser",
-    shortcut: "2",
-  },
-  {
-    icon: GraduationCap,
-    title: "Training Room",
-    description: "Learn from incidents, build lessons, skills, and enforcement rules",
-    color: "text-amber-400",
-    bgColor: "bg-amber-500/10",
-    viewId: "training-room",
-    shortcut: "6",
-  },
-  {
-    icon: Shield,
-    title: "Impact Analysis",
-    description: "Analyze risks and validate changes before implementation",
-    color: "text-red-400",
-    bgColor: "bg-red-500/10",
-    viewId: "impact-analysis",
-    shortcut: "7",
+    color: "text-[var(--feature-knowledge)]",
+    bgColor: "bg-[var(--feature-knowledge)]/10",
+    viewId: "knowledge",
+    shortcut: "3",
   },
   {
     icon: Ticket,
     title: "Ticket Queue",
     description: "Receive external tickets and convert them to tasks",
-    color: "text-cyan-400",
-    bgColor: "bg-cyan-500/10",
+    color: "text-[var(--feature-tickets)]",
+    bgColor: "bg-[var(--feature-tickets)]/10",
     viewId: "ticket-queue",
     shortcut: "4",
   },
+  {
+    icon: GraduationCap,
+    title: "Training Room",
+    description: "Learn from incidents, build lessons, skills, and enforcement rules",
+    color: "text-[var(--feature-training)]",
+    bgColor: "bg-[var(--feature-training)]/10",
+    viewId: "training-room",
+    shortcut: "5",
+  },
 ];
 
-// Quick start options (shown as primary actions at bottom)
-const QUICK_START_OPTIONS = [
+const SETUP_STEPS = [
   {
-    id: "project-hub",
-    label: "Project Hub",
-    shortcut: "1",
-    icon: Layers,
-    description: "View project intelligence",
-    primary: true,
+    label: "Initialize your project",
+    command: "npx @sidstack/cli init --scan",
+    description: "Sets up governance, MCP config, and generates knowledge docs with AI",
   },
   {
-    id: "task-manager",
-    label: "Task Manager",
-    shortcut: "2",
-    icon: CheckSquare,
-    description: "Manage tasks",
+    label: "Use in Claude Code",
+    command: "/sidstack",
+    description: "Project dashboard — tasks, tickets, impact, focus, and governance",
   },
 ];
 
@@ -107,6 +93,7 @@ export function GettingStartedModal({
 }: GettingStartedModalProps) {
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { skipOnboarding, markProjectOnboarded, setDontShowAgain: persistDontShowAgain } =
     useOnboardingStore();
@@ -151,7 +138,7 @@ export function GettingStartedModal({
                 Welcome to SidStack!
               </DialogTitle>
               <DialogDescription className="text-sm text-[var(--text-secondary)] mt-2">
-                Your AI-powered development orchestrator
+                AI-Powered Project Intelligence Platform
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -165,7 +152,7 @@ export function GettingStartedModal({
               What you can do with SidStack
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {VALUE_PROPOSITIONS.map((item, index) => {
               const Icon = item.icon;
               return (
@@ -191,7 +178,7 @@ export function GettingStartedModal({
                     >
                       <Icon className={cn("w-5 h-5", item.color)} />
                     </div>
-                    <kbd className="flex items-center justify-center w-6 h-6 text-[10px] font-mono rounded bg-[var(--surface-2)] text-[var(--text-muted)]">
+                    <kbd className="flex items-center justify-center w-6 h-6 text-[11px] font-mono rounded bg-[var(--surface-2)] text-[var(--text-muted)]">
                       {item.shortcut}
                     </kbd>
                   </div>
@@ -207,58 +194,49 @@ export function GettingStartedModal({
           </div>
         </div>
 
-        {/* Quick Start Options */}
+        {/* Use with Claude Code */}
         <div className="px-6 py-4 bg-[var(--surface-0)]/50 border-t border-[var(--border-muted)]">
-          <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-3 block">
-            Quick Start
-          </span>
-          <div className="flex gap-2">
-            {QUICK_START_OPTIONS.map((option) => {
-              const Icon = option.icon;
-              const isPrimary = "primary" in option && option.primary;
-              return (
-                <button
-                  key={option.id}
-                  onClick={() => handleQuickStart(option.id)}
-                  className={cn(
-                    "flex-1 flex items-center gap-3 p-3 rounded-lg",
-                    "transition-all duration-200 group text-left",
-                    isPrimary
-                      ? "bg-[var(--accent-primary)] border border-[var(--accent-primary)] hover:opacity-90"
-                      : "bg-[var(--surface-1)] border border-[var(--border-muted)] hover:bg-[var(--surface-2)] hover:border-[var(--border-default)]"
-                  )}
-                >
-                  <Icon className={cn(
-                    "w-4 h-4",
-                    isPrimary
-                      ? "text-white"
-                      : "text-[var(--text-muted)] group-hover:text-[var(--accent-primary)]"
-                  )} />
-                  <div className="flex-1 min-w-0">
-                    <div className={cn(
-                      "text-sm font-medium truncate",
-                      isPrimary ? "text-white" : "text-[var(--text-primary)]"
-                    )}>
-                      {option.label}
-                    </div>
-                    <div className={cn(
-                      "text-xs",
-                      isPrimary ? "text-white/90" : "text-[var(--text-muted)]"
-                    )}>
-                      {option.description}
-                    </div>
+          <div className="flex items-center gap-2 mb-3">
+            <Terminal className="w-4 h-4 text-[var(--accent-primary)]" />
+            <span className="text-sm font-medium text-[var(--text-primary)]">
+              Use with Claude Code
+            </span>
+          </div>
+          <div className="space-y-3">
+            {SETUP_STEPS.map((step, index) => (
+              <div key={index} className="flex gap-3">
+                <div className="shrink-0 w-5 h-5 rounded-full bg-[var(--accent-primary)] text-white text-xs flex items-center justify-center font-medium mt-0.5">
+                  {index + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-[var(--text-primary)] mb-1">
+                    {step.label}
                   </div>
-                  <kbd className={cn(
-                    "hidden sm:flex items-center justify-center w-6 h-6 text-[10px] font-mono rounded",
-                    isPrimary
-                      ? "bg-white/20 text-white"
-                      : "bg-[var(--surface-2)] text-[var(--text-muted)]"
-                  )}>
-                    {option.shortcut}
-                  </kbd>
-                </button>
-              );
-            })}
+                  <div className="flex items-center gap-2 mb-1">
+                    <code className="bg-[var(--surface-2)] rounded px-2 py-0.5 text-xs font-mono text-[var(--accent-primary)]">
+                      {step.command}
+                    </code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(step.command);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="p-1 rounded hover:bg-[var(--surface-2)] transition-colors"
+                      aria-label={`Copy ${step.command}`}
+                    >
+                      {copied
+                        ? <Check className="w-3 h-3 text-[var(--color-success)]" />
+                        : <Copy className="w-3 h-3 text-[var(--text-muted)]" />
+                      }
+                    </button>
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    {step.description}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

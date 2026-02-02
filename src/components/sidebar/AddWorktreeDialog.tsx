@@ -14,6 +14,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/stores/projectStore";
 
@@ -159,7 +166,7 @@ export const AddWorktreeDialog = memo(function AddWorktreeDialog({
       });
 
       // Add to project store
-      await addWorktree(projectId, worktreePath);
+      await addWorktree(projectId, worktreePath, purpose || undefined);
 
       // Reset form and close dialog
       setBranchName("");
@@ -173,7 +180,7 @@ export const AddWorktreeDialog = memo(function AddWorktreeDialog({
     } finally {
       setIsLoading(false);
     }
-  }, [branchName, worktreePath, mode, projectPath, projectId, addWorktree, onOpenChange]);
+  }, [branchName, worktreePath, purpose, mode, projectPath, projectId, addWorktree, onOpenChange]);
 
   const handleRegisterExisting = useCallback(async () => {
     if (!worktreePath) {
@@ -186,7 +193,7 @@ export const AddWorktreeDialog = memo(function AddWorktreeDialog({
 
     try {
       // Just register existing worktree without running git command
-      await addWorktree(projectId, worktreePath);
+      await addWorktree(projectId, worktreePath, purpose || undefined);
 
       // Reset form and close dialog
       setWorktreePath("");
@@ -198,7 +205,7 @@ export const AddWorktreeDialog = memo(function AddWorktreeDialog({
     } finally {
       setIsLoading(false);
     }
-  }, [worktreePath, projectId, addWorktree, onOpenChange]);
+  }, [worktreePath, purpose, projectId, addWorktree, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -249,20 +256,22 @@ export const AddWorktreeDialog = memo(function AddWorktreeDialog({
               Branch
             </Label>
             {mode === "existing" ? (
-              <select
-                id="branch"
-                value={branchName}
-                onChange={(e) => setBranchName(e.target.value)}
-                className="flex h-9 w-full rounded-md border px-3 py-2 text-[13px] bg-[var(--surface-0)] border-[var(--surface-3)] text-[var(--text-primary)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
+              <Select
+                value={branchName || undefined}
+                onValueChange={setBranchName}
                 disabled={loadingBranches}
               >
-                <option value="">Select a branch...</option>
-                {branches.map((branch) => (
-                  <option key={branch.name} value={branch.name}>
-                    {branch.name} {branch.isRemote && "(remote)"}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full h-9 text-[13px]">
+                  <SelectValue placeholder="Select a branch..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.name} value={branch.name}>
+                      {branch.name} {branch.isRemote && "(remote)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ) : (
               <Input
                 id="branch"

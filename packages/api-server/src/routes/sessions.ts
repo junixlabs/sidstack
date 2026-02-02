@@ -6,7 +6,7 @@
  */
 
 import { Router } from 'express';
-import { getDB, launchClaudeSession, isClaudeInstalled, checkSessionStatus, getSessionSettings } from '@sidstack/shared';
+import { getDB, launchClaudeSession, isClaudeInstalled, checkSessionStatus, getSessionSettings, createKnowledgeService, buildSessionContext, createSessionContextOptions } from '@sidstack/shared';
 import type { SessionFilters, CreateClaudeSessionInput, TerminalApp, LaunchMode, WindowMode } from '@sidstack/shared';
 
 export const sessionsRouter: Router = Router();
@@ -38,6 +38,10 @@ sessionsRouter.post('/launch', async (req, res) => {
       mode,
       prompt,
       windowMode,
+      includeContext,
+      includeTraining,
+      agentRole,
+      taskType,
     } = req.body;
 
     const projectPath = projectDir || workspacePath;
@@ -56,6 +60,42 @@ sessionsRouter.post('/launch', async (req, res) => {
     const resolvedMode = mode || projectSessionSettings.defaultMode;
     const resolvedWindowMode = windowMode || projectSessionSettings.windowMode;
 
+    // Determine if context should be injected
+    const shouldInjectContext = includeContext !== undefined
+      ? includeContext
+      : !!(taskId || moduleId);
+
+    // Build knowledge + training context
+    let contextPrompt: string | undefined;
+    let contextEntities: string[] = [];
+    if (shouldInjectContext && (taskId || moduleId)) {
+      try {
+        const knowledgeService = createKnowledgeService(projectPath);
+        const contextOptions = createSessionContextOptions({
+          db,
+          knowledgeService,
+          workspacePath: projectPath,
+          taskId,
+          moduleId,
+          includeTraining: includeTraining !== undefined ? includeTraining : !!moduleId,
+          agentRole: agentRole || 'dev',
+          taskType: taskType || 'general',
+        });
+        const builtContext = await buildSessionContext(contextOptions);
+        if (builtContext.prompt && builtContext.metadata.entities.length > 0) {
+          contextPrompt = builtContext.prompt;
+          contextEntities = builtContext.metadata.entities;
+        }
+      } catch {
+        // Context failure must NOT block launch
+      }
+    }
+
+    // Combine context with user prompt
+    const finalPrompt = contextPrompt && prompt
+      ? `${contextPrompt}\n---\n\n${prompt}`
+      : contextPrompt || prompt;
+
     // Launch the terminal
     const launchResult = await launchClaudeSession({
       projectDir: projectPath,
@@ -65,7 +105,7 @@ sessionsRouter.post('/launch', async (req, res) => {
       context: {
         taskId,
         moduleId,
-        prompt,
+        prompt: finalPrompt,
       },
     });
 
@@ -83,7 +123,7 @@ sessionsRouter.post('/launch', async (req, res) => {
       moduleId,
       terminal: launchResult.terminal,
       launchMode: resolvedMode || 'normal',
-      initialPrompt: prompt,
+      initialPrompt: finalPrompt,
       pid: launchResult.pid,
       terminalWindowId: launchResult.terminalWindowId,
       claudeSessionId: launchResult.claudeSessionId,
@@ -104,6 +144,8 @@ sessionsRouter.post('/launch', async (req, res) => {
         command: launchResult.command,
         claudeSessionId: launchResult.claudeSessionId,
         usedProjectSettings: !terminal || !mode || !windowMode,
+        contextInjected: !!contextPrompt,
+        contextEntities,
       },
     });
 
@@ -116,6 +158,8 @@ sessionsRouter.post('/launch', async (req, res) => {
         pid: launchResult.pid,
         windowId: launchResult.terminalWindowId,
       },
+      contextInjected: !!contextPrompt,
+      contextEntities,
     });
   } catch (error) {
     console.error('Failed to launch session:', error);

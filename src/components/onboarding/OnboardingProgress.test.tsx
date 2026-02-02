@@ -40,8 +40,8 @@ describe("OnboardingProgress", () => {
     expect(screen.getByText("Getting Started")).toBeInTheDocument();
     expect(screen.getByText("View Project Hub")).toBeInTheDocument();
     expect(screen.getByText("Browse Knowledge")).toBeInTheDocument();
-    expect(screen.getByText("Launch Session")).toBeInTheDocument();
-    expect(screen.getByText("Create Task")).toBeInTheDocument();
+    expect(screen.getByText("Visit Ticket Queue")).toBeInTheDocument();
+    expect(screen.getByText("Visit Training Room")).toBeInTheDocument();
     expect(screen.getByText("0/4")).toBeInTheDocument();
   });
 
@@ -65,26 +65,25 @@ describe("OnboardingProgress", () => {
     expect(screen.getByText("2/4")).toBeInTheDocument();
   });
 
-  it("shows completion state when all milestones done", () => {
+  it("renders nothing when all displayed milestones are complete", () => {
     useOnboardingStore.setState({
       milestones: {
-        projectOpened: true,
+        projectOpened: false,
         projectHubViewed: true,
         knowledgeBrowsed: true,
-        sessionLaunched: true,
-        taskCreated: true,
-        taskCompleted: true,
+        sessionLaunched: false,
+        taskCreated: false,
+        taskCompleted: false,
         trainingRoomVisited: true,
-        impactAnalysisViewed: true,
+        impactAnalysisViewed: false,
         ticketQueueViewed: true,
       },
     });
 
-    render(<OnboardingProgress />, { wrapper: Wrapper });
+    const { container } = render(<OnboardingProgress />, { wrapper: Wrapper });
 
-    expect(screen.getByText("Onboarding complete")).toBeInTheDocument();
-    // Should not show milestone list
-    expect(screen.queryByText("View Project Hub")).not.toBeInTheDocument();
+    // Component returns null when all 4 displayed milestones are complete
+    expect(container.innerHTML).toBe("");
   });
 
   it("renders compact mode with progress counter", () => {

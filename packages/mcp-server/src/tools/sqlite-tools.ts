@@ -81,6 +81,7 @@ export const sqliteTools = [
         priority: { type: 'string', enum: ['low', 'medium', 'high'], default: 'medium' },
         assignedAgent: { type: 'string', description: 'Agent role to assign' },
         createdBy: { type: 'string', default: 'user', description: 'Who created this task' },
+        branch: { type: 'string', description: 'Git branch name to link this task to' },
       },
       required: ['title', 'description', 'projectId'],
     },
@@ -119,6 +120,7 @@ export const sqliteTools = [
         status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'blocked', 'failed', 'cancelled'] },
         progress: { type: 'number', minimum: 0, maximum: 100, description: 'Progress percentage' },
         notes: { type: 'string', description: 'Status update notes' },
+        branch: { type: 'string', description: 'Git branch name to link this task to' },
       },
       required: ['taskId'],
     },
@@ -366,6 +368,10 @@ Examples:
           enum: ['normal', 'skip-permissions', 'continue', 'print', 'verbose'],
           description: 'Launch mode. "skip-permissions" adds --dangerously-skip-permissions flag'
         },
+        includeContext: {
+          type: 'boolean',
+          description: 'Auto-inject knowledge context (task, module docs, training) into the session prompt. Defaults to true when taskId or moduleId is provided.'
+        },
         includeTraining: {
           type: 'boolean',
           description: 'Include training context (skills, rules) in the session prompt. Requires moduleId.'
@@ -607,6 +613,7 @@ export async function handleSqliteTool(
         status: 'pending',
         taskType,
         moduleId: args.moduleId as string | undefined,
+        branch: args.branch as string | undefined,
         governance: JSON.stringify(governance),
         acceptanceCriteria: JSON.stringify(acceptanceCriteria),
         validation: JSON.stringify({
@@ -706,6 +713,7 @@ export async function handleSqliteTool(
       if (newStatus) updates.status = newStatus;
       if (args.progress !== undefined) updates.progress = args.progress;
       if (args.notes) updates.notes = args.notes;
+      if (args.branch !== undefined) updates.branch = args.branch;
 
       // Validate subtasks when completing a task
       if (newStatus === 'completed') {
@@ -868,7 +876,7 @@ export async function handleSqliteTool(
           // Separate rules by level
           for (const rule of trainingContext.rules) {
             const ruleInfo = { id: rule.id, name: rule.name, content: rule.content, level: rule.level };
-            if (rule.level === 'must' && rule.enforcement === 'block') {
+            if (rule.level === 'must' && rule.enforcement === 'gate') {
               trainingRules.blockers.push(ruleInfo);
             } else if (rule.level === 'should') {
               trainingRules.warnings.push(ruleInfo);
@@ -1016,6 +1024,18 @@ export async function handleSqliteTool(
         }),
       });
 
+      // Auto-complete linked ticket if this task was created from a ticket
+      let linkedTicketCompleted: string | undefined;
+      try {
+        const linkedTicket = database.getTicketByTaskId(taskId);
+        if (linkedTicket && linkedTicket.status !== 'completed' && linkedTicket.status !== 'rejected') {
+          database.updateTicket(linkedTicket.id, { status: 'completed' });
+          linkedTicketCompleted = linkedTicket.id;
+        }
+      } catch {
+        // Non-blocking: ticket completion failure should not affect task completion
+      }
+
       // Get applicable training context for feedback prompt
       let trainingFeedbackPrompt: {
         message: string;
@@ -1052,6 +1072,7 @@ export async function handleSqliteTool(
             validation: validationResult.validation,
             forcedCompletion: force && !validationResult.canComplete,
             violationId,
+            linkedTicketCompleted,
             trainingFeedbackPrompt,
             hint: trainingFeedbackPrompt
               ? 'Use training_feedback_submit to record whether skills/rules helped or hindered this task.'
@@ -1206,20 +1227,21 @@ export async function handleSqliteTool(
     // Claude Session Handlers
     // =========================================================================
     case 'session_launch': {
-      const { projectDir, taskId, moduleId, prompt, terminal, mode, includeTraining, agentRole, taskType } = args as {
+      const { projectDir, taskId, moduleId, prompt, terminal, mode, includeContext, includeTraining, agentRole, taskType } = args as {
         projectDir: string;
         taskId?: string;
         moduleId?: string;
         prompt?: string;
         terminal?: string;
         mode?: string;
+        includeContext?: boolean;
         includeTraining?: boolean;
         agentRole?: string;
         taskType?: string;
       };
 
       // Import external session launcher and settings dynamically
-      const { launchClaudeSession, detectTerminal, getSessionSettings } = await import('@sidstack/shared');
+      const { launchClaudeSession, detectTerminal, getSessionSettings, createKnowledgeService, buildSessionContext, createSessionContextOptions } = await import('@sidstack/shared');
 
       // Load project settings as defaults
       const projectSessionSettings = getSessionSettings(projectDir);
@@ -1228,51 +1250,42 @@ export async function handleSqliteTool(
       const resolvedTerminal = terminal || projectSessionSettings.defaultTerminal || detectTerminal();
       const resolvedMode = mode || projectSessionSettings.defaultMode || 'normal';
 
-      // Build training context if requested
-      let trainingContextPrompt: string | undefined;
-      if (includeTraining && moduleId) {
-        const trainingContext = database.getTrainingContext(
-          moduleId,
-          agentRole || 'dev',
-          taskType || 'general'
-        );
+      // Determine if context should be injected
+      // Default: true when taskId or moduleId is provided, false otherwise
+      const shouldInjectContext = includeContext !== undefined
+        ? includeContext
+        : !!(taskId || moduleId);
 
-        // Build context prompt if we have any training data
-        if (trainingContext.skills.length > 0 || trainingContext.rules.length > 0) {
-          const lines: string[] = [];
-          lines.push('## Project Training Context');
-          lines.push('_Apply these learned skills and follow these rules._\n');
-
-          if (trainingContext.skills.length > 0) {
-            lines.push('### Applicable Skills');
-            for (const skill of trainingContext.skills.slice(0, 5)) {
-              lines.push(`**${skill.name}** (${skill.type})`);
-              // Truncate long content
-              const content = skill.content.length > 300
-                ? skill.content.slice(0, 300) + '...'
-                : skill.content;
-              lines.push(content);
-              lines.push('');
-            }
+      // Build knowledge + training context via buildSessionContext
+      let contextPrompt: string | undefined;
+      let contextEntities: string[] = [];
+      if (shouldInjectContext && (taskId || moduleId)) {
+        try {
+          const knowledgeService = createKnowledgeService(projectDir);
+          const contextOptions = createSessionContextOptions({
+            db: database,
+            knowledgeService,
+            workspacePath: projectDir,
+            taskId,
+            moduleId,
+            includeTraining: includeTraining !== undefined ? includeTraining : !!moduleId,
+            agentRole: agentRole || 'dev',
+            taskType: taskType || 'general',
+          });
+          const builtContext = await buildSessionContext(contextOptions);
+          if (builtContext.prompt && builtContext.metadata.entities.length > 0) {
+            contextPrompt = builtContext.prompt;
+            contextEntities = builtContext.metadata.entities;
           }
-
-          if (trainingContext.rules.length > 0) {
-            lines.push('### Active Rules');
-            for (const rule of trainingContext.rules.slice(0, 10)) {
-              const emoji = rule.level === 'must' ? '🔴' : rule.level === 'should' ? '🟡' : '🟢';
-              lines.push(`${emoji} **[${rule.level.toUpperCase()}]** ${rule.name}: ${rule.content}`);
-            }
-            lines.push('');
-          }
-
-          trainingContextPrompt = lines.join('\n');
+        } catch {
+          // Context failure must NOT block launch
         }
       }
 
-      // Combine training context with user prompt
-      const finalPrompt = trainingContextPrompt && prompt
-        ? `${trainingContextPrompt}\n---\n\n${prompt}`
-        : trainingContextPrompt || prompt;
+      // Combine context with user prompt
+      const finalPrompt = contextPrompt && prompt
+        ? `${contextPrompt}\n---\n\n${prompt}`
+        : contextPrompt || prompt;
 
       // Create session record
       const session = database.createClaudeSession({
@@ -1293,9 +1306,9 @@ export async function handleSqliteTool(
           mode: resolvedMode,
           taskId,
           moduleId,
-          usedProjectSettings: !terminal || !mode, // Indicate if project settings were used
-          includeTraining: !!includeTraining,
-          trainingContextIncluded: !!trainingContextPrompt,
+          usedProjectSettings: !terminal || !mode,
+          contextInjected: !!contextPrompt,
+          contextEntities,
         },
       });
 
@@ -1329,7 +1342,8 @@ export async function handleSqliteTool(
               terminal: result.terminal,
               command: result.command,
               pid: result.pid,
-              trainingContextIncluded: !!trainingContextPrompt,
+              contextInjected: !!contextPrompt,
+              contextEntities,
             }, null, 2),
           }],
         };

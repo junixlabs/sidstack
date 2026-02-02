@@ -136,9 +136,17 @@ function parseValue(value: string): unknown {
  * Normalize frontmatter to DocumentFrontmatter interface
  */
 function normalizeFrontmatter(raw: Record<string, unknown>): DocumentFrontmatter {
+  // Map legacy types to their replacements
+  let type: DocumentType | undefined;
+  if (isValidDocumentType(raw.type)) {
+    type = raw.type;
+  } else if (typeof raw.type === 'string' && LEGACY_TYPE_MAP[raw.type]) {
+    type = LEGACY_TYPE_MAP[raw.type];
+  }
+
   return {
     id: typeof raw.id === 'string' ? raw.id : undefined,
-    type: isValidDocumentType(raw.type) ? raw.type : undefined,
+    type,
     title: typeof raw.title === 'string' ? raw.title : undefined,
     status: isValidDocumentStatus(raw.status) ? raw.status : undefined,
     summary: typeof raw.summary === 'string' ? raw.summary : undefined,
@@ -158,6 +166,87 @@ function normalizeFrontmatter(raw: Record<string, unknown>): DocumentFrontmatter
     updatedAt: typeof raw.updatedAt === 'string' || typeof raw.updated_at === 'string'
       ? (raw.updatedAt || raw.updated_at) as string
       : undefined,
+  };
+}
+
+// =============================================================================
+// Frontmatter Serialization
+// =============================================================================
+
+/**
+ * Serialize a DocumentFrontmatter object and body back to markdown with YAML frontmatter
+ */
+export function serializeFrontmatter(frontmatter: DocumentFrontmatter, body: string): string {
+  const lines: string[] = ['---'];
+
+  const writeField = (key: string, value: unknown) => {
+    if (value === undefined || value === null) return;
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) return;
+      lines.push(`${key}:`);
+      for (const item of value) {
+        lines.push(`  - ${item}`);
+      }
+    } else {
+      lines.push(`${key}: ${value}`);
+    }
+  };
+
+  // Write fields in a consistent order
+  writeField('id', frontmatter.id);
+  writeField('type', frontmatter.type);
+  writeField('title', frontmatter.title);
+  writeField('status', frontmatter.status);
+  writeField('summary', frontmatter.summary);
+  writeField('description', frontmatter.description);
+  writeField('module', frontmatter.module);
+  writeField('tags', frontmatter.tags);
+  writeField('owner', frontmatter.owner);
+  writeField('author', frontmatter.author);
+  writeField('reviewDate', frontmatter.reviewDate);
+  writeField('related', frontmatter.related);
+  writeField('dependsOn', frontmatter.dependsOn);
+  writeField('createdAt', frontmatter.createdAt);
+  writeField('updatedAt', frontmatter.updatedAt);
+
+  lines.push('---');
+  lines.push('');
+
+  // Append body
+  if (body) {
+    lines.push(body);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Generate frontmatter from a create document input
+ */
+export function generateDocumentFrontmatter(input: {
+  title: string;
+  type: DocumentType;
+  status?: DocumentStatus;
+  module?: string;
+  tags?: string[];
+  owner?: string;
+  related?: string[];
+  dependsOn?: string[];
+}): DocumentFrontmatter {
+  const now = new Date().toISOString();
+  return {
+    id: generateSlug(input.title),
+    type: input.type,
+    title: input.title,
+    status: input.status || 'draft',
+    module: input.module,
+    tags: input.tags || [],
+    owner: input.owner,
+    related: input.related,
+    dependsOn: input.dependsOn,
+    createdAt: now,
+    updatedAt: now,
   };
 }
 
@@ -229,11 +318,18 @@ export function estimateReadingTime(wordCount: number): number {
 
 const VALID_DOCUMENT_TYPES: DocumentType[] = [
   'spec', 'decision', 'proposal',
-  'tutorial', 'guide', 'reference', 'explanation', 'concept',
+  'guide', 'reference',
   'template', 'checklist', 'pattern',
   'skill', 'principle', 'rule',
   'module', 'index',
 ];
+
+// Legacy types that map to 'guide'
+const LEGACY_TYPE_MAP: Record<string, DocumentType> = {
+  'tutorial': 'guide',
+  'explanation': 'guide',
+  'concept': 'guide',
+};
 
 const VALID_DOCUMENT_STATUSES: DocumentStatus[] = [
   'draft', 'active', 'review', 'archived',

@@ -239,7 +239,7 @@ export const OutputBlock = memo(function OutputBlock({ block }: OutputBlockProps
 
         {/* Content */}
         <div className="flex-1 min-w-0 pt-0.5">
-          <div className="text-[10px] text-[var(--text-muted)] mb-1 font-medium uppercase tracking-wide flex items-center gap-2">
+          <div className="text-[11px] text-[var(--text-muted)] mb-1 font-medium uppercase tracking-wide flex items-center gap-2">
             <span>Claude</span>
             {isStreaming && (
               <span className="flex gap-0.5">

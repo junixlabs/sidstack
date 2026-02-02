@@ -45,6 +45,8 @@ export interface RepoStatus {
   staged: string[];
   modified: string[];
   untracked: string[];
+  ahead: number;
+  behind: number;
 }
 
 // Workspace types

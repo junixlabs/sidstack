@@ -519,7 +519,7 @@ trainingRouter.post('/rules', async (req, res) => {
       description,
       skillIds,
       level = 'should',
-      enforcement = 'warn',
+      enforcement = 'manual',
       content,
       applicability,
     } = req.body;
@@ -767,15 +767,15 @@ trainingRouter.post('/feedback', async (req, res) => {
     });
 
     // Update skill success rate if applicable
-    if (entityType === 'skill' && (outcome === 'success' || outcome === 'failure')) {
+    if (entityType === 'skill' && (outcome === 'helped' || outcome === 'hindered')) {
       const skill = db.getSkill(entityId);
       if (skill) {
         const feedbackList = db.listTrainingFeedback('skill', entityId);
-        const successCount = feedbackList.filter((f) => f.outcome === 'success').length;
+        const helpedCount = feedbackList.filter((f) => f.outcome === 'helped').length;
         const totalCount = feedbackList.filter((f) =>
-          ['success', 'failure'].includes(f.outcome)
+          ['helped', 'hindered'].includes(f.outcome)
         ).length;
-        const successRate = totalCount > 0 ? Math.round((successCount / totalCount) * 100) : 0;
+        const successRate = totalCount > 0 ? Math.round((helpedCount / totalCount) * 100) : 0;
         db.updateSkill({ id: entityId, successRate });
       }
     }

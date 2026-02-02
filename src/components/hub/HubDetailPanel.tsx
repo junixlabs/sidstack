@@ -91,7 +91,7 @@ function CapabilityHeader({ cap }: { cap: CapabilityDefinition }) {
       </div>
       <h2 className="text-base font-medium text-[var(--text-primary)]">{cap.name}</h2>
       <div className="flex items-center gap-2 mt-1">
-        <p className="text-[10px] text-[var(--text-muted)] font-mono">{cap.id}</p>
+        <p className="text-[11px] text-[var(--text-muted)] font-mono">{cap.id}</p>
         <div className="ml-auto">
           <CapabilityActions capability={cap} />
         </div>
@@ -187,13 +187,13 @@ function BusinessRulesSection({ rules }: { rules?: CapabilityBusinessRule[] }) {
                 {enriched.rule}
               </p>
               {enriched.rationale && (
-                <p className="text-[10px] text-[var(--text-muted)] mt-0.5 ml-4">
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5 ml-4">
                   Rationale: {enriched.rationale}
                 </p>
               )}
               {enriched.enforcement && (
                 <span className={cn(
-                  'inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-0.5 ml-4',
+                  'inline-block text-[11px] font-medium px-1.5 py-0.5 rounded mt-0.5 ml-4',
                   enforcementColor(enriched.enforcement),
                 )}>
                   {enriched.enforcement}
@@ -246,13 +246,13 @@ function RequirementsSection({ requirements }: { requirements?: CapabilityRequir
                 {enriched.status && <RequirementStatusBadge status={enriched.status} />}
                 <span className="text-[var(--text-primary)] flex-1">{enriched.description}</span>
                 {enriched.completeness !== undefined && enriched.completeness > 0 && (
-                  <span className="text-[10px] text-[var(--text-muted)] flex-shrink-0">
+                  <span className="text-[11px] text-[var(--text-muted)] flex-shrink-0">
                     {enriched.completeness}%
                   </span>
                 )}
               </div>
               {enriched.acceptanceCriteria && enriched.acceptanceCriteria.length > 0 && (
-                <div className="ml-7 mt-0.5 text-[10px] text-[var(--text-muted)]">
+                <div className="ml-7 mt-0.5 text-[11px] text-[var(--text-muted)]">
                   {enriched.acceptanceCriteria.join(', ')}
                 </div>
               )}
@@ -299,7 +299,7 @@ function RelationshipGroup({
 
   return (
     <div className="flex items-start gap-2">
-      <span className="text-[10px] text-[var(--text-muted)] w-20 flex-shrink-0 text-right font-mono">
+      <span className="text-[11px] text-[var(--text-muted)] w-20 flex-shrink-0 text-right font-mono">
         {label}
       </span>
       <span className="text-[var(--text-muted)]">{'->'}</span>
@@ -341,7 +341,7 @@ function StatusSection({ cap }: { cap: CapabilityDefinition }) {
             <span className="text-[var(--text-muted)] w-16">Tags</span>
             <div className="flex flex-wrap gap-1">
               {cap.tags!.map((tag) => (
-                <span key={tag} className="text-[10px] bg-[var(--surface-2)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded">
+                <span key={tag} className="text-[11px] bg-[var(--surface-2)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded">
                   {tag}
                 </span>
               ))}
@@ -353,7 +353,7 @@ function StatusSection({ cap }: { cap: CapabilityDefinition }) {
             <span className="text-[var(--text-muted)] w-16">Modules</span>
             <div className="flex flex-wrap gap-1">
               {cap.modules!.map((mod) => (
-                <span key={mod} className="text-[10px] bg-[var(--surface-2)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded font-mono">
+                <span key={mod} className="text-[11px] bg-[var(--surface-2)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded font-mono">
                   {mod}
                 </span>
               ))}
@@ -393,7 +393,7 @@ function Section({
           <span className="text-[11px] text-[var(--text-muted)]">({count})</span>
         )}
         {concept && (
-          <span className="text-[10px] text-[var(--text-muted)] ml-auto">
+          <span className="text-[11px] text-[var(--text-muted)] ml-auto">
             {concept}
           </span>
         )}
@@ -415,7 +415,7 @@ function RequirementStatusBadge({ status }: { status: string }) {
   };
   const cfg = map[status] || { label: status, color: 'bg-[var(--surface-3)] text-[var(--text-muted)]' };
   return (
-    <span className={cn('text-[10px] font-mono font-bold px-1 py-0.5 rounded flex-shrink-0', cfg.color)}>
+    <span className={cn('text-[11px] font-mono font-bold px-1 py-0.5 rounded flex-shrink-0', cfg.color)}>
       {cfg.label}
     </span>
   );

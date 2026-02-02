@@ -273,7 +273,7 @@ function RequirementStatusBadge({ status }: { status: string }) {
   };
   const cfg = map[status] || { label: status, color: 'bg-[var(--surface-3)] text-[var(--text-muted)]' };
   return (
-    <span className={cn('text-[10px] font-mono font-bold px-1 py-0.5 rounded flex-shrink-0', cfg.color)}>
+    <span className={cn('text-[11px] font-mono font-bold px-1 py-0.5 rounded flex-shrink-0', cfg.color)}>
       {cfg.label}
     </span>
   );

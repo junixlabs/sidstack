@@ -158,12 +158,12 @@ function SessionItem({
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium truncate">{displayName}</span>
           {session.role && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-secondary)] font-medium flex-shrink-0">
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-secondary)] font-medium flex-shrink-0">
               {session.role}
             </span>
           )}
           {isActive && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-secondary)] font-medium flex-shrink-0">
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-secondary)] font-medium flex-shrink-0">
               active
             </span>
           )}
@@ -180,7 +180,7 @@ function SessionItem({
         </div>
 
         {/* Row 3: Session ID */}
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50 mt-0.5 font-mono">
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground/50 mt-0.5 font-mono">
           <span>ID: {shortSessionId}...</span>
         </div>
       </div>

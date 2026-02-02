@@ -93,8 +93,9 @@ interface ProjectStore {
   getActiveProject: () => Project | null;
 
   // Worktree actions
-  addWorktree: (projectId: string, worktreePath: string) => Promise<void>;
+  addWorktree: (projectId: string, worktreePath: string, purpose?: string) => Promise<void>;
   removeWorktree: (projectId: string, worktreeId: string) => void;
+  removeWorktreeFromDisk: (projectId: string, worktreeId: string) => Promise<void>;
   switchWorktree: (worktreeId: string) => void;
   getActiveWorktree: () => Worktree | null;
 
@@ -207,7 +208,7 @@ export const useProjectStore = create<ProjectStore>()(
       // Worktree Actions
       // =======================================================================
 
-      addWorktree: async (projectId: string, worktreePath: string) => {
+      addWorktree: async (projectId: string, worktreePath: string, purpose?: string) => {
         const { allocatePorts } = get();
 
         // Get branch info for the worktree
@@ -230,6 +231,7 @@ export const useProjectStore = create<ProjectStore>()(
           id: worktreeId,
           path: worktreePath,
           branch,
+          purpose,
           ports,
           isActive: false,
           lastActive: new Date().toISOString(),
@@ -263,6 +265,33 @@ export const useProjectStore = create<ProjectStore>()(
             };
           }),
         }));
+      },
+
+      removeWorktreeFromDisk: async (projectId: string, worktreeId: string) => {
+        const { projects, removeWorktree } = get();
+        const project = projects.find((p) => p.id === projectId);
+        const worktree = project?.worktrees.find((w) => w.id === worktreeId);
+        if (!worktree || !project) return;
+
+        // Use the main worktree as cwd for the git command
+        const mainWorktree = project.worktrees[0];
+        if (!mainWorktree) return;
+
+        try {
+          await invoke<string>("run_git_command", {
+            cwd: mainWorktree.path,
+            args: ["worktree", "remove", worktree.path],
+          });
+        } catch (error) {
+          // Try force remove if regular remove fails
+          await invoke<string>("run_git_command", {
+            cwd: mainWorktree.path,
+            args: ["worktree", "remove", "--force", worktree.path],
+          });
+        }
+
+        // Remove from SidStack state
+        removeWorktree(projectId, worktreeId);
       },
 
       switchWorktree: (worktreeId: string) => {

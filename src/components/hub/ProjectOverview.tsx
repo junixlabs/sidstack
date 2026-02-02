@@ -20,8 +20,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { showSuccess, showError } from '@/lib/toast';
 import { useProjectHubStore } from '@/stores/projectHubStore';
+import { CreateTaskDialog } from './CreateTaskDialog';
 import type { HubViewMode, ProjectGoalsDomain, ProjectGoalsSubGoal } from '@/stores/projectHubStore';
 
 const API_BASE = 'http://localhost:19432';
@@ -241,7 +241,7 @@ function ProjectOKRsSection({
         <span className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">
           Overall: {overallProgress}%
         </span>
-        <span className="text-[10px] text-[var(--text-muted)]">
+        <span className="text-[11px] text-[var(--text-muted)]">
           {allKRs.length} key results
         </span>
       </div>
@@ -289,7 +289,7 @@ function QuarterCard({ quarter }: { quarter: OKRQuarter }) {
           {quarter.label}
           <span className="text-[var(--text-muted)] font-normal ml-1.5">{quarter.theme}</span>
         </span>
-        <span className="text-[10px] text-[var(--text-muted)] mr-1">{quarter.period}</span>
+        <span className="text-[11px] text-[var(--text-muted)] mr-1">{quarter.period}</span>
         <span className="text-sm font-semibold text-[var(--text-primary)] tabular-nums w-10 text-right">
           {quarterProgress}%
         </span>
@@ -336,7 +336,7 @@ function ObjectiveBlock({ objective }: { objective: OKRObjective }) {
         ) : (
           <ChevronRight size={10} className="text-[var(--text-muted)] flex-shrink-0" />
         )}
-        <span className="text-[10px] text-[var(--text-muted)] font-mono flex-shrink-0">
+        <span className="text-[11px] text-[var(--text-muted)] font-mono flex-shrink-0">
           {objective.id}
         </span>
         <span className="text-xs text-[var(--text-primary)] flex-1 truncate">
@@ -363,7 +363,7 @@ function KeyResultRow({ kr }: { kr: OKRKeyResult }) {
   return (
     <div className="text-xs">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-[var(--text-muted)] font-mono w-10 flex-shrink-0">
+        <span className="text-[11px] text-[var(--text-muted)] font-mono w-10 flex-shrink-0">
           {kr.id}
         </span>
         <span className="text-[var(--text-primary)] flex-1 truncate">{kr.title}</span>
@@ -375,7 +375,7 @@ function KeyResultRow({ kr }: { kr: OKRKeyResult }) {
         <div className="flex-1">
           <ProgressBar score={kr.progress} />
         </div>
-        <span className="text-[10px] text-[var(--text-muted)] flex-shrink-0 w-24 text-right truncate">
+        <span className="text-[11px] text-[var(--text-muted)] flex-shrink-0 w-24 text-right truncate">
           {kr.target}
         </span>
       </div>
@@ -538,7 +538,7 @@ function StatusCard({
       <div className="text-lg font-semibold text-[var(--text-primary)] tabular-nums">
         {loading ? '--' : value ?? '--'}
       </div>
-      <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mt-0.5">
+      <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider mt-0.5">
         {label}
       </div>
     </div>
@@ -558,33 +558,7 @@ function ActionItemsSection({
   loading: boolean;
   projectId: string;
 }) {
-  const [isCreating, setIsCreating] = useState(false);
-
-  const handleCreateTask = async () => {
-    setIsCreating(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          title: 'New task',
-          description: 'Created from Project Overview',
-          taskType: 'feature',
-          createdBy: 'ui',
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.error || `HTTP ${res.status}`);
-      }
-      showSuccess('Task created');
-    } catch (err: any) {
-      showError('Failed to create task', err.message);
-    } finally {
-      setIsCreating(false);
-    }
-  };
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   if (loading) {
     return (
@@ -636,7 +610,7 @@ function ActionItemsSection({
                 >
                   <PriorityBadge priority={task.priority} />
                   <span className="text-[var(--text-primary)] flex-1 truncate">{task.title}</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">pending</span>
+                  <span className="text-[11px] text-[var(--text-muted)]">pending</span>
                 </div>
               ))}
             </div>
@@ -648,17 +622,18 @@ function ActionItemsSection({
         <Button
           variant="secondary"
           size="sm"
-          onClick={handleCreateTask}
-          disabled={isCreating}
+          onClick={() => setShowCreateDialog(true)}
         >
-          {isCreating ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Plus className="w-3.5 h-3.5" />
-          )}
+          <Plus className="w-3.5 h-3.5" />
           Create Task
         </Button>
       </div>
+
+      <CreateTaskDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        projectId={projectId}
+      />
     </SectionWrapper>
   );
 }
@@ -673,7 +648,7 @@ function PriorityBadge({ priority }: { priority: string }) {
   return (
     <span
       className={cn(
-        'text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0',
+        'text-[11px] font-medium px-1.5 py-0.5 rounded flex-shrink-0',
         colors[priority] || 'bg-[var(--surface-3)] text-[var(--text-muted)]',
       )}
     >
@@ -738,7 +713,7 @@ function MaturityTag({ maturity }: { maturity: string }) {
   return (
     <span
       className={cn(
-        'text-[10px] px-1.5 py-0.5 rounded flex-shrink-0',
+        'text-[11px] px-1.5 py-0.5 rounded flex-shrink-0',
         colors[maturity] || 'bg-[var(--surface-3)] text-[var(--text-muted)]',
       )}
     >

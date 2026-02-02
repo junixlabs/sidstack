@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 const IPC_PORT: u16 = 17432;
-const LOCK_FILE_NAME: &str = ".sidstack-agent-manager.lock";
+const LOCK_FILE_NAME: &str = ".sidstack.lock";
 
 /// Get the lockfile path in the user's home directory
 fn get_lock_file_path() -> PathBuf {

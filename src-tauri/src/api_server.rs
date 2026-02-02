@@ -53,7 +53,7 @@ fn get_project_root() -> Option<std::path::PathBuf> {
         return Some(current_dir);
     }
 
-    // Try to find from exe path (dev mode: target/debug/sidstack-agent-manager)
+    // Try to find from exe path (dev mode: target/debug/sidstack)
     let mut path = exe_path.parent()?; // debug
     path = path.parent()?; // target
     path = path.parent()?; // src-tauri

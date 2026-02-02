@@ -20,7 +20,7 @@ function StatusBadge({ status }: { status: FileStatus }) {
     <span
       className={clsx(
         "inline-flex items-center justify-center",
-        "w-5 h-5 text-[10px] font-semibold",
+        "w-5 h-5 text-[11px] font-semibold",
         "rounded border",
         colorClass
       )}

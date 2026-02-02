@@ -14,7 +14,7 @@ This project uses **SidStack** for AI agent governance, task management, and qua
 
 1. **Check tasks:** `task_list({ projectId: "{projectName}" })` - see pending/in-progress work
 2. **Resume or create:** If in-progress task exists, continue it. If user requests implementation, create a task.
-3. **Check training context:** `training_context_get({ projectId: "{projectName}" })` - load applicable lessons/rules
+3. **Check rules:** `rule_check({ projectPath: ".", moduleId: "...", role: "dev", taskType: "..." })` - load applicable rules
 
 **NEVER start implementation without an active task.**
 
@@ -41,8 +41,7 @@ This project uses **SidStack** for AI agent governance, task management, and qua
 | Create task | `task_create` | Before implementation work (not questions/discussions) |
 | Start work | `task_update` (status: `in_progress`) | When beginning implementation |
 | Track progress | `task_update` (progress: 0-100) | During implementation |
-| Complete task | `task_update` (status: `completed`) | After quality gates pass |
-| Break down | `task_breakdown` | For complex tasks (>3 steps) |
+| Complete task | `task_complete` | After quality gates pass |
 
 ### Task Creation Requirements
 Every task MUST have:
@@ -84,14 +83,14 @@ After quality gates pass, verify runtime:
 | Situation | SidStack Feature | MCP Tool |
 |-----------|-----------------|----------|
 | Starting any work | Task Management | `task_create`, `task_update` |
-| Risky/large change | Impact Analysis | `impact_analyze` |
-| Bug found during work | Training Room | `incident_create` |
+| Completing work | Task Completion | `task_complete` (validates quality gates) |
+| Risky/large change | Impact Analysis | `impact_analyze`, `impact_check_gate` |
 | Bug fix completed | Lesson Detection | `lesson_create` (ask user first) |
-| Reusable pattern found | Skill Creation | `skill_create` (ask user first) |
-| Recurring mistake | Rule Creation | `rule_create` (ask user first) |
+| Check applicable rules | Training Room | `rule_check` |
 | Need project context | Knowledge API | `knowledge_context`, `knowledge_search` |
 | Parallel work needed | Session Manager | `session_launch` |
 | External ticket intake | Ticket Queue | `ticket_create`, `ticket_list` |
+| Track project goals | OKR Management | `okr_list`, `okr_update` |
 
 ---
 
@@ -136,20 +135,11 @@ After fixing bugs or solving problems, check these triggers:
 | Preventable error occurred | Ask user: "Create a rule?" |
 | Same error happened before | Ask user: "Create enforcement rule?" |
 
-### Training Flow
-```
-incident_create → lesson_create → skill_create → rule_create
-```
-
 ### Available Tools
-- `incident_create` - Log what went wrong
-- `lesson_create` - Document what was learned
-- `skill_create` - Create reusable procedure/checklist
-- `rule_create` - Create enforcement rule (must/should/may)
-- `training_context_get` - Get applicable lessons for current work
-- `training_feedback_submit` - Log training effectiveness
+- `lesson_create` - Document what was learned from an incident
+- `rule_check` - Check applicable rules for current context (module, role, task type)
 
-**Always ask user before creating lessons/skills/rules.**
+**Always ask user before creating lessons.**
 
 ---
 
@@ -175,13 +165,11 @@ For parallel work or fresh context:
 
 ```
 session_launch({
-  workspacePath: "/path/to/project",
+  projectDir: "/path/to/project",
   taskId: "task-to-work-on",
   prompt: "Clear instructions for the new session"
 })
 ```
-
-Track sessions: `session_list`, `session_get`, `session_stats`
 
 ---
 
@@ -201,10 +189,9 @@ Spawn agents: `/sidstack:agent worker [task]` or `/sidstack:agent reviewer [task
 
 | Command | Description |
 |---------|-------------|
-| `/sidstack` | Project intelligence hub (dashboard, tasks, tickets, impact, governance, focus, analyze) |
-| `/sidstack:agent worker [task]` | Spawn governed Worker agent |
-| `/sidstack:agent reviewer [task]` | Spawn Reviewer agent |
-| `/sidstack:knowledge` | Knowledge system (build, explore, search, init) |
+| `/sidstack` | Project intelligence hub (task, ticket, focus, analyze, impact, governance, review) |
+| `/sidstack:agent` | Spawn governed agent (worker/reviewer) |
+| `/sidstack:knowledge` | Knowledge system (build, explore, search, init, validate, Q&A) |
 
 ---
 

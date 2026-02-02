@@ -338,7 +338,7 @@ function HunkView({ hunk, viewMode, isActive, onClick }: HunkViewProps) {
           <button
             onClick={toggleContext}
             className={clsx(
-              "ml-2 px-2 py-0.5 rounded text-[10px] transition-colors",
+              "ml-2 px-2 py-0.5 rounded text-[11px] transition-colors",
               contextExpanded
                 ? "bg-[var(--surface-3)] text-[var(--text-muted)] hover:bg-[var(--surface-3)]"
                 : "bg-[var(--surface-3)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]"

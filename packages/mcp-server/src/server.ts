@@ -9,13 +9,17 @@ import {
 import { sqliteTools, handleSqliteTool } from './tools/sqlite-tools.js';
 import { tools as allTools, handleToolCall } from './tools/index.js';
 
+// Read version from package.json to avoid hardcoding
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pkg = JSON.parse(require('fs').readFileSync(require('path').resolve(__dirname, '../package.json'), 'utf-8'));
+
 // Create a set of sqlite tool names for routing
 const sqliteToolNames = new Set(sqliteTools.map(t => t.name));
 
 const server = new Server(
   {
     name: 'sidstack-mcp-server',
-    version: '0.1.0',
+    version: pkg.version,
   },
   {
     capabilities: {
@@ -43,7 +47,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`SidStack MCP server v0.1.0 running on stdio (${allTools.length} tools)`);
+  console.error(`SidStack MCP server v${pkg.version} running on stdio (${allTools.length} tools)`);
 }
 
 main().catch(console.error);

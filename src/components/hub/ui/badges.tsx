@@ -12,7 +12,7 @@ export function LevelBadge({ level }: { level: string }) {
     L2: 'bg-[var(--color-success)]/20 text-[var(--color-success)]',
   };
   return (
-    <span className={cn('text-[10px] font-mono font-bold px-1.5 py-0.5 rounded', colors[level] || 'bg-[var(--surface-3)] text-[var(--text-muted)]')}>
+    <span className={cn('text-[11px] font-mono font-bold px-1.5 py-0.5 rounded', colors[level] || 'bg-[var(--surface-3)] text-[var(--text-muted)]')}>
       {level}
     </span>
   );
@@ -25,7 +25,7 @@ export function StatusBadge({ status }: { status: string }) {
     deprecated: 'bg-[var(--color-error)]/20 text-[var(--color-error)]',
   };
   return (
-    <span className={cn('text-[10px] px-1.5 py-0.5 rounded', colors[status] || 'bg-[var(--surface-3)] text-[var(--text-muted)]')}>
+    <span className={cn('text-[11px] px-1.5 py-0.5 rounded', colors[status] || 'bg-[var(--surface-3)] text-[var(--text-muted)]')}>
       {status}
     </span>
   );
@@ -39,7 +39,7 @@ export function MaturityBadge({ maturity }: { maturity: string }) {
     optimized: 'bg-[var(--color-info)]/20 text-[var(--color-info)]',
   };
   return (
-    <span className={cn('text-[10px] px-1.5 py-0.5 rounded', colors[maturity] || 'bg-[var(--surface-3)] text-[var(--text-muted)]')}>
+    <span className={cn('text-[11px] px-1.5 py-0.5 rounded', colors[maturity] || 'bg-[var(--surface-3)] text-[var(--text-muted)]')}>
       {maturity}
     </span>
   );

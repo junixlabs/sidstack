@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/junixlabs/sidstack/actions/workflows/ci.yml/badge.svg)](https://github.com/junixlabs/sidstack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/junixlabs/sidstack/releases)
+[![Version](https://img.shields.io/badge/version-0.3.2-blue.svg)](https://github.com/junixlabs/sidstack/releases)
 
 **Knowledge-powered AI coding assistant.** Structured project knowledge, impact analysis, and governance for Claude Code.
 

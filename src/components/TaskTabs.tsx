@@ -323,7 +323,7 @@ const TabItem = React.forwardRef<HTMLDivElement, TabItemProps>(
             </span>
             {displaySubtitle && (
               <span className={cn(
-                "text-[10px] truncate select-none",
+                "text-[11px] truncate select-none",
                 isDark ? "text-[var(--text-muted)]" : "text-gray-400"
               )}>
                 {displaySubtitle}

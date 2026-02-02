@@ -146,6 +146,35 @@ describe('Tickets Integration', () => {
     expect(res.status).toBe(409);
   });
 
+  // --- Full Flow: Ticket → Task → Complete → Ticket auto-completed ---
+
+  it('completes task and auto-completes linked ticket', async () => {
+    // The ticketId was converted to a task above. Get the task ID.
+    const ticketRes = await request(app).get(`/api/tickets/${ticketId}`);
+    expect(ticketRes.status).toBe(200);
+    const taskId = ticketRes.body.ticket.taskId;
+    expect(taskId).toBeDefined();
+
+    // Move task to in_progress
+    const progressRes = await request(app)
+      .patch(`/api/tasks/${taskId}`)
+      .send({ status: 'in_progress', progress: 50 });
+    expect(progressRes.status).toBe(200);
+
+    // Complete the task (force since governance may block in test env)
+    const completeRes = await request(app)
+      .post(`/api/tasks/${taskId}/complete`)
+      .send({ force: true, reason: 'E2E test completion' });
+    expect(completeRes.status).toBe(200);
+    expect(completeRes.body.task.status).toBe('completed');
+    expect(completeRes.body.linkedTicketCompleted).toBe(ticketId);
+
+    // Verify ticket was auto-completed
+    const verifyRes = await request(app).get(`/api/tickets/${ticketId}`);
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.ticket.status).toBe('completed');
+  });
+
   // --- Delete ---
 
   it('deletes a ticket', async () => {

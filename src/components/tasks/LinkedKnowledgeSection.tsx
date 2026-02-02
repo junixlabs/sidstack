@@ -5,26 +5,33 @@
  * Supports navigation and unlink actions.
  */
 
-import { BookOpen, ChevronDown, ChevronRight, X, ExternalLink } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, X, ExternalLink, Sparkles, Check } from "lucide-react";
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
-import type { TaskKnowledgeLink } from "@/stores/unifiedContextStore";
+import type { TaskKnowledgeLink, LinkSuggestion } from "@/stores/unifiedContextStore";
 
 interface LinkedKnowledgeSectionProps {
   links: TaskKnowledgeLink[];
+  suggestions?: LinkSuggestion[];
   onNavigate: (knowledgePath: string) => void;
   onUnlink?: (linkId: string) => void;
+  onAcceptSuggestion?: (suggestion: LinkSuggestion) => void;
+  onDismissSuggestion?: (suggestion: LinkSuggestion) => void;
   isLoading?: boolean;
 }
 
 export function LinkedKnowledgeSection({
   links,
+  suggestions,
   onNavigate,
   onUnlink,
+  onAcceptSuggestion,
+  onDismissSuggestion,
   isLoading,
 }: LinkedKnowledgeSectionProps) {
   const [expanded, setExpanded] = useState(true);
+  const activeSuggestions = suggestions?.filter((s) => s.type === "knowledge") || [];
 
   return (
     <div>
@@ -62,6 +69,51 @@ export function LinkedKnowledgeSection({
                 onUnlink={onUnlink ? () => onUnlink(link.id) : undefined}
               />
             ))
+          )}
+
+          {/* Suggestions */}
+          {activeSuggestions.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-[var(--border-muted)]">
+              <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-1.5">
+                <Sparkles className="w-3 h-3" />
+                <span>Suggested</span>
+              </div>
+              {activeSuggestions.map((suggestion) => {
+                const fileName = suggestion.path.split("/").pop()?.replace(".md", "") || suggestion.path;
+                return (
+                  <div
+                    key={suggestion.id}
+                    className="flex items-center gap-2 group"
+                  >
+                    <span className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 bg-amber-400" />
+                    <span
+                      className="flex-1 text-xs text-[var(--text-muted)] truncate"
+                      title={suggestion.reason}
+                    >
+                      {fileName}
+                    </span>
+                    {onAcceptSuggestion && (
+                      <button
+                        onClick={() => onAcceptSuggestion(suggestion)}
+                        className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-green-400 flex-shrink-0"
+                        title="Link this document"
+                      >
+                        <Check className="w-3 h-3" />
+                      </button>
+                    )}
+                    {onDismissSuggestion && (
+                      <button
+                        onClick={() => onDismissSuggestion(suggestion)}
+                        className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-400 flex-shrink-0"
+                        title="Dismiss suggestion"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       )}

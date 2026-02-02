@@ -2,12 +2,13 @@
  * LinkedKnowledgeSection
  *
  * Displays knowledge documents linked to the current task with actions to navigate or unlink.
+ * Also shows auto-suggested knowledge documents based on task keywords.
  */
 
-import { BookOpen, X, Plus, ExternalLink } from "lucide-react";
+import { BookOpen, X, Plus, ExternalLink, Sparkles, Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { useUnifiedContextStore, TaskKnowledgeLink } from "@/stores/unifiedContextStore";
+import { useUnifiedContextStore, TaskKnowledgeLink, LinkSuggestion } from "@/stores/unifiedContextStore";
 
 interface LinkedKnowledgeSectionProps {
   taskId: string;
@@ -20,10 +21,11 @@ export function LinkedKnowledgeSection({
   className,
   onAddKnowledge,
 }: LinkedKnowledgeSectionProps) {
-  const { knowledgeLinks, unlinkKnowledge, navigateTo, isLoading } =
+  const { knowledgeLinks, suggestions, unlinkKnowledge, navigateTo, acceptSuggestion, dismissSuggestion, isLoading } =
     useUnifiedContextStore();
 
   const links = knowledgeLinks.filter((l) => l.taskId === taskId);
+  const activeSuggestions = suggestions.filter((s) => s.type === "knowledge");
 
   const handleNavigate = (link: TaskKnowledgeLink) => {
     navigateTo({ type: "knowledge", path: link.knowledgePath });
@@ -32,6 +34,16 @@ export function LinkedKnowledgeSection({
   const handleUnlink = async (e: React.MouseEvent, linkId: string) => {
     e.stopPropagation();
     await unlinkKnowledge(linkId);
+  };
+
+  const handleAcceptSuggestion = async (e: React.MouseEvent, suggestion: LinkSuggestion) => {
+    e.stopPropagation();
+    await acceptSuggestion(suggestion);
+  };
+
+  const handleDismissSuggestion = async (e: React.MouseEvent, suggestion: LinkSuggestion) => {
+    e.stopPropagation();
+    await dismissSuggestion(suggestion);
   };
 
   const getLinkTypeBadge = (linkType: string) => {
@@ -90,7 +102,7 @@ export function LinkedKnowledgeSection({
                 onClick={() => handleNavigate(link)}
               >
                 {folder && (
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[11px] text-muted-foreground">
                     {folder}/
                   </span>
                 )}
@@ -100,7 +112,7 @@ export function LinkedKnowledgeSection({
                 {link.linkType !== "manual" && (
                   <span
                     className={cn(
-                      "px-1.5 py-0.5 text-[10px] font-medium rounded",
+                      "px-1.5 py-0.5 text-[11px] font-medium rounded",
                       getLinkTypeBadge(link.linkType)
                     )}
                   >
@@ -119,6 +131,50 @@ export function LinkedKnowledgeSection({
             );
           })}
         </ul>
+      )}
+
+      {/* Suggestions */}
+      {activeSuggestions.length > 0 && (
+        <div className="mt-3">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5 pl-6">
+            <Sparkles className="w-3 h-3" />
+            <span>Suggested</span>
+          </div>
+          <ul className="space-y-1 pl-6">
+            {activeSuggestions.map((suggestion) => {
+              const { filename, folder } = formatPath(suggestion.path);
+              return (
+                <li
+                  key={suggestion.id}
+                  className="group flex items-center gap-2 text-sm rounded px-2 py-1 transition-colors border border-dashed border-[var(--border-muted)] hover:border-[var(--border-emphasis)] hover:bg-accent/30"
+                >
+                  {folder && (
+                    <span className="text-[11px] text-muted-foreground">
+                      {folder}/
+                    </span>
+                  )}
+                  <span className="flex-1 truncate text-muted-foreground">
+                    {filename}
+                  </span>
+                  <button
+                    onClick={(e) => handleAcceptSuggestion(e, suggestion)}
+                    className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-green-500/20 hover:text-green-500 transition-all"
+                    title="Link this document"
+                  >
+                    <Check className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => handleDismissSuggestion(e, suggestion)}
+                    className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/20 hover:text-destructive transition-all"
+                    title="Dismiss suggestion"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       {isLoading && (

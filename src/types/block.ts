@@ -1,7 +1,7 @@
 // Block System Types for SidStack
 // Inspired by WaveTerm's block architecture
 
-export type BlockViewType = "preview" | "webview" | "settings" | "specs-browser" | "knowledge-browser" | "training-room" | "task-manager" | "worktree-status" | "ticket-queue" | "project-hub";
+export type BlockViewType = "preview" | "webview" | "settings" | "specs-browser" | "knowledge-browser" | "training-room" | "task-manager" | "worktree-status" | "worktree-overview" | "ticket-queue" | "project-hub";
 
 /**
  * Block data stored per block instance

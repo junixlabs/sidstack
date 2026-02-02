@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
 // Mock the raw changelog import
-vi.mock("@/docs/changelog.md?raw", () => ({
+vi.mock("../../CHANGELOG.md?raw", () => ({
   default: "## [1.0.0] - 2026-01-21\n- Added new feature\n- Fixed critical bug\n- Improved performance",
 }));
 
@@ -21,7 +21,7 @@ describe("WelcomeScreen", () => {
     render(<WelcomeScreen onOpenProject={onOpenProject} onShowDocs={onShowDocs} />);
 
     expect(screen.getByText("Welcome to SidStack")).toBeInTheDocument();
-    expect(screen.getByText("Lightweight Orchestrator-to-Agents Platform")).toBeInTheDocument();
+    expect(screen.getByText("AI-Powered Project Intelligence Platform")).toBeInTheDocument();
   });
 
   it("displays feature cards", () => {

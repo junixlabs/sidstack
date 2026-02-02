@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 fn get_crash_log_path() -> PathBuf {
     let mut path = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
-    path.push("sidstack-agent-manager");
+    path.push("sidstack");
     fs::create_dir_all(&path).ok();
     path.push("crash.log");
     path
@@ -54,5 +54,5 @@ fn setup_panic_handler() {
 
 fn main() {
     setup_panic_handler();
-    sidstack_agent_manager_lib::run()
+    sidstack_lib::run()
 }

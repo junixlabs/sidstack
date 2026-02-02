@@ -4,6 +4,8 @@
  */
 
 import { CheckSquare, Terminal, BookOpen, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useBlockNavigation } from '@/hooks/useBlockNavigation';
 import { useProjectHubStore, type ConnectedEntity } from '@/stores/projectHubStore';
 
 const MAX_ITEMS_PER_GROUP = 5;
@@ -106,10 +108,29 @@ const statusDotColor: Record<string, string> = {
 };
 
 function EntityRow({ entity }: { entity: ConnectedEntity }) {
+  const { navigateToBlockView } = useBlockNavigation();
   const dotClass = statusDotColor[entity.status || ''] || 'bg-[var(--status-pending)]';
 
+  const isNavigable = entity.type === 'task' || entity.type === 'knowledge';
+
+  const handleClick = () => {
+    if (entity.type === 'task') {
+      navigateToBlockView('task-manager', { selectedTaskId: entity.id });
+    } else if (entity.type === 'knowledge') {
+      navigateToBlockView('knowledge-browser', { selectedKnowledgePath: entity.id });
+    }
+  };
+
   return (
-    <div className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--surface-2)] transition-colors cursor-pointer text-xs">
+    <div
+      onClick={isNavigable ? handleClick : undefined}
+      className={cn(
+        'flex items-center gap-2 px-2 py-1 rounded transition-colors text-xs',
+        isNavigable
+          ? 'hover:bg-[var(--surface-2)] cursor-pointer'
+          : 'cursor-default',
+      )}
+    >
       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotClass}`} />
       <span className="text-[var(--text-primary)] truncate flex-1">{entity.title}</span>
       {entity.status && (

@@ -169,7 +169,7 @@ function WorkspaceItem({ label, sublabel, stats, isActive, onClick, isDark, icon
             </span>
             {stats && stats.commits_ahead > 0 && (
               <span className={cn(
-                "text-[10px] font-medium shrink-0",
+                "text-[11px] font-medium shrink-0",
                 isDark ? "text-[var(--text-muted)]" : "text-gray-500"
               )}>
                 {stats.commits_ahead} ahead

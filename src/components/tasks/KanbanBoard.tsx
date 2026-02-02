@@ -5,7 +5,7 @@
  * Optimized for PM workflow visibility.
  */
 
-import { Clock, User } from "lucide-react";
+import { Clock, GitBranch, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { Task, TaskStatus } from "@/stores/taskStore";
@@ -192,14 +192,18 @@ function KanbanCard({ task, isSelected, onSelect, onContextMenu }: KanbanCardPro
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
       onContextMenu={handleContextMenu}
       className={cn(
         "p-2.5 rounded-md cursor-pointer transition-all border",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]",
         isSelected
           ? "bg-[var(--surface-3)] border-[var(--border-emphasis)] ring-1 ring-[var(--border-emphasis)]"
           : "bg-[var(--surface-1)] border-[var(--border-muted)] hover:bg-[var(--surface-2)] hover:border-[var(--border-default)]",
-        isEpic && "border-l-2 border-l-blue-500/50"
+        isEpic && "border-l-2 border-l-[var(--accent-primary)]/50"
       )}
     >
       {/* Top row: Type + Priority */}
@@ -238,25 +242,31 @@ function KanbanCard({ task, isSelected, onSelect, onContextMenu }: KanbanCardPro
               }}
             />
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 text-right">
+          <div className="text-[11px] text-[var(--text-muted)] mt-0.5 text-right">
             {task.progress}%
           </div>
         </div>
       )}
 
-      {/* Bottom row: Agent + Time */}
+      {/* Bottom row: Agent + Branch + Time */}
       <div className="flex items-center gap-1.5 flex-wrap">
         {task.assignedAgent && (
-          <span className="text-[10px] px-1.5 py-0.5 bg-sky-500/20 text-sky-300 rounded border border-sky-500/30 flex items-center gap-0.5">
+          <span className="text-[11px] px-1.5 py-0.5 bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] rounded border border-[var(--accent-primary)]/30 flex items-center gap-0.5">
             <User className="w-2.5 h-2.5" />
             {task.assignedAgent}
+          </span>
+        )}
+        {task.branch && (
+          <span className="text-[11px] px-1.5 py-0.5 bg-purple-500/15 text-purple-400 rounded border border-purple-500/25 flex items-center gap-0.5" title={`Branch: ${task.branch}`}>
+            <GitBranch className="w-2.5 h-2.5" />
+            {task.branch.length > 12 ? `${task.branch.substring(0, 12)}...` : task.branch}
           </span>
         )}
 
         <div className="flex-1" />
 
         <span
-          className="text-[10px] text-[var(--text-muted)] flex items-center gap-0.5"
+          className="text-[11px] text-[var(--text-muted)] flex items-center gap-0.5"
           title={new Date(task.updatedAt).toLocaleString()}
         >
           <Clock className="w-2.5 h-2.5" />

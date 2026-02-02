@@ -6,7 +6,9 @@ import * as path from 'path';
 import { Args, Command, Flags } from '@oclif/core';
 
 import { detectProject } from '../lib/project-detector.js';
-import { CommandDiscovery } from '../lib/config/command-discovery.js';
+import { checkPrerequisites } from '../lib/prerequisites.js';
+import { runInitWizard } from '../lib/init-prompts.js';
+import { verifyInit } from '../lib/init-verify.js';
 import { PresetLoader, type PresetConfig } from '../lib/preset-loader.js';
 import { resolveTemplatesDir, resolveSkillsDir } from '../lib/resolve-paths.js';
 
@@ -16,10 +18,9 @@ export default class Init extends Command {
   static examples = [
     '<%= config.bin %> init',
     '<%= config.bin %> init /path/to/project',
-    '<%= config.bin %> init --project-name my-app',
-    '<%= config.bin %> init --preset minimal',
-    '<%= config.bin %> init --no-frameworks  # Skip governance and openspec',
-    '<%= config.bin %> init --scan  # Scan codebase and generate knowledge docs',
+    '<%= config.bin %> init -n my-app --preset minimal',
+    '<%= config.bin %> init --scan',
+    '<%= config.bin %> init --json --force',
   ];
 
   static flags = {
@@ -39,14 +40,6 @@ export default class Init extends Command {
       char: 'f',
       description: 'Force initialization (overwrite existing)',
       default: false,
-    }),
-    'no-frameworks': Flags.boolean({
-      description: 'Skip governance and openspec (minimal setup)',
-      default: false,
-    }),
-    commands: Flags.string({
-      char: 'c',
-      description: 'Install commands (all, core, optional, or comma-separated names)',
     }),
     scan: Flags.boolean({
       char: 's',
@@ -90,18 +83,97 @@ export default class Init extends Command {
       return;
     }
 
-    // Validate preset if provided
+    const projectPath = args.path ? path.resolve(args.path) : process.cwd();
+
+    // Prerequisites check
+    if (!flags.json) {
+      this.log('SidStack - Project Intelligence Setup');
+      this.log('======================================');
+      this.log('');
+      this.log('Checking prerequisites...');
+    }
+
+    const prereqs = checkPrerequisites(projectPath);
+
+    if (!flags.json) {
+      for (const r of prereqs.results) {
+        const icon = r.status === 'ok' ? '✓' : r.status === 'warn' ? '⚠' : '✗';
+        this.log(`  ${icon} ${r.message}`);
+        if (r.suggestion && r.status !== 'ok') {
+          this.log(`    ${r.suggestion}`);
+        }
+      }
+      this.log('');
+    }
+
+    if (!prereqs.canProceed) {
+      this.error('Prerequisites check failed. Fix the errors above and try again.');
+    }
+
+    // Detect interactive mode: TTY with no explicit flags
+    const isInteractive = !!(
+      process.stdout.isTTY &&
+      !flags.json &&
+      !flags.preset &&
+      !flags.scan &&
+      !flags['project-name']
+    );
+
+    // Detect project early (needed for wizard)
+    const projectInfo = detectProject(projectPath);
+
+    // Resolve init parameters — either from wizard or flags
+    let projectName: string;
     let presetConfig: PresetConfig | null = null;
-    if (flags.preset) {
-      presetConfig = presetLoader.loadPreset(flags.preset);
-      if (!presetConfig) {
-        const available = presetLoader.getPresetNames().join(', ');
-        this.error(`Unknown preset: ${flags.preset}. Available: ${available}`);
+    let installGovernance = true;
+    let installOpenSpec = true;
+    let runScan = flags.scan;
+
+    if (isInteractive) {
+      // Interactive wizard
+      if (!flags.json) {
+        this.log('Analyzing project...');
+        if (projectInfo.isNew) {
+          this.log(`  Detected: New project (${projectInfo.type})`);
+        } else {
+          this.log(`  Detected: ${projectInfo.techStack?.language || 'Unknown'} / ${projectInfo.techStack?.framework || 'Unknown'} (existing project)`);
+        }
+        this.log('');
+      }
+
+      const wizardResult = await runInitWizard(
+        projectPath,
+        path.basename(projectPath),
+        projectInfo,
+        prereqs.claudeAvailable
+      );
+
+      if (wizardResult.cancelled) {
+        this.log('Init cancelled.');
+        return;
+      }
+
+      projectName = wizardResult.projectName;
+      installGovernance = wizardResult.installGovernance;
+      installOpenSpec = wizardResult.installOpenSpec;
+      runScan = wizardResult.runScan;
+
+      if (wizardResult.preset) {
+        presetConfig = presetLoader.loadPreset(wizardResult.preset);
+      }
+    } else {
+      // Non-interactive: use flags
+      projectName = flags['project-name'] || path.basename(projectPath);
+
+      if (flags.preset) {
+        presetConfig = presetLoader.loadPreset(flags.preset);
+        if (!presetConfig) {
+          const available = presetLoader.getPresetNames().join(', ');
+          this.error(`Unknown preset: ${flags.preset}. Available: ${available}`);
+        }
       }
     }
 
-    const projectPath = args.path ? path.resolve(args.path) : process.cwd();
-    const projectName = flags['project-name'] || path.basename(projectPath);
     const projectId = randomUUID();
     const sidstackDir = path.join(projectPath, '.sidstack');
 
@@ -110,10 +182,17 @@ export default class Init extends Command {
       this.error(`Workspace already initialized at ${projectPath}. Use --force to reinitialize.`);
     }
 
-    this.log(`Initializing SidStack workspace...`);
-    this.log(`  Project: ${projectName}`);
-    this.log(`  Path: ${projectPath}`);
-    this.log('');
+    if (!flags.json) {
+      this.log(`Initializing SidStack workspace...`);
+      this.log(`  Project: ${projectName}`);
+      this.log(`  Path: ${projectPath}`);
+      this.log('');
+    }
+
+    // Clean up old version artifacts when --force
+    if (flags.force && fs.existsSync(sidstackDir)) {
+      this.cleanupOldVersion(projectPath);
+    }
 
     // 1. Create .sidstack directory
     if (!fs.existsSync(sidstackDir)) {
@@ -126,7 +205,7 @@ export default class Init extends Command {
       projectId,
       projectName,
       projectPath,
-      version: '0.1.0',
+      version: this.config.version,
       createdAt: new Date().toISOString(),
     };
 
@@ -198,45 +277,37 @@ export default class Init extends Command {
     // 6. Update .gitignore
     this.updateGitignore(projectPath);
 
-    // 7. Detect project type
-    this.log('');
-    this.log('Analyzing project...');
-    const projectInfo = detectProject(projectPath);
-
-    if (projectInfo.isNew) {
-      this.log(`✓ Detected: New project (${projectInfo.type})`);
-      if (projectInfo.hasPrd) {
-        this.log(`✓ Found PRD: ${projectInfo.prdPath}`);
+    // 7. Log project detection (non-interactive already showed this above)
+    if (!isInteractive && !flags.json) {
+      this.log('');
+      this.log('Analyzing project...');
+      if (projectInfo.isNew) {
+        this.log(`✓ Detected: New project (${projectInfo.type})`);
+        if (projectInfo.hasPrd) {
+          this.log(`✓ Found PRD: ${projectInfo.prdPath}`);
+        }
+      } else {
+        this.log(`✓ Detected: Existing codebase`);
+        this.log(`  Tech: ${projectInfo.techStack?.language || 'Unknown'} / ${projectInfo.techStack?.framework || 'Unknown'}`);
+        this.log(`  Files: ${projectInfo.detectedFiles.join(', ')}`);
       }
-    } else {
-      this.log(`✓ Detected: Existing codebase`);
-      this.log(`  Tech: ${projectInfo.techStack?.language || 'Unknown'} / ${projectInfo.techStack?.framework || 'Unknown'}`);
-      this.log(`  Files: ${projectInfo.detectedFiles.join(', ')}`);
     }
 
-    // 7. Install frameworks (governance + openspec by default)
+    // 8. Install frameworks based on resolved settings
     const installedFrameworks: string[] = [];
 
-    if (!flags['no-frameworks']) {
+    if (installOpenSpec) {
       this.log('');
       this.log('Installing OpenSpec...');
       this.initOpenSpec(projectPath, projectName);
       installedFrameworks.push('OpenSpec');
+    }
 
+    if (installGovernance) {
       this.log('');
       this.log('Installing Governance...');
       this.initGovernance(projectPath);
       installedFrameworks.push('Governance');
-    }
-
-    // 8. Handle --commands flag (independent of governance)
-    if (flags.commands && flags['no-frameworks']) {
-      this.log('');
-      this.log('Installing commands...');
-      const installedCount = await this.installCommands(projectPath, flags.commands);
-      if (installedCount > 0) {
-        this.log(`✓ Installed ${installedCount} command(s)`);
-      }
     }
 
     // Done - output result
@@ -256,11 +327,25 @@ export default class Init extends Command {
       return;
     }
 
+    // Post-init verification
     this.log('');
-    this.log('═══════════════════════════════════════════════════════════════');
-    this.log('✅ SidStack workspace initialized!');
-    this.log('═══════════════════════════════════════════════════════════════');
+    this.log('Verifying installation...');
+    const verification = verifyInit(projectPath, {
+      governance: installGovernance,
+      openspec: installOpenSpec,
+    });
+
+    for (const check of verification.checks) {
+      const icon = check.passed ? '✓' : '✗';
+      this.log(`  ${icon} ${check.message}`);
+    }
+
     this.log('');
+    this.log('════════════════════════════════════════');
+    this.log('  SidStack initialized!');
+    this.log('════════════════════════════════════════');
+    this.log('');
+
     if (presetConfig) {
       this.log(`Preset: ${presetConfig.displayName}`);
       this.log(`  Language: ${presetConfig.language}`);
@@ -272,13 +357,13 @@ export default class Init extends Command {
       this.log('');
     }
 
-    // Launch Claude session
-    if (flags.scan) {
+    // Launch Claude session or show completion guide
+    if (runScan) {
       await this.launchScanSession(projectPath);
-    } else if (!flags['no-frameworks']) {
+    } else if (installGovernance) {
       await this.launchOnboardingSession(projectPath, projectName, installedFrameworks);
     } else {
-      this.logNextSteps(installedFrameworks, presetConfig);
+      this.logCompletionGuide(prereqs.claudeAvailable);
     }
   }
 
@@ -287,10 +372,104 @@ export default class Init extends Command {
     _projectName: string,
     _installedFrameworks: string[]
   ): Promise<void> {
-    this.log('Opening Claude Code with SidStack onboarding...');
+    this.log('Starting interactive onboarding with Claude Code...');
+    this.log('Claude will interview you about your project and set up the Project Hub.');
     this.log('');
 
-    const initialPrompt = 'Read CLAUDE.md and .sidstack/governance.md only. Then give me a concise welcome to SidStack: what was installed, the 3 agent roles, and key slash commands. Do NOT explore or scan the codebase.';
+    const initialPrompt = `You are the SidStack onboarding assistant. SidStack was just initialized in this project.
+
+## Your Role
+Guide the user through discovering SidStack features. Interview them about their project to generate meaningful data for the Project Hub. Be conversational — ask questions, use MCP tools, and create files.
+
+## Phase 1: Welcome
+1. Read CLAUDE.md and .sidstack/config.json to get the project name and path.
+2. Welcome the user. Briefly list what was installed: governance system (principles, skills, hooks), OpenSpec, MCP tools (20 tools for tasks, knowledge, impact, tickets, training, OKRs).
+3. Ask: "I'd like to learn about your project so I can set up the Project Hub with your business domains. Ready to get started?"
+   - If user says skip/no → jump to Phase 3.
+
+## Phase 2: Business Logic Discovery
+Interview the user to understand their project structure. Use their answers to generate capability YAML files.
+
+### Questions to ask (one at a time, conversational):
+1. "What are the 2-4 main domains or areas of your project? For example: Authentication, Payments, Dashboard, API..."
+2. For each domain: "What's the main goal of [domain]?" (becomes the purpose field)
+3. For each domain: "Any key business rules? For example: 'All payments must be idempotent' or 'Users must verify email before checkout'" (becomes businessRules)
+4. "How do these domains relate to each other? Which ones depend on others?" (becomes relationships)
+
+### Generate capability files:
+After collecting answers, create .sidstack/capabilities/ YAML files using the Write tool:
+
+**L0 root (project-level):**
+\`\`\`yaml
+id: {project-name}
+name: {Project Name}
+level: L0
+purpose: {user's project description or detected from README}
+status: active
+maturity: developing
+tags:
+  - project
+\`\`\`
+
+**L1 per domain:**
+\`\`\`yaml
+id: {domain-id}
+name: {Domain Name}
+level: L1
+parent: {project-name}
+purpose: {user's answer about this domain's goal}
+status: active
+maturity: developing
+modules:
+  - {domain-id}
+businessRules:
+  - {rule 1 from user}
+  - {rule 2 from user}
+relationships:
+  dependsOn:
+    - {dependencies from user's answers}
+tags:
+  - {project-name}
+\`\`\`
+
+Tell the user: "I've created your Project Hub capability map. Open the SidStack app (Cmd+1) to see your project domains."
+
+## Phase 3: Seed Data
+Use MCP tools to create starter data. Ask before each action.
+
+1. **Task Management** — "Let me create your first task."
+   → Use task_create with projectId = folder name (read from .sidstack/config.json), title "[docs] Review and customize project governance", relevant acceptance criteria.
+
+2. **Knowledge System** — "Let me show the knowledge system."
+   → Use knowledge_list with projectPath.
+   → If existing codebase: "Want me to scan your codebase to generate knowledge docs? It helps future sessions understand your project faster."
+
+3. **Ticket Queue** — "I'll create a sample ticket to demo the intake queue."
+   → Use ticket_create with a relevant customization ticket.
+
+4. **Governance** — "Let me show what rules apply here."
+   → Use rule_check with projectPath, moduleId from one of the domains created above, role "dev", taskType "feature".
+
+5. **OKRs** — "Let me check project OKRs."
+   → Use okr_list with projectPath.
+
+## Phase 4: Feature Tour
+Briefly explain remaining features:
+- **Impact Analysis**: impact_analyze before risky changes — shows scope, risks, validation checklist
+- **Training Room**: Lessons auto-suggested after complex debugging — captures problem, root cause, solution
+- **Session Manager**: session_launch for parallel Claude sessions in external terminals
+- **Slash Commands**: /sidstack (hub), /sidstack:agent worker [task] (spawn governed agent), /sidstack:knowledge build (generate knowledge)
+- **Desktop App**: 7 views — Project Hub (Cmd+1), Task Manager (Cmd+2), Knowledge Browser (Cmd+3), Ticket Queue (Cmd+4), Training Room (Cmd+5), Settings (Cmd+,)
+
+Ask: "What would you like to work on first?"
+
+## Rules
+- Be conversational. Ask one question at a time.
+- Always ask before creating data or files. If user says "skip", move on.
+- Use the folder name as projectId for MCP tool calls (read from .sidstack/config.json).
+- For capability YAML files, use the Write tool to create files in .sidstack/capabilities/.
+- Keep explanations concise — show by doing, don't lecture.
+- If user seems impatient, offer to skip ahead at any point.`;
 
     return new Promise((resolve) => {
       const claude = spawn('claude', [initialPrompt], {
@@ -301,11 +480,13 @@ export default class Init extends Command {
       claude.on('error', () => {
         this.log('Could not start Claude Code. Make sure `claude` is installed.');
         this.log('');
-        this.logNextSteps(['governance'], null);
+        this.logCompletionGuide(false);
         resolve();
       });
 
       claude.on('close', () => {
+        this.log('');
+        this.log('To continue working with SidStack, run: claude');
         resolve();
       });
     });
@@ -363,33 +544,18 @@ export default class Init extends Command {
     });
   }
 
-  private logNextSteps(
-    selectedFrameworks: string[],
-    presetConfig: PresetConfig | null
-  ): void {
-    this.log('Next steps:');
-    this.log('  1. Start Agent Manager app');
-    this.log('  2. Open terminal as orchestrator');
-    this.log('  3. Use MCP tools to spawn agents');
-    let stepNum = 4;
-    if (selectedFrameworks.includes('openspec')) {
-      this.log(`  ${stepNum}. Create specs in openspec/specs/`);
-      stepNum++;
-      this.log(`  ${stepNum}. Use /openspec:proposal to create changes`);
-      stepNum++;
-    }
-    if (selectedFrameworks.includes('governance')) {
-      this.log(`  ${stepNum}. Use /sidstack:agent [role] [task] to spawn governed agents`);
-      stepNum++;
-      this.log(`  ${stepNum}. Read .sidstack/governance.md for governance overview`);
-      stepNum++;
-    }
-    if (presetConfig?.recommended && Object.keys(presetConfig.recommended).length > 0) {
-      this.log('');
-      this.log('Recommended tools for this preset:');
-      for (const [key, value] of Object.entries(presetConfig.recommended)) {
-        this.log(`  ${key}: ${value}`);
-      }
+  private logCompletionGuide(claudeAvailable: boolean): void {
+    this.log('What to do next:');
+    this.log('');
+    if (claudeAvailable) {
+      this.log('  1. Open Claude Code:        claude');
+      this.log('  2. Try a command:           /sidstack status');
+      this.log('  3. View governance:         cat .sidstack/governance.md');
+      this.log('  4. Generate knowledge:      sidstack init --scan');
+    } else {
+      this.log('  1. Install Claude Code:     npm i -g @anthropic-ai/claude-code');
+      this.log('  2. Then start it:           claude');
+      this.log('  3. View governance:         cat .sidstack/governance.md');
     }
     this.log('');
   }
@@ -515,25 +681,38 @@ ${projectName} - [Add project description here]
     this.copyDirectorySync(sourceSidstack, targetSidstack);
     this.log('✓ Created .sidstack/ governance structure');
 
-    // Update version.json with actual values
-    const versionFile = path.join(targetSidstack, 'version.json');
-    const versionContent = fs.readFileSync(versionFile, 'utf-8');
+    // Replace template placeholders in .sidstack files
     const now = new Date().toISOString();
-    const updatedVersion = versionContent
-      .replace('{{SIDSTACK_VERSION}}', '0.1.0')
-      .replace('{{INITIALIZED_AT}}', now)
-      .replace('{{UPDATED_AT}}', now);
-    fs.writeFileSync(versionFile, updatedVersion);
+    const replacePlaceholders = (filePath: string) => {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      if (content.includes('{{SIDSTACK_VERSION}}') || content.includes('{{INITIALIZED_AT}}')) {
+        const updated = content
+          .replace(/\{\{SIDSTACK_VERSION\}\}/g, this.config.version)
+          .replace(/\{\{INITIALIZED_AT\}\}/g, now)
+          .replace(/\{\{UPDATED_AT\}\}/g, now);
+        fs.writeFileSync(filePath, updated);
+      }
+    };
+
+    replacePlaceholders(path.join(targetSidstack, 'version.json'));
+    replacePlaceholders(path.join(targetSidstack, 'governance.md'));
     this.log('✓ Created version.json');
 
-    // Copy .claude/commands/sidstack directory
-    const sourceCommands = path.join(templatesDir, '.claude/commands/sidstack');
-    const targetCommands = path.join(projectPath, '.claude/commands/sidstack');
+    // Copy .claude/commands/ (sidstack.md hub + sidstack/ subcommands)
+    const commandsDir = path.join(projectPath, '.claude/commands');
+    fs.mkdirSync(commandsDir, { recursive: true });
 
-    // Ensure .claude/commands exists
-    fs.mkdirSync(path.dirname(targetCommands), { recursive: true });
+    // Copy hub command: sidstack.md -> /sidstack
+    const sourceHub = path.join(templatesDir, '.claude/commands/sidstack.md');
+    if (fs.existsSync(sourceHub)) {
+      fs.copyFileSync(sourceHub, path.join(commandsDir, 'sidstack.md'));
+    }
+
+    // Copy subcommands: sidstack/agent.md, sidstack/knowledge.md
+    const sourceCommands = path.join(templatesDir, '.claude/commands/sidstack');
+    const targetCommands = path.join(commandsDir, 'sidstack');
     this.copyDirectorySync(sourceCommands, targetCommands);
-    this.log('✓ Created .claude/commands/sidstack/ (slash commands)');
+    this.log('✓ Created .claude/commands/ (3 slash commands: /sidstack, :agent, :knowledge)');
 
     // Copy .claude/hooks directory
     const sourceHooks = path.join(templatesDir, '.claude/hooks');
@@ -616,12 +795,57 @@ ${projectName} - [Add project description here]
     // Log summary
     this.log('');
     this.log('Governance installed:');
-    this.log('  Principles: code-quality, testing, security, collaboration');
-    this.log('  Skills: implement-feature, fix-bug, test-feature, verify-fix, handoff, code-review');
+    this.log('  Principles: task-management, code-quality, testing, security, collaboration, quality-gates');
+    this.log('  Skills: implement (4), design (3), test (3), review (3), deploy (2), shared (2), knowledge (1)');
     this.log('  Workflows: new-feature');
-    this.log('  Commands: /sidstack, /sidstack:agent, /sidstack:knowledge');
-    this.log('  Hooks: SessionStart, PreCompact (context persistence)');
+    this.log('  Commands: /sidstack (hub), /sidstack:agent, /sidstack:knowledge');
+    this.log('  Hooks: SessionStart, PreCompact, UserPromptSubmit, PreToolUse, PostToolUse');
     this.log('  Scripts: .claude/scripts/open-claude-session.sh (auto-detect terminal)');
+  }
+
+  private cleanupOldVersion(projectPath: string): void {
+    this.log('Cleaning up previous version...');
+
+    // Directories managed entirely by SidStack (safe to remove and recreate)
+    const managedDirs = [
+      path.join(projectPath, '.sidstack', 'principles'),
+      path.join(projectPath, '.sidstack', 'skills'),
+      path.join(projectPath, '.sidstack', 'workflows'),
+      path.join(projectPath, '.claude', 'hooks'),
+      path.join(projectPath, '.claude', 'commands', 'sidstack'),
+      path.join(projectPath, '.claude', 'scripts'),
+    ];
+
+    // Files managed by SidStack (hub command)
+    const managedFiles = [
+      path.join(projectPath, '.claude', 'commands', 'sidstack.md'),
+    ];
+
+    for (const dir of managedDirs) {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    for (const file of managedFiles) {
+      if (fs.existsSync(file)) {
+        fs.unlinkSync(file);
+      }
+    }
+
+    // Remove settings.json hooks (will be recreated from template)
+    const settingsPath = path.join(projectPath, '.claude', 'settings.json');
+    if (fs.existsSync(settingsPath)) {
+      try {
+        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        delete settings.hooks;
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+      } catch {
+        // Corrupt file, will be overwritten
+      }
+    }
+
+    this.log('✓ Cleaned up old version artifacts');
   }
 
   private copyDirectorySync(source: string, target: string): void {
@@ -674,44 +898,4 @@ logs/
     }
   }
 
-  private async installCommands(projectPath: string, commandsArg: string): Promise<number> {
-    const discovery = new CommandDiscovery({ projectDir: projectPath });
-    const bundleCommands = await discovery.getCommandsFromSource('bundle');
-
-    let commandsToInstall: string[] = [];
-
-    if (commandsArg === 'all') {
-      commandsToInstall = bundleCommands.map((c) => c.config.name.split(': ').pop()?.toLowerCase().replace(/\s+/g, '-') || '');
-    } else if (commandsArg === 'core') {
-      commandsToInstall = bundleCommands
-        .filter((c) => c.config.category === 'core')
-        .map((c) => c.config.name.split(': ').pop()?.toLowerCase().replace(/\s+/g, '-') || '');
-    } else if (commandsArg === 'optional') {
-      commandsToInstall = bundleCommands
-        .filter((c) => c.config.category === 'optional')
-        .map((c) => c.config.name.split(': ').pop()?.toLowerCase().replace(/\s+/g, '-') || '');
-    } else {
-      // Comma-separated list of command names
-      commandsToInstall = commandsArg.split(',').map((c) => c.trim());
-    }
-
-    let installedCount = 0;
-    for (const cmdName of commandsToInstall) {
-      if (!cmdName) continue;
-      const cmd = await discovery.resolveCommand(cmdName);
-      if (cmd && cmd.source === 'bundle') {
-        try {
-          await discovery.copyToProject(cmdName);
-          this.log(`  ✓ ${cmdName}`);
-          installedCount++;
-        } catch {
-          this.log(`  ✗ ${cmdName}: Failed to copy`);
-        }
-      } else if (!cmd) {
-        this.log(`  ✗ ${cmdName}: Not found`);
-      }
-    }
-
-    return installedCount;
-  }
 }

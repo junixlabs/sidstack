@@ -128,7 +128,7 @@ function EpicCard({
               <span className="text-sm font-medium text-[var(--text-primary)]">
                 {progress}%
               </span>
-              <span className="text-[10px] text-[var(--text-muted)]">
+              <span className="text-[11px] text-[var(--text-muted)]">
                 {completedCount}/{subtasks.length} completed
               </span>
             </div>
@@ -186,7 +186,7 @@ function EpicCard({
         </div>
 
         {/* Summary badges */}
-        <div className="mt-2 flex items-center gap-2 text-[10px]">
+        <div className="mt-2 flex items-center gap-2 text-[11px]">
           {inProgressCount > 0 && (
             <span className="px-1.5 py-0.5 bg-[var(--color-info)]/20 text-[var(--color-info)] rounded">
               {inProgressCount} in progress
@@ -254,14 +254,14 @@ function EpicCard({
 
               {/* Progress */}
               {subtask.progress > 0 && subtask.status !== "completed" && (
-                <span className="text-[10px] text-[var(--text-muted)]">
+                <span className="text-[11px] text-[var(--text-muted)]">
                   {subtask.progress}%
                 </span>
               )}
 
               {/* Assigned */}
               {subtask.assignedAgent && (
-                <span className="text-[10px] px-1.5 py-0.5 bg-sky-500/20 text-sky-300 rounded">
+                <span className="text-[11px] px-1.5 py-0.5 bg-sky-500/20 text-sky-300 rounded">
                   @{subtask.assignedAgent}
                 </span>
               )}

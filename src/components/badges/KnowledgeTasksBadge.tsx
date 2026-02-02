@@ -43,7 +43,7 @@ export function KnowledgeTasksBadge({
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-muted animate-pulse",
+          "inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] rounded bg-muted animate-pulse",
           className
         )}
       >
@@ -66,7 +66,7 @@ export function KnowledgeTasksBadge({
     <button
       onClick={handleClick}
       className={cn(
-        "inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded",
+        "inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded",
         "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors",
         className
       )}

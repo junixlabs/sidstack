@@ -10,6 +10,7 @@ import { vi } from 'vitest';
 export const mockDB = {
   // Tickets
   getTicketByExternalId: vi.fn().mockReturnValue(null),
+  getTicketByTaskId: vi.fn().mockReturnValue(null),
   getProject: vi.fn().mockReturnValue({ id: 'test-project', name: 'Test', path: '/tmp/test', status: 'active' }),
   createProject: vi.fn().mockReturnValue({ id: 'test-project', name: 'Test', path: '/tmp/test', status: 'active' }),
   createTicket: vi.fn().mockReturnValue({

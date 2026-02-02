@@ -106,7 +106,7 @@ export function EmptyState({
               key={index}
               className={cn(
                 "text-[var(--text-muted)]",
-                compact ? "text-[10px]" : "text-xs"
+                compact ? "text-[11px]" : "text-xs"
               )}
             >
               {tip}

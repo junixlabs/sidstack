@@ -21,7 +21,7 @@ const app: Application = express();
 const server = createServer(app);
 const PORT = process.env.API_PORT || 19432;
 
-// Middleware - CORS restricted to localhost origins (desktop app only)
+// Middleware - CORS restricted to localhost and VS Code WebView origins
 const ALLOWED_ORIGINS = [
   'http://localhost:1420',   // Tauri dev webview
   'http://localhost:5173',   // Vite dev server
@@ -30,10 +30,17 @@ const ALLOWED_ORIGINS = [
   'https://tauri.localhost', // Tauri production webview (macOS)
 ];
 
+// VS Code WebView origins use dynamic scheme: vscode-webview://
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^vscode-webview:\/\//,
+];
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (same-origin, curl, MCP server)
+    // Allow requests with no origin (same-origin, curl, MCP server, VS Code extension host)
     if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else if (ALLOWED_ORIGIN_PATTERNS.some((pattern) => pattern.test(origin))) {
       callback(null, true);
     } else {
       callback(new Error(`CORS blocked: ${origin}`));

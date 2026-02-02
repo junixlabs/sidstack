@@ -1,4 +1,4 @@
-import { Check, CheckCircle2, Circle, ExternalLink, History, User, X } from "lucide-react";
+import { Check, CheckCircle2, Circle, ExternalLink, GitBranch, History, User, X } from "lucide-react";
 import { useEffect } from "react";
 import { useTask } from "@/hooks/useTasks";
 import { cn } from "@/lib/utils";
@@ -35,16 +35,21 @@ export function TaskDetailPanel({
   const {
     specLinks,
     knowledgeLinks,
+    suggestions,
     loadLinksForTask,
+    loadSuggestions,
     unlinkSpec,
     unlinkKnowledge,
+    acceptSuggestion,
+    dismissSuggestion,
     isLoading: linksLoading,
   } = useUnifiedContextStore();
 
-  // Load links when task changes
+  // Load links and suggestions when task changes
   useEffect(() => {
     loadLinksForTask(task.id);
-  }, [task.id, loadLinksForTask]);
+    loadSuggestions(task.id);
+  }, [task.id, loadLinksForTask, loadSuggestions]);
 
   // Filter links for current task
   const taskSpecLinks = specLinks.filter((l) => l.taskId === task.id);
@@ -86,6 +91,17 @@ export function TaskDetailPanel({
           </div>
         </div>
 
+        {/* Branch */}
+        {task.branch && (
+          <div>
+            <div className="text-xs text-[var(--text-muted)] mb-1">Branch</div>
+            <div className="flex items-center gap-1.5 text-sm text-purple-400">
+              <GitBranch className="w-3.5 h-3.5" />
+              <span className="font-mono text-xs">{task.branch}</span>
+            </div>
+          </div>
+        )}
+
         {/* Quick navigation links */}
         <div className="flex items-center gap-2 flex-wrap">
           {onNavigateToProgressTracker && progressHistory.length > 0 && (
@@ -114,8 +130,11 @@ export function TaskDetailPanel({
         {onNavigateToKnowledge && (
           <LinkedKnowledgeSection
             links={taskKnowledgeLinks}
+            suggestions={suggestions}
             onNavigate={onNavigateToKnowledge}
             onUnlink={unlinkKnowledge}
+            onAcceptSuggestion={acceptSuggestion}
+            onDismissSuggestion={dismissSuggestion}
             isLoading={linksLoading}
           />
         )}
@@ -179,6 +198,9 @@ export function TaskDetailPanel({
                   className="flex items-start gap-3"
                 >
                   <div
+                    role="checkbox"
+                    aria-checked={criterion.completed}
+                    aria-label={criterion.description}
                     className={cn(
                       "w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5",
                       criterion.completed

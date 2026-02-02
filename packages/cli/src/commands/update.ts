@@ -6,11 +6,8 @@ import { Args, Command, Flags } from '@oclif/core';
 
 import { resolveTemplatesDir } from '../lib/resolve-paths.js';
 
-// Current SidStack version
-const CURRENT_VERSION = '0.3.0';
-
-// Current governance version - v2.0.0: Simplified roles + capability-based skills
-const GOVERNANCE_VERSION = '2.0.0';
+// Versions are read from this.config.version (oclif reads package.json) at runtime.
+// No hardcoded version constants - prevents drift between package.json and code.
 
 interface SidStackConfig {
   projectId: string;
@@ -96,14 +93,14 @@ export default class Update extends Command {
       const config: SidStackConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
       this.log(`  Project: ${config.projectName}`);
-      this.log(`  Version: ${config.version} → ${CURRENT_VERSION}`);
+      this.log(`  Version: ${config.version} → ${this.config.version}`);
       this.log('');
 
       // 1. Update config.json
       this.log('📋 Updating configuration...');
       const updatedConfig = {
         ...config,
-        version: CURRENT_VERSION,
+        version: this.config.version,
         updatedAt: new Date().toISOString(),
       };
       fs.writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2));
@@ -142,7 +139,7 @@ export default class Update extends Command {
       this.log('\n📜 Updating Governance...');
       const updated = this.updateGovernance(projectPath, flags.force);
       if (updated) {
-        this.log('  ✓ Governance updated to v' + GOVERNANCE_VERSION);
+        this.log('  ✓ Governance updated to v' + this.config.version);
       } else {
         this.log('  ✓ Governance already up to date');
       }
@@ -297,12 +294,12 @@ pnpm test        # All pass
     }
 
     // Check if update is needed
-    if (!force && currentVersion.sidstackVersion === GOVERNANCE_VERSION) {
+    if (!force && currentVersion.sidstackVersion === this.config.version) {
       return false;
     }
 
     this.log(`  Current: v${currentVersion.sidstackVersion}`);
-    this.log(`  Latest:  v${GOVERNANCE_VERSION}`);
+    this.log(`  Latest:  v${this.config.version}`);
 
     // Get templates directory
     const templatesDir = resolveTemplatesDir(__dirname, 'governance');
@@ -379,11 +376,33 @@ pnpm test        # All pass
       this.log('  ✓ Updated .claude/settings.json (hook config)');
     }
 
-    // Update version.json
+    // Update governance.md from template
+    const sourceGovernance = path.join(sourceSidstack, 'governance.md');
+    const targetGovernance = path.join(targetSidstack, 'governance.md');
+    if (fs.existsSync(sourceGovernance)) {
+      this.copyDirectorySync(path.dirname(sourceGovernance), path.dirname(targetGovernance));
+      this.log('  ✓ Updated governance.md');
+    }
+
+    // Replace template placeholders in updated files
     const now = new Date().toISOString();
+    const replacePlaceholders = (filePath: string) => {
+      if (!fs.existsSync(filePath)) return;
+      const content = fs.readFileSync(filePath, 'utf-8');
+      if (content.includes('{{SIDSTACK_VERSION}}') || content.includes('{{INITIALIZED_AT}}')) {
+        const updated = content
+          .replace(/\{\{SIDSTACK_VERSION\}\}/g, this.config.version)
+          .replace(/\{\{INITIALIZED_AT\}\}/g, currentVersion.initializedAt)
+          .replace(/\{\{UPDATED_AT\}\}/g, now);
+        fs.writeFileSync(filePath, updated);
+      }
+    };
+    replacePlaceholders(targetGovernance);
+
+    // Update version.json
     const updatedVersion: GovernanceVersion = {
       version: currentVersion.version,
-      sidstackVersion: GOVERNANCE_VERSION,
+      sidstackVersion: this.config.version,
       initializedAt: currentVersion.initializedAt,
       updatedAt: now,
     };

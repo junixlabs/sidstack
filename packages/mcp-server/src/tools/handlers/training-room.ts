@@ -39,6 +39,45 @@ async function getDatabase(): Promise<SidStackDB> {
 }
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Extract keywords from text (stop words removed, lowercase, 3+ chars)
+ */
+function extractKeywords(text: string): string[] {
+  const STOP_WORDS = new Set([
+    'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+    'should', 'may', 'might', 'shall', 'can', 'need', 'must', 'ought',
+    'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as',
+    'and', 'but', 'or', 'nor', 'not', 'so', 'yet', 'both', 'either',
+    'neither', 'each', 'every', 'all', 'any', 'few', 'more', 'most',
+    'other', 'some', 'such', 'no', 'only', 'own', 'same', 'than',
+    'too', 'very', 'just', 'because', 'if', 'when', 'while', 'this',
+    'that', 'these', 'those', 'it', 'its', 'we', 'they', 'them',
+  ]);
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+}
+
+/**
+ * Check if two texts share significant keywords (>= 2 overlap)
+ */
+function hasSimilarKeywords(textA: string, textB: string): boolean {
+  const kwA = new Set(extractKeywords(textA));
+  const kwB = extractKeywords(textB);
+  let overlap = 0;
+  for (const kw of kwB) {
+    if (kwA.has(kw)) overlap++;
+  }
+  return overlap >= 2;
+}
+
+// =============================================================================
 // Tool Definitions
 // =============================================================================
 
@@ -633,10 +672,35 @@ export async function handleIncidentCreate(args: {
     context: args.context,
   });
 
+  // Check for similar incidents to suggest lesson creation
+  let suggestion: { action: string; reason: string; similarIncidentIds: string[] } | undefined;
+  try {
+    const existingIncidents = database.listIncidents({
+      sessionId: session.id,
+      status: 'open' as IncidentStatus,
+    });
+
+    const incidentText = `${incident.title} ${args.description || ''}`;
+    const similarIncidents = existingIncidents.filter(i =>
+      i.id !== incident.id && hasSimilarKeywords(`${i.title} ${i.description || ''}`, incidentText)
+    );
+
+    if (similarIncidents.length >= 2) {
+      suggestion = {
+        action: 'create_lesson',
+        reason: `Found ${similarIncidents.length} similar incidents for module "${args.moduleId}". Consider creating a lesson to capture the pattern.`,
+        similarIncidentIds: similarIncidents.map(i => i.id),
+      };
+    }
+  } catch {
+    // Non-critical - skip suggestion on error
+  }
+
   return {
     success: true,
     incident,
     message: `Incident created: ${incident.id}`,
+    ...(suggestion ? { suggestion } : {}),
   };
 }
 
@@ -742,6 +806,15 @@ export async function handleLessonApprove(args: { lessonId: string; approver: st
     success: true,
     lesson,
     message: `Lesson approved by ${args.approver}`,
+    suggestion: {
+      action: 'create_skill',
+      reason: 'Lesson approved. Consider creating a reusable skill from the solution.',
+      skillTemplate: {
+        name: `Skill: ${lesson.title}`,
+        type: 'procedure',
+        content: `## Problem\n${lesson.problem}\n\n## Solution\n${lesson.solution}`,
+      },
+    },
   };
 }
 

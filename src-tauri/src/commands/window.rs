@@ -21,7 +21,7 @@ pub struct WindowState {
 
 fn get_window_state_path() -> PathBuf {
     let mut path = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
-    path.push("sidstack-agent-manager");
+    path.push("sidstack");
     fs::create_dir_all(&path).ok();
     path.push("windows.json");
     path

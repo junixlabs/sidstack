@@ -120,7 +120,7 @@ function ExplorerSection({
         />
         <span
           className={cn(
-            "text-[10px] font-semibold uppercase tracking-wider",
+            "text-[11px] font-semibold uppercase tracking-wider",
             isDark ? "text-[var(--text-muted)]" : "text-gray-500"
           )}
         >
@@ -142,7 +142,7 @@ function ExplorerSection({
             >
               <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p>Open a project to browse files</p>
-              <p className="mt-1 text-[10px] font-mono">⌘O</p>
+              <p className="mt-1 text-[11px] font-mono">⌘O</p>
             </div>
           )}
         </div>
@@ -186,7 +186,7 @@ function WorkspacesSection({ isDark, isExpanded, onToggle }: WorkspacesSectionPr
         />
         <span
           className={cn(
-            "text-[10px] font-semibold uppercase tracking-wider",
+            "text-[11px] font-semibold uppercase tracking-wider",
             isDark ? "text-[var(--text-muted)]" : "text-gray-500"
           )}
         >

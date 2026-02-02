@@ -58,7 +58,7 @@ impl SessionTracker {
     /// Get path to sessions file
     fn get_sessions_path() -> PathBuf {
         let mut path = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
-        path.push("sidstack-agent-manager");
+        path.push("sidstack");
         fs::create_dir_all(&path).ok();
         path.push("active_sessions.json");
         path

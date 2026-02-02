@@ -84,6 +84,8 @@ pub struct RepoStatus {
     pub staged: Vec<String>,
     pub modified: Vec<String>,
     pub untracked: Vec<String>,
+    pub ahead: usize,
+    pub behind: usize,
 }
 
 /// Get diff between working directory and a base branch
@@ -379,12 +381,42 @@ pub async fn get_repo_status(repo_path: String) -> Result<RepoStatus, GitError> 
 
     let is_clean = staged.is_empty() && modified.is_empty() && untracked.is_empty();
 
+    // Compute ahead/behind relative to upstream
+    let (ahead, behind) = {
+        let head_ref = repo.head().ok();
+        if let Some(ref h) = head_ref {
+            if let Some(local_oid) = h.target() {
+                // Try to find upstream branch
+                let branch_name = h.shorthand().unwrap_or("HEAD");
+                if let Ok(local_branch) = repo.find_branch(branch_name, git2::BranchType::Local) {
+                    if let Ok(upstream) = local_branch.upstream() {
+                        if let Some(remote_oid) = upstream.get().target() {
+                            repo.graph_ahead_behind(local_oid, remote_oid).unwrap_or((0, 0))
+                        } else {
+                            (0, 0)
+                        }
+                    } else {
+                        (0, 0)
+                    }
+                } else {
+                    (0, 0)
+                }
+            } else {
+                (0, 0)
+            }
+        } else {
+            (0, 0)
+        }
+    };
+
     Ok(RepoStatus {
         branch,
         is_clean,
         staged,
         modified,
         untracked,
+        ahead,
+        behind,
     })
 }
 

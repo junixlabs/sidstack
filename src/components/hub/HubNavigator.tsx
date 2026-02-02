@@ -107,7 +107,7 @@ export function HubNavigator({ projectPath }: HubNavigatorProps) {
             aria-label="Search capabilities"
             className="w-full pl-7 pr-8 py-1.5 text-xs bg-[var(--surface-2)] border border-[var(--border-muted)] rounded text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)]"
           />
-          <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-muted)] bg-[var(--surface-0)] border border-[var(--border-muted)] rounded px-1">
+          <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-muted)] bg-[var(--surface-0)] border border-[var(--border-muted)] rounded px-1">
             /
           </kbd>
         </div>
@@ -204,7 +204,7 @@ function TreeNode({
 
         {/* Child count for L0 */}
         {isL0 && hasChildren && (
-          <span className="text-[10px] text-[var(--text-muted)] flex-shrink-0">
+          <span className="text-[11px] text-[var(--text-muted)] flex-shrink-0">
             ({node.children.length})
           </span>
         )}
@@ -216,7 +216,7 @@ function TreeNode({
       {/* Progress bar for L1/L2 */}
       {!isL0 && isSelected && (
         <div className="px-2 pb-1" style={{ paddingLeft: 8 + node.depth * 16 + 24 }}>
-          <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+          <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
             <span>{cap.maturity}</span>
           </div>
         </div>
@@ -251,10 +251,10 @@ function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) 
     <div className="p-4 text-center">
       <AlertTriangle size={24} className="mx-auto mb-2 text-yellow-400" />
       <p className="text-xs text-[var(--text-secondary)] mb-1">Failed to load capabilities</p>
-      <p className="text-[10px] text-[var(--text-muted)] mb-2">{error}</p>
+      <p className="text-[11px] text-[var(--text-muted)] mb-2">{error}</p>
       <button
         onClick={onRetry}
-        className="inline-flex items-center gap-1 text-[10px] text-[var(--accent-primary)] hover:underline"
+        className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-primary)] hover:underline"
       >
         <RefreshCw size={10} />
         Retry
@@ -277,12 +277,12 @@ function EmptyState({ hasSearch, onRetry }: { hasSearch: boolean; onRetry: () =>
     <div className="p-4 text-center">
       <Layers size={24} className="mx-auto mb-2 text-[var(--text-muted)] opacity-40" />
       <p className="text-xs text-[var(--text-secondary)] mb-1">No capabilities defined</p>
-      <p className="text-[10px] text-[var(--text-muted)] mb-2">
+      <p className="text-[11px] text-[var(--text-muted)] mb-2">
         Run the migration tool or create capabilities in .sidstack/capabilities/
       </p>
       <button
         onClick={onRetry}
-        className="inline-flex items-center gap-1 text-[10px] text-[var(--accent-primary)] hover:underline"
+        className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-primary)] hover:underline"
       >
         <RefreshCw size={10} />
         Reload

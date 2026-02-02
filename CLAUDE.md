@@ -241,6 +241,24 @@ Status flow: `new -> reviewing -> approved -> in_progress -> completed` (or `rej
 
 MCP tools: `ticket_create`, `ticket_list`, `ticket_update`, `ticket_convert_to_task`
 
+<!-- DOCUMENTATION-DISCIPLINE:START -->
+## MANDATORY: Documentation Discipline
+
+### Session Continuity
+- **Read `JOURNAL.md`** at session start when you need context about recent changes
+- **Write to `JOURNAL.md`** when completing significant changes (new features, architecture decisions, non-trivial fixes)
+- Entry format: date, what changed, which files, why, decisions made
+
+### Changelog
+- **Update `CHANGELOG.md`** when bumping versions
+- Follow [Keep a Changelog](https://keepachangelog.com) format: Added, Changed, Fixed, Removed, Security
+- Every released version must have an entry
+
+### Commit Messages
+- Use conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`
+- Include context in commit body for non-obvious changes
+<!-- DOCUMENTATION-DISCIPLINE:END -->
+
 ## Guidelines
 
 ### DO

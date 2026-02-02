@@ -16,6 +16,7 @@ import {
   PanelRightOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useBlockNavigation } from '@/hooks/useBlockNavigation';
 import { useProjectHubStore, type ConnectedEntity } from '@/stores/projectHubStore';
 
 const MAX_ITEMS_PER_GROUP = 5;
@@ -48,7 +49,7 @@ export function ConnectedPanel({ collapsed, onToggleCollapse }: ConnectedPanelPr
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-default)]">
         <Link2 size={12} className="text-[var(--text-muted)]" />
-        <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider flex-1">
+        <span className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider flex-1">
           Connected
         </span>
         <button
@@ -66,7 +67,7 @@ export function ConnectedPanel({ collapsed, onToggleCollapse }: ConnectedPanelPr
         {!selectedCapabilityId ? (
           <EmptyNoSelection />
         ) : isLoadingConnected ? (
-          <div className="p-2 text-[10px] text-[var(--text-muted)]">Loading...</div>
+          <div className="p-2 text-[11px] text-[var(--text-muted)]">Loading...</div>
         ) : !connectedEntities ? (
           <EmptyNoConnections />
         ) : (
@@ -128,10 +129,10 @@ function EntityGroup({
     <div>
       <div className="flex items-center gap-1.5 mb-1">
         <Icon size={10} className="text-[var(--text-muted)]" />
-        <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+        <span className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
           {label}
         </span>
-        <span className="text-[10px] text-[var(--text-muted)]">({entities.length})</span>
+        <span className="text-[11px] text-[var(--text-muted)]">({entities.length})</span>
       </div>
       <div className="space-y-0.5">
         {visible.map((entity) => (
@@ -140,7 +141,7 @@ function EntityGroup({
         {!showAll && remaining > 0 && (
           <button
             onClick={() => setShowAll(true)}
-            className="text-[10px] text-[var(--accent-primary)] hover:underline pl-2"
+            className="text-[11px] text-[var(--accent-primary)] hover:underline pl-2"
           >
             +{remaining} more
           </button>
@@ -156,13 +157,18 @@ function EntityGroup({
 
 function EntityRow({ entity }: { entity: ConnectedEntity }) {
   const { selectCapability } = useProjectHubStore();
+  const { navigateToBlockView } = useBlockNavigation();
+
+  const isNavigable = entity.type === 'capability' || entity.type === 'task' || entity.type === 'knowledge';
 
   const handleClick = () => {
     if (entity.type === 'capability') {
       selectCapability(entity.id);
+    } else if (entity.type === 'task') {
+      navigateToBlockView('task-manager', { selectedTaskId: entity.id });
+    } else if (entity.type === 'knowledge') {
+      navigateToBlockView('knowledge-browser', { selectedKnowledgePath: entity.id });
     }
-    // For tasks/sessions/knowledge, would navigate to their sidebar views
-    // For now, just show in connected panel
   };
 
   return (
@@ -170,13 +176,13 @@ function EntityRow({ entity }: { entity: ConnectedEntity }) {
       onClick={handleClick}
       className={cn(
         'w-full text-left px-2 py-1 rounded text-[11px] transition-colors',
-        entity.type === 'capability'
+        isNavigable
           ? 'hover:bg-[var(--surface-2)] cursor-pointer'
           : 'cursor-default',
       )}
     >
       <div className="truncate text-[var(--text-primary)]">{entity.title}</div>
-      <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+      <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
         {entity.status && <span>{entity.status}</span>}
         {entity.relationshipType && (
           <span className="font-mono">{entity.relationshipType}</span>
@@ -194,7 +200,7 @@ function EmptyNoSelection() {
   return (
     <div className="p-3 text-center">
       <Link2 size={16} className="mx-auto mb-1.5 text-[var(--text-muted)] opacity-30" />
-      <p className="text-[10px] text-[var(--text-muted)]">
+      <p className="text-[11px] text-[var(--text-muted)]">
         Select a capability to see connected entities
       </p>
     </div>
@@ -205,8 +211,8 @@ function EmptyNoConnections() {
   return (
     <div className="p-3 text-center">
       <Link2 size={16} className="mx-auto mb-1.5 text-[var(--text-muted)] opacity-30" />
-      <p className="text-[10px] text-[var(--text-muted)]">No connected entities</p>
-      <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+      <p className="text-[11px] text-[var(--text-muted)]">No connected entities</p>
+      <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
         Connections appear as work artifacts reference this capability.
       </p>
     </div>

@@ -53,6 +53,7 @@ export interface Task {
   updatedAt: number;
   progress: number;
   notes?: string;
+  branch?: string;
   // Governance fields
   taskType?: TaskType;
   moduleId?: string;

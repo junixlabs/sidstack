@@ -258,7 +258,7 @@ export function TeamCreateDialog({ isOpen, onClose, onSuccess }: TeamCreateDialo
                     className="flex items-center justify-between p-2 rounded bg-[var(--surface-2)]"
                   >
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-[10px]">
+                      <Badge variant="secondary" className="text-[11px]">
                         {member.agentType}
                       </Badge>
                       <span className="text-sm text-[var(--text-secondary)]">
@@ -308,7 +308,7 @@ export function TeamCreateDialog({ isOpen, onClose, onSuccess }: TeamCreateDialo
                     disabled={!projectPath || !autoRecovery}
                     className="h-8 text-sm"
                   />
-                  <p className="text-[10px] text-[var(--text-muted)]">
+                  <p className="text-[11px] text-[var(--text-muted)]">
                     Number of times to attempt recovery before giving up
                   </p>
                 </div>

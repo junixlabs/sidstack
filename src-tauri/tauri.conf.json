@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "SidStack Agent Manager",
-  "version": "0.3.1",
+  "productName": "SidStack",
+  "version": "0.4.0",
   "identifier": "com.sidstack.agent-manager",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -12,7 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "SidStack Agent Manager",
+        "title": "SidStack",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
         "width": 1200,
         "height": 800,
         "minWidth": 800,
@@ -41,6 +43,6 @@
     ],
     "category": "DeveloperTool",
     "shortDescription": "Lightweight AI agent management tool",
-    "longDescription": "SidStack Agent Manager - A lightweight desktop application for managing AI agents, reviewing code changes, and approving merge requests without the overhead of a full IDE."
+    "longDescription": "SidStack - AI-Powered Project Intelligence Platform for managing knowledge, tasks, governance, and agent sessions."
   }
 }

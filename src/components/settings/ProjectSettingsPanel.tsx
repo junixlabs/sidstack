@@ -196,7 +196,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
           {isDirty && (
             <Badge
               variant="outline"
-              className="text-[10px] px-1.5 py-0 h-5 border-[var(--color-warning)] text-[var(--color-warning)]"
+              className="text-[11px] px-1.5 py-0 h-5 border-[var(--color-warning)] text-[var(--color-warning)]"
             >
               Unsaved
             </Badge>
@@ -447,7 +447,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
             )} />
             <div>
               <div className="text-xs font-medium text-[var(--text-primary)]">Self-hosted</div>
-              <div className="text-[10px] text-[var(--text-muted)]">Local webhook endpoint</div>
+              <div className="text-[11px] text-[var(--text-muted)]">Local webhook endpoint</div>
             </div>
           </button>
           <button
@@ -465,7 +465,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
             )} />
             <div>
               <div className="text-xs font-medium text-[var(--text-primary)]">SidStack Cloud</div>
-              <div className="text-[10px] text-[var(--text-muted)]">Cloud relay service</div>
+              <div className="text-[11px] text-[var(--text-muted)]">Cloud relay service</div>
             </div>
           </button>
         </div>
@@ -485,7 +485,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
               <>
                 {/* Webhook URL */}
                 <div className="p-2.5 rounded bg-[var(--surface-2)] border border-[var(--border-muted)]">
-                  <Label className="text-[10px] text-[var(--text-muted)]">Webhook URL</Label>
+                  <Label className="text-[11px] text-[var(--text-muted)]">Webhook URL</Label>
                   <div className="flex items-center gap-2 mt-1">
                     <code className="text-xs text-[var(--text-primary)] flex-1 truncate font-mono">
                       {settings.ticket?.tunnelUrl || "http://localhost:19432/api/tickets"}
@@ -506,7 +506,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-xs text-[var(--text-primary)]">Public Tunnel</Label>
-                      <p className="text-[10px] text-[var(--text-muted)]">
+                      <p className="text-[11px] text-[var(--text-muted)]">
                         Expose webhook URL publicly
                       </p>
                     </div>
@@ -530,7 +530,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
                             tunnelInfo.status === 'stopped' && "bg-gray-400",
                             tunnelInfo.status === 'error' && "bg-red-500"
                           )} />
-                          <span className="text-[10px] text-[var(--text-secondary)]">
+                          <span className="text-[11px] text-[var(--text-secondary)]">
                             {tunnelInfo.status === 'running' && `Running (${tunnelInfo.provider})`}
                             {tunnelInfo.status === 'starting' && 'Starting...'}
                             {tunnelInfo.status === 'stopped' && 'Stopped'}
@@ -541,7 +541,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-6 px-2 text-[10px]"
+                            className="h-6 px-2 text-[11px]"
                             onClick={() => stopTunnel()}
                             disabled={isTunnelLoading}
                           >
@@ -552,7 +552,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-6 px-2 text-[10px]"
+                            className="h-6 px-2 text-[11px]"
                             onClick={() => startTunnel()}
                             disabled={isTunnelLoading}
                           >
@@ -570,7 +570,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
                       {tunnelInfo.status === 'error' && tunnelInfo.error && (
                         <div className="flex items-start gap-2 p-2 rounded bg-[var(--color-error)]/10 text-[var(--color-error)]">
                           <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                          <div className="text-[10px]">
+                          <div className="text-[11px]">
                             <p>{tunnelInfo.error}</p>
                             {!recommendedProvider && (
                               <p className="mt-1 text-[var(--text-muted)]">
@@ -601,7 +601,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
                       {/* Public URL when running */}
                       {tunnelInfo.status === 'running' && tunnelInfo.publicUrl && (
                         <div className="p-2 rounded bg-[var(--color-success)]/10 border border-[var(--color-success)]/30">
-                          <Label className="text-[10px] text-[var(--color-success)]">Public Webhook URL</Label>
+                          <Label className="text-[11px] text-[var(--color-success)]">Public Webhook URL</Label>
                           <div className="flex items-center gap-2 mt-1">
                             <code className="text-xs text-[var(--text-primary)] flex-1 truncate font-mono">
                               {tunnelInfo.publicUrl}/api/tickets
@@ -632,7 +632,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
 
                       {/* Provider Info */}
                       {tunnelProviders.length > 0 && tunnelInfo.status !== 'running' && (
-                        <div className="text-[10px] text-[var(--text-muted)]">
+                        <div className="text-[11px] text-[var(--text-muted)]">
                           Available: {tunnelProviders.filter(p => p.installed).map(p => p.name).join(', ') || 'None'}
                           {recommendedProvider && ` (using ${recommendedProvider})`}
                         </div>
@@ -642,7 +642,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
                 </div>
 
                 {/* Help text */}
-                <p className="text-[10px] text-[var(--text-muted)]">
+                <p className="text-[11px] text-[var(--text-muted)]">
                   Configure your issue tracker (Jira, GitHub, Linear) to send webhooks to this URL.
                   Tickets will appear in the Ticket Queue for review.
                 </p>
@@ -659,7 +659,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-xs text-[var(--text-primary)]">Connection Status</Label>
                 <span className={cn(
-                  "text-[10px] px-2 py-0.5 rounded-full",
+                  "text-[11px] px-2 py-0.5 rounded-full",
                   settings.ticket?.cloud?.connected
                     ? "bg-[var(--color-success)]/20 text-[var(--color-success)]"
                     : "bg-[var(--text-muted)]/20 text-[var(--text-muted)]"
@@ -671,7 +671,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
               {settings.ticket?.cloud?.connected ? (
                 <>
                   {/* Connected state */}
-                  <div className="space-y-2 text-[10px]">
+                  <div className="space-y-2 text-[11px]">
                     <div className="flex justify-between">
                       <span className="text-[var(--text-muted)]">Account</span>
                       <span className="text-[var(--text-primary)]">{settings.ticket.cloud.email}</span>
@@ -716,7 +716,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
               ) : (
                 <>
                   {/* Not connected state */}
-                  <p className="text-[10px] text-[var(--text-muted)] mb-3">
+                  <p className="text-[11px] text-[var(--text-muted)] mb-3">
                     Connect to SidStack Cloud to get a public webhook URL that forwards tickets to your local app in real-time.
                   </p>
                   <Button
@@ -736,7 +736,7 @@ export const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({
             </div>
 
             {/* Benefits */}
-            <div className="text-[10px] text-[var(--text-muted)] space-y-1">
+            <div className="text-[11px] text-[var(--text-muted)] space-y-1">
               <p className="font-medium text-[var(--text-secondary)]">Benefits:</p>
               <ul className="list-disc list-inside space-y-0.5 ml-1">
                 <li>No tunnel setup required</li>
@@ -775,7 +775,7 @@ function SettingsSection({ icon, title, description, children }: SettingsSection
           <span className="text-[var(--text-secondary)]">{icon}</span>
           <span className="text-xs font-medium">{title}</span>
         </div>
-        <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{description}</p>
+        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{description}</p>
       </div>
       {/* Content */}
       <div className="p-3 space-y-3">
@@ -800,7 +800,7 @@ function SettingsField({ label, hint, children }: SettingsFieldProps) {
       <Label className="text-xs text-[var(--text-secondary)]">{label}</Label>
       {children}
       {hint && (
-        <p className="text-[10px] text-[var(--text-muted)]">{hint}</p>
+        <p className="text-[11px] text-[var(--text-muted)]">{hint}</p>
       )}
     </div>
   );
@@ -821,7 +821,7 @@ function SettingsToggle({ label, description, checked, onCheckedChange }: Settin
     <div className="flex items-center justify-between py-1">
       <div className="space-y-0.5">
         <Label className="text-xs text-[var(--text-primary)]">{label}</Label>
-        <p className="text-[10px] text-[var(--text-muted)]">{description}</p>
+        <p className="text-[11px] text-[var(--text-muted)]">{description}</p>
       </div>
       <Switch
         checked={checked}
@@ -864,7 +864,7 @@ function SettingsSlider({ label, value, onChange, min, max, step, unit, hint }: 
         className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
       />
       {hint && (
-        <p className="text-[10px] text-[var(--text-muted)]">{hint}</p>
+        <p className="text-[11px] text-[var(--text-muted)]">{hint}</p>
       )}
     </div>
   );

@@ -16,7 +16,6 @@ import {
   AlertCircle,
   BookOpen,
   GitBranch,
-  Lightbulb,
   FileCode,
   Copy,
   CheckSquare,
@@ -28,8 +27,6 @@ import {
   Sparkles,
   Box,
   LayoutList,
-  GraduationCap,
-  HelpCircle,
   FileEdit,
   Terminal,
 } from "lucide-react";
@@ -37,6 +34,13 @@ import { memo, useEffect, useState, useCallback, useMemo } from "react";
 
 import { MarkdownPreview } from "@/components/MarkdownPreview";
 import { EmptyState } from "@/components/common/EmptyState";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { useOptionalWorkspaceContext } from "@/contexts/WorkspaceContext";
 import { useBlockNavigation } from "@/hooks/useBlockNavigation";
 import { cn } from "@/lib/utils";
@@ -53,12 +57,9 @@ type DocumentType =
   | "spec"
   | "decision"
   | "proposal"
-  // Docs (Diátaxis)
-  | "tutorial"
+  // Docs
   | "guide"
   | "reference"
-  | "explanation"
-  | "concept"
   // Resources
   | "template"
   | "checklist"
@@ -124,51 +125,48 @@ const API_BASE = "http://localhost:19432/api/knowledge";
 
 const TYPE_CONFIG: Record<DocumentType, { label: string; icon: typeof FileText; color: string }> = {
   // Specs
-  spec: { label: "Spec", icon: FileText, color: "#8b5cf6" },
-  decision: { label: "Decision", icon: GitBranch, color: "#10b981" },
-  proposal: { label: "Proposal", icon: FileEdit, color: "#a855f7" },
-  // Docs (Diátaxis)
-  tutorial: { label: "Tutorial", icon: GraduationCap, color: "#06b6d4" },
-  guide: { label: "Guide", icon: BookOpen, color: "#3b82f6" },
-  reference: { label: "Reference", icon: FileCode, color: "#6366f1" },
-  explanation: { label: "Explanation", icon: HelpCircle, color: "#14b8a6" },
-  concept: { label: "Concept", icon: Lightbulb, color: "#f59e0b" },
+  spec: { label: "Spec", icon: FileText, color: "var(--doc-type-spec)" },
+  decision: { label: "Decision", icon: GitBranch, color: "var(--doc-type-decision)" },
+  proposal: { label: "Proposal", icon: FileEdit, color: "var(--doc-type-proposal)" },
+  // Docs
+  guide: { label: "Guide", icon: BookOpen, color: "var(--doc-type-guide)" },
+  reference: { label: "Reference", icon: FileCode, color: "var(--doc-type-reference)" },
   // Resources
-  template: { label: "Template", icon: Copy, color: "#64748b" },
-  checklist: { label: "Checklist", icon: CheckSquare, color: "#22c55e" },
-  pattern: { label: "Pattern", icon: Puzzle, color: "#ec4899" },
+  template: { label: "Template", icon: Copy, color: "var(--doc-type-template)" },
+  checklist: { label: "Checklist", icon: CheckSquare, color: "var(--doc-type-checklist)" },
+  pattern: { label: "Pattern", icon: Puzzle, color: "var(--doc-type-pattern)" },
   // Agent-specific
-  skill: { label: "Skill", icon: Sparkles, color: "#f472b6" },
-  principle: { label: "Principle", icon: Star, color: "#f97316" },
-  rule: { label: "Rule", icon: Shield, color: "#ef4444" },
+  skill: { label: "Skill", icon: Sparkles, color: "var(--doc-type-skill)" },
+  principle: { label: "Principle", icon: Star, color: "var(--doc-type-principle)" },
+  rule: { label: "Rule", icon: Shield, color: "var(--doc-type-rule)" },
   // Meta
-  module: { label: "Module", icon: Box, color: "#8b5cf6" },
-  index: { label: "Index", icon: LayoutList, color: "#94a3b8" },
+  module: { label: "Module", icon: Box, color: "var(--doc-type-module)" },
+  index: { label: "Index", icon: LayoutList, color: "var(--doc-type-index)" },
 };
 
 const STATUS_CONFIG: Record<DocumentStatus, { label: string; color: string }> = {
-  draft: { label: "Draft", color: "#64748b" },
-  active: { label: "Active", color: "#22c55e" },
-  review: { label: "Needs Review", color: "#f59e0b" },
-  archived: { label: "Archived", color: "#94a3b8" },
+  draft: { label: "Draft", color: "var(--doc-status-draft)" },
+  active: { label: "Active", color: "var(--doc-status-active)" },
+  review: { label: "Needs Review", color: "var(--doc-status-review)" },
+  archived: { label: "Archived", color: "var(--doc-status-archived)" },
 };
 
 // Category groups for quick-filter tabs
 const TYPE_CATEGORIES: { label: string; types: DocumentType[]; color: string }[] = [
-  { label: "Specs", types: ["spec", "decision", "proposal"], color: "#8b5cf6" },
-  { label: "Docs", types: ["tutorial", "guide", "reference", "explanation", "concept"], color: "#3b82f6" },
-  { label: "Resources", types: ["template", "checklist", "pattern"], color: "#ec4899" },
-  { label: "Agent", types: ["skill", "principle", "rule"], color: "#f97316" },
-  { label: "Meta", types: ["module", "index"], color: "#94a3b8" },
+  { label: "Specs", types: ["spec", "decision", "proposal"], color: "var(--doc-type-spec)" },
+  { label: "Docs", types: ["guide", "reference"], color: "var(--doc-type-guide)" },
+  { label: "Resources", types: ["template", "checklist", "pattern"], color: "var(--doc-type-pattern)" },
+  { label: "Agent", types: ["skill", "principle", "rule"], color: "var(--doc-type-principle)" },
+  { label: "Meta", types: ["module", "index"], color: "var(--doc-type-index)" },
 ];
 
 // HTTP method detection for API reference docs
 const HTTP_METHOD_COLORS: Record<string, string> = {
-  GET: "#22c55e",
-  POST: "#f59e0b",
-  PUT: "#3b82f6",
-  PATCH: "#8b5cf6",
-  DELETE: "#ef4444",
+  GET: "var(--http-get)",
+  POST: "var(--http-post)",
+  PUT: "var(--http-put)",
+  PATCH: "var(--http-patch)",
+  DELETE: "var(--http-delete)",
 };
 
 function detectHttpMethods(content: string): string[] {
@@ -504,22 +502,22 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
                 {stats && Object.keys(stats.byModule).length > 0 && (
                   <div className="flex-1">
                     <div className="text-xs text-[var(--text-muted)] mb-1">Module</div>
-                    <select
-                      value={moduleFilter || ""}
-                      onChange={(e) => setModuleFilter(e.target.value || null)}
-                      className={cn(
-                        "w-full px-2 py-1 text-xs rounded",
-                        "bg-[var(--surface-1)] border border-[var(--border-muted)]",
-                        "text-[var(--text-primary)]"
-                      )}
+                    <Select
+                      value={moduleFilter || "__all__"}
+                      onValueChange={(v) => setModuleFilter(v === "__all__" ? null : v)}
                     >
-                      <option value="">All modules</option>
-                      {Object.keys(stats.byModule).map((module) => (
-                        <option key={module} value={module}>
-                          {module} ({stats.byModule[module]})
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full h-7 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">All modules</SelectItem>
+                        {Object.keys(stats.byModule).map((module) => (
+                          <SelectItem key={module} value={module}>
+                            {module} ({stats.byModule[module]})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               </div>
@@ -981,7 +979,7 @@ function TypeContextBar({ doc }: { doc: KnowledgeDocument }) {
         {methods.map((m) => (
           <span
             key={m}
-            className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
+            className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold"
             style={{ backgroundColor: `${HTTP_METHOD_COLORS[m] || "#666"}20`, color: HTTP_METHOD_COLORS[m] || "#666" }}
           >
             {m}
@@ -1004,7 +1002,7 @@ function TypeContextBar({ doc }: { doc: KnowledgeDocument }) {
       <div className="px-4 py-1.5 border-b border-[var(--border-muted)] bg-[var(--surface-0)] flex items-center gap-2">
         {level && (
           <span
-            className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+            className="px-1.5 py-0.5 rounded text-[11px] font-bold"
             style={{ backgroundColor: `${levelColors[level] || "#666"}20`, color: levelColors[level] || "#666" }}
           >
             {level}
@@ -1012,7 +1010,7 @@ function TypeContextBar({ doc }: { doc: KnowledgeDocument }) {
         )}
         {enforcement && (
           <span
-            className="px-1.5 py-0.5 rounded text-[10px] font-mono"
+            className="px-1.5 py-0.5 rounded text-[11px] font-mono"
             style={{ backgroundColor: `${enfColors[enforcement] || "#666"}20`, color: enfColors[enforcement] || "#666" }}
           >
             {enforcement}
@@ -1030,7 +1028,7 @@ function TypeContextBar({ doc }: { doc: KnowledgeDocument }) {
     return (
       <div className="px-4 py-1.5 border-b border-[var(--border-muted)] bg-[var(--surface-0)] flex items-center gap-2">
         <span className="text-xs text-[var(--text-muted)]">Skill type:</span>
-        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-pink-500/10 text-pink-400">
+        <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-pink-500/10 text-pink-400">
           {skillType}
         </span>
       </div>
@@ -1066,7 +1064,7 @@ function TypeContextBar({ doc }: { doc: KnowledgeDocument }) {
     return (
       <div className="px-4 py-1.5 border-b border-[var(--border-muted)] bg-[var(--surface-0)] flex items-center gap-2">
         <span className="text-xs text-[var(--text-muted)]">Pattern:</span>
-        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-pink-500/10 text-pink-400">
+        <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-pink-500/10 text-pink-400">
           {cat}
         </span>
       </div>

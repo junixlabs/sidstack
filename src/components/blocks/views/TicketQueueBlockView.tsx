@@ -258,7 +258,7 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
           </div>
           <div className="flex items-center gap-1">
             {autoRefreshActive && (
-              <span className="text-[10px] text-[var(--text-muted)]">Auto</span>
+              <span className="text-[11px] text-[var(--text-muted)]">Auto</span>
             )}
             <Button
               variant="ghost"
@@ -311,8 +311,8 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
 
       {/* Error display */}
       {error && (
-        <div className="p-3 bg-red-500/10 border-b border-red-500/20">
-          <div className="flex items-center gap-2 text-sm text-red-400">
+        <div className="p-3 bg-[var(--color-error)]/10 border-b border-[var(--color-error)]/20">
+          <div className="flex items-center gap-2 text-sm text-[var(--color-error)]">
             <AlertTriangle className="w-4 h-4" />
             {error}
             <Button variant="ghost" size="sm" onClick={clearError}>
@@ -372,11 +372,11 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
                           Connect Your Issue Tracker
                         </h4>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--surface-3)] text-[var(--text-secondary)]">
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-[var(--surface-3)] text-[var(--text-secondary)]">
                             {settings.ticket?.source === 'sidstack-cloud' ? 'SidStack Cloud' : 'Self-hosted'}
                           </span>
                           {tunnelInfo.status === 'running' && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-500">
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--color-success)]/20 text-[var(--color-success)]">
                               Tunnel Active
                             </span>
                           )}
@@ -411,14 +411,14 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
                                 title="Copy URL"
                               >
                                 {copiedExample === "url" ? (
-                                  <Check className="w-3.5 h-3.5 text-green-500" />
+                                  <Check className="w-3.5 h-3.5 text-[var(--color-success)]" />
                                 ) : (
                                   <Copy className="w-3.5 h-3.5" />
                                 )}
                               </button>
                             </div>
                             {tunnelInfo.status !== 'running' && (
-                              <p className="text-[10px] text-[var(--text-muted)]">
+                              <p className="text-[11px] text-[var(--text-muted)]">
                                 Enable tunnel in Settings → Ticket Source for public URL
                               </p>
                             )}
@@ -441,11 +441,11 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
     "source": "jira",
     "externalId": "PROJ-123"
   }'`, "curl")}
-                                className="flex items-center gap-1.5 px-2 py-1 text-[10px] rounded bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border-muted)] transition-colors"
+                                className="flex items-center gap-1.5 px-2 py-1 text-[11px] rounded bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border-muted)] transition-colors"
                               >
                                 {copiedExample === "curl" ? (
                                   <>
-                                    <Check className="w-3 h-3 text-green-500" />
+                                    <Check className="w-3 h-3 text-[var(--color-success)]" />
                                     Copied!
                                   </>
                                 ) : (
@@ -456,7 +456,7 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
                                 )}
                               </button>
                             </div>
-                            <pre className="text-[10px] bg-[var(--surface-2)] p-3 rounded font-mono overflow-x-auto border border-[var(--border-muted)]">
+                            <pre className="text-[11px] bg-[var(--surface-2)] p-3 rounded font-mono overflow-x-auto border border-[var(--border-muted)]">
 {`{
   "projectId": "${projectId}",
   "title": "Fix login bug",
@@ -509,11 +509,15 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
               {tickets.map((ticket) => (
                 <div
                   key={ticket.id}
+                  role="button"
+                  tabIndex={0}
                   className={cn(
                     "p-3 cursor-pointer hover:bg-[var(--surface-1)] transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]",
                     selectedTicket?.id === ticket.id && "bg-[var(--surface-2)] border-l-2 border-l-[var(--accent-primary)]"
                   )}
                   onClick={() => selectTicket(ticket.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectTicket(ticket.id); } }}
                 >
                   <div className="flex items-start gap-3">
                     {/* Type icon */}
@@ -525,14 +529,14 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
                     <div className="flex-1 min-w-0">
                       {/* Title row with status/priority badges */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className={cn("text-[10px] px-1.5 py-0", statusColors[ticket.status])}>
+                        <Badge className={cn("text-[11px] px-1.5 py-0", statusColors[ticket.status])}>
                           {ticket.status.replace("_", " ")}
                         </Badge>
-                        <Badge className={cn("text-[10px] px-1.5 py-0", priorityColors[ticket.priority])}>
+                        <Badge className={cn("text-[11px] px-1.5 py-0", priorityColors[ticket.priority])}>
                           {ticket.priority}
                         </Badge>
                         {ticket.externalId && (
-                          <span className="text-[10px] text-muted-foreground font-mono">
+                          <span className="text-[11px] text-muted-foreground font-mono">
                             #{ticket.externalId}
                           </span>
                         )}
@@ -554,12 +558,12 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
                       {ticket.labels.length > 0 && (
                         <div className="flex items-center gap-1 mt-2 flex-wrap">
                           {ticket.labels.slice(0, 3).map((label) => (
-                            <span key={label} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                            <span key={label} className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                               {label}
                             </span>
                           ))}
                           {ticket.labels.length > 3 && (
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-[11px] text-muted-foreground">
                               +{ticket.labels.length - 3}
                             </span>
                           )}

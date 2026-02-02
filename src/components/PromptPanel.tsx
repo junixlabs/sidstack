@@ -134,7 +134,7 @@ export function PromptPanel({
                     className="w-full px-3 py-2 text-left text-xs text-zinc-300 hover:bg-zinc-700 border-b border-zinc-700 last:border-0"
                   >
                     <div className="truncate">{item.prompt}</div>
-                    <div className="text-zinc-500 text-[10px] mt-1">
+                    <div className="text-zinc-500 text-[11px] mt-1">
                       {new Date(item.timestamp).toLocaleString()}
                       {item.context.length > 0 && ` - ${item.context.length} files`}
                     </div>

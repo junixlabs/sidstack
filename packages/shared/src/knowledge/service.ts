@@ -5,6 +5,10 @@
  * Provides CRUD operations, search, and context building.
  */
 
+import * as fs from 'fs';
+import * as fsp from 'fs/promises';
+import * as path from 'path';
+
 import type {
   KnowledgeDocument,
   ScoredDocument,
@@ -17,9 +21,20 @@ import type {
   KnowledgeContext,
   KnowledgeStats,
   KnowledgeTreeNode,
+  CreateDocumentInput,
+  UpdateDocumentInput,
+  HealthCheckResult,
+  HealthIssue,
 } from './types';
 import { DOCUMENT_TYPE_CONFIG } from './types';
 import { AdapterRegistry, defaultAdapterRegistry } from './adapters';
+import {
+  serializeFrontmatter,
+  generateDocumentFrontmatter,
+  generateSlug,
+  isValidDocumentType,
+  parseFrontmatter,
+} from './parser';
 
 // =============================================================================
 // Knowledge Service
@@ -359,6 +374,231 @@ export class KnowledgeService {
       totalCharacters: totalChars,
       prompt,
     };
+  }
+
+  // ===========================================================================
+  // Document CRUD
+  // ===========================================================================
+
+  /**
+   * Create a new knowledge document
+   */
+  async createDocument(input: CreateDocumentInput): Promise<KnowledgeDocument> {
+    // Validate type
+    if (!isValidDocumentType(input.type)) {
+      throw new Error(`Invalid document type: ${input.type}`);
+    }
+
+    // Generate slug from title
+    const slug = generateSlug(input.title);
+
+    // Determine target folder
+    const typeConfig = DOCUMENT_TYPE_CONFIG[input.type];
+    const folder = input.category || typeConfig?.folder || input.type;
+    const targetDir = path.join(this.basePath, '.sidstack', 'knowledge', folder);
+
+    // Create directory if not exists
+    await fsp.mkdir(targetDir, { recursive: true });
+
+    // Generate filename
+    const filePath = path.join(targetDir, `${slug}.md`);
+
+    // Check if file already exists
+    if (fs.existsSync(filePath)) {
+      throw new Error(`Document already exists: ${slug}`);
+    }
+
+    // Generate frontmatter
+    const frontmatter = generateDocumentFrontmatter({
+      title: input.title,
+      type: input.type,
+      status: input.status,
+      module: input.module,
+      tags: input.tags,
+      owner: input.owner,
+      related: input.related,
+      dependsOn: input.dependsOn,
+    });
+
+    // Serialize and write
+    const fileContent = serializeFrontmatter(frontmatter, input.content);
+    await fsp.writeFile(filePath, fileContent, 'utf-8');
+
+    // Invalidate cache and reload
+    this.invalidateCache();
+
+    // Return the document by loading it fresh
+    const doc = await this.getDocument(frontmatter.id!);
+    if (!doc) {
+      throw new Error('Failed to load created document');
+    }
+    return doc;
+  }
+
+  /**
+   * Update an existing knowledge document
+   */
+  async updateDocument(docId: string, updates: UpdateDocumentInput): Promise<KnowledgeDocument> {
+    const doc = await this.getDocument(docId);
+    if (!doc) {
+      throw new Error(`Document not found: ${docId}`);
+    }
+
+    // Read the raw file
+    const rawContent = await fsp.readFile(doc.absolutePath, 'utf-8');
+    const { frontmatter, body } = parseFrontmatter(rawContent);
+
+    // Merge updates into frontmatter
+    if (updates.title !== undefined) frontmatter.title = updates.title;
+    if (updates.status !== undefined) frontmatter.status = updates.status;
+    if (updates.tags !== undefined) frontmatter.tags = updates.tags;
+    if (updates.module !== undefined) frontmatter.module = updates.module;
+    if (updates.owner !== undefined) frontmatter.owner = updates.owner;
+    if (updates.related !== undefined) frontmatter.related = updates.related;
+    if (updates.dependsOn !== undefined) frontmatter.dependsOn = updates.dependsOn;
+
+    // Update timestamp
+    frontmatter.updatedAt = new Date().toISOString();
+
+    // Use updated content or keep existing body
+    const newBody = updates.content !== undefined ? updates.content : body;
+
+    // Serialize and write back
+    const fileContent = serializeFrontmatter(frontmatter, newBody);
+    await fsp.writeFile(doc.absolutePath, fileContent, 'utf-8');
+
+    // Invalidate cache and reload
+    this.invalidateCache();
+
+    const updated = await this.getDocument(docId);
+    if (!updated) {
+      throw new Error('Failed to load updated document');
+    }
+    return updated;
+  }
+
+  /**
+   * Delete or archive a knowledge document
+   */
+  async deleteDocument(docId: string, archive = true): Promise<void> {
+    const doc = await this.getDocument(docId);
+    if (!doc) {
+      throw new Error(`Document not found: ${docId}`);
+    }
+
+    if (archive) {
+      // Move to archive folder
+      const archiveDir = path.join(this.basePath, '.sidstack', '.archive');
+      await fsp.mkdir(archiveDir, { recursive: true });
+
+      const filename = path.basename(doc.absolutePath);
+      const archivePath = path.join(archiveDir, filename);
+      await fsp.rename(doc.absolutePath, archivePath);
+    } else {
+      // Delete file
+      await fsp.unlink(doc.absolutePath);
+    }
+
+    this.invalidateCache();
+  }
+
+  // ===========================================================================
+  // Health Check
+  // ===========================================================================
+
+  /**
+   * Run health checks on the knowledge base
+   */
+  async healthCheck(checks?: string[]): Promise<HealthCheckResult> {
+    const documents = await this.loadDocuments();
+    const issues: HealthIssue[] = [];
+
+    const shouldRun = (check: string) => !checks || checks.length === 0 || checks.includes(check);
+
+    // Stale check: docs not updated in 90+ days
+    if (shouldRun('stale')) {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+      for (const doc of documents) {
+        if (new Date(doc.updatedAt) < ninetyDaysAgo) {
+          issues.push({
+            severity: 'warning',
+            category: 'stale',
+            docId: doc.id,
+            docTitle: doc.title,
+            message: `Not updated since ${doc.updatedAt.split('T')[0]}`,
+          });
+        }
+      }
+    }
+
+    // Missing metadata check
+    if (shouldRun('missing-metadata')) {
+      for (const doc of documents) {
+        if (!doc.title) {
+          issues.push({ severity: 'error', category: 'missing-metadata', docId: doc.id, docTitle: doc.id, message: 'Missing title' });
+        }
+        if (!doc.type) {
+          issues.push({ severity: 'error', category: 'missing-metadata', docId: doc.id, docTitle: doc.title, message: 'Missing type' });
+        }
+        if (!doc.status) {
+          issues.push({ severity: 'error', category: 'missing-metadata', docId: doc.id, docTitle: doc.title, message: 'Missing status' });
+        }
+      }
+    }
+
+    // Broken links check
+    if (shouldRun('broken-link')) {
+      const docIds = new Set(documents.map(d => d.id));
+
+      for (const doc of documents) {
+        for (const ref of doc.related || []) {
+          if (!docIds.has(ref)) {
+            issues.push({ severity: 'error', category: 'broken-link', docId: doc.id, docTitle: doc.title, message: `Related doc not found: ${ref}` });
+          }
+        }
+        for (const ref of doc.dependsOn || []) {
+          if (!docIds.has(ref)) {
+            issues.push({ severity: 'error', category: 'broken-link', docId: doc.id, docTitle: doc.title, message: `Dependency not found: ${ref}` });
+          }
+        }
+      }
+    }
+
+    // Orphaned check: docs with no module and not referenced
+    if (shouldRun('orphaned')) {
+      const referencedIds = new Set<string>();
+      for (const doc of documents) {
+        for (const ref of doc.related || []) referencedIds.add(ref);
+        for (const ref of doc.dependsOn || []) referencedIds.add(ref);
+      }
+
+      for (const doc of documents) {
+        if (!doc.module && !referencedIds.has(doc.id) && doc.type !== 'index' && doc.type !== 'module') {
+          issues.push({ severity: 'info', category: 'orphaned', docId: doc.id, docTitle: doc.title, message: 'No module and not referenced by any other doc' });
+        }
+      }
+    }
+
+    // Overdue review check
+    if (shouldRun('overdue-review')) {
+      const now = new Date();
+      for (const doc of documents) {
+        if (doc.reviewDate && new Date(doc.reviewDate) < now) {
+          issues.push({ severity: 'warning', category: 'overdue-review', docId: doc.id, docTitle: doc.title, message: `Review overdue since ${doc.reviewDate}` });
+        }
+      }
+    }
+
+    // Summary
+    const summary = {
+      errors: issues.filter(i => i.severity === 'error').length,
+      warnings: issues.filter(i => i.severity === 'warning').length,
+      info: issues.filter(i => i.severity === 'info').length,
+    };
+
+    return { totalDocuments: documents.length, issues, summary };
   }
 
   // ===========================================================================

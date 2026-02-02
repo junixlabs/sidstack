@@ -13,6 +13,8 @@ import {
   type DocumentType,
   type DocumentStatus,
   type ListDocumentsQuery,
+  type CreateDocumentInput,
+  type UpdateDocumentInput,
 } from '@sidstack/shared';
 
 export const knowledgeRouter: Router = Router();
@@ -328,6 +330,127 @@ knowledgeRouter.get('/modules', async (req, res) => {
     console.error('Error listing modules:', error);
     res.status(500).json({
       error: 'Failed to list modules',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * POST /api/knowledge
+ * Create a new knowledge document
+ */
+knowledgeRouter.post('/', async (req, res) => {
+  try {
+    const { projectPath, title, type, content, module, tags, status, owner, category, related, dependsOn } = req.body;
+
+    if (!projectPath) {
+      return res.status(400).json({ error: 'projectPath is required' });
+    }
+    if (!title || !type || content === undefined) {
+      return res.status(400).json({ error: 'title, type, and content are required' });
+    }
+
+    const service = getService(projectPath);
+    const input: CreateDocumentInput = { title, type, content, module, tags, status, owner, category, related, dependsOn };
+    const doc = await service.createDocument(input);
+
+    res.status(201).json(doc);
+  } catch (error) {
+    console.error('Error creating document:', error);
+    const status = (error instanceof Error && error.message.includes('already exists')) ? 409 : 500;
+    res.status(status).json({
+      error: 'Failed to create document',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * PUT /api/knowledge/doc/:id
+ * Update an existing knowledge document
+ */
+knowledgeRouter.put('/doc/:id', async (req, res) => {
+  try {
+    const projectPath = req.query.projectPath as string || req.body.projectPath;
+    if (!projectPath) {
+      return res.status(400).json({ error: 'projectPath is required' });
+    }
+
+    const { id } = req.params;
+    const { title, content, status, tags, module, owner, related, dependsOn } = req.body;
+
+    const service = getService(projectPath);
+    const updates: UpdateDocumentInput = {};
+    if (title !== undefined) updates.title = title;
+    if (content !== undefined) updates.content = content;
+    if (status !== undefined) updates.status = status;
+    if (tags !== undefined) updates.tags = tags;
+    if (module !== undefined) updates.module = module;
+    if (owner !== undefined) updates.owner = owner;
+    if (related !== undefined) updates.related = related;
+    if (dependsOn !== undefined) updates.dependsOn = dependsOn;
+
+    const doc = await service.updateDocument(id, updates);
+    res.json(doc);
+  } catch (error) {
+    console.error('Error updating document:', error);
+    const status = (error instanceof Error && error.message.includes('not found')) ? 404 : 500;
+    res.status(status).json({
+      error: 'Failed to update document',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * DELETE /api/knowledge/doc/:id
+ * Delete (archive) a knowledge document
+ */
+knowledgeRouter.delete('/doc/:id', async (req, res) => {
+  try {
+    const projectPath = req.query.projectPath as string;
+    if (!projectPath) {
+      return res.status(400).json({ error: 'projectPath is required' });
+    }
+
+    const { id } = req.params;
+    const archive = req.query.archive !== 'false'; // default true
+
+    const service = getService(projectPath);
+    await service.deleteDocument(id, archive);
+
+    res.json({ success: true, action: archive ? 'archived' : 'deleted' });
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    const statusCode = (error instanceof Error && error.message.includes('not found')) ? 404 : 500;
+    res.status(statusCode).json({
+      error: 'Failed to delete document',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * GET /api/knowledge/health
+ * Run health checks on the knowledge base
+ */
+knowledgeRouter.get('/health', async (req, res) => {
+  try {
+    const projectPath = req.query.projectPath as string;
+    if (!projectPath) {
+      return res.status(400).json({ error: 'projectPath is required' });
+    }
+
+    const checks = req.query.checks ? (req.query.checks as string).split(',') : undefined;
+
+    const service = getService(projectPath);
+    const result = await service.healthCheck(checks);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error running health check:', error);
+    res.status(500).json({
+      error: 'Failed to run health check',
       details: error instanceof Error ? error.message : 'Unknown error',
     });
   }

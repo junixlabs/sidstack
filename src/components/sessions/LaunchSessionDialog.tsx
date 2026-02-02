@@ -596,7 +596,7 @@ export const LaunchSessionDialog = memo(function LaunchSessionDialog({
                     {contextPreview.details.map((detail, idx) => (
                       <span
                         key={idx}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-secondary)]"
+                        className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-secondary)]"
                       >
                         {detail.label}: {detail.value}
                       </span>

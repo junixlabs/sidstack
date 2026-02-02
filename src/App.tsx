@@ -207,12 +207,10 @@ function App() {
     setStatusMessage(`Switched to ${item.label}`);
 
     // Track onboarding milestones
-    if (item.id === "project-hub") {
-      completeMilestone("projectHubViewed");
-    }
-    if (item.id === "knowledge") {
-      completeMilestone("knowledgeBrowsed");
-    }
+    if (item.id === "project-hub") completeMilestone("projectHubViewed");
+    if (item.id === "knowledge") completeMilestone("knowledgeBrowsed");
+    if (item.id === "ticket-queue") completeMilestone("ticketQueueViewed");
+    if (item.id === "training-room") completeMilestone("trainingRoomVisited");
   }, [completeMilestone]);
 
   // Handle navigation from Getting Started modal
@@ -224,12 +222,10 @@ function App() {
     }
 
     // Track onboarding milestones
-    if (viewId === "project-hub") {
-      completeMilestone("projectHubViewed");
-    }
-    if (viewId === "knowledge") {
-      completeMilestone("knowledgeBrowsed");
-    }
+    if (viewId === "project-hub") completeMilestone("projectHubViewed");
+    if (viewId === "knowledge") completeMilestone("knowledgeBrowsed");
+    if (viewId === "ticket-queue") completeMilestone("ticketQueueViewed");
+    if (viewId === "training-room") completeMilestone("trainingRoomVisited");
   }, [completeMilestone]);
 
   // Handle worktree click - open worktree status view
@@ -353,10 +349,11 @@ function App() {
       <div className="h-screen w-screen flex flex-col overflow-hidden bg-[var(--surface-0)]">
         {/* ===== ZONE 1: HEADER (40px fixed, simplified) ===== */}
         <header
+          data-tauri-drag-region
           style={{ height: LAYOUT.HEADER_HEIGHT }}
-          className="flex-none flex items-center px-3 border-b bg-[var(--surface-1)] border-[var(--border-muted)]"
+          className="flex-none flex items-center pl-[72px] pr-3 border-b bg-[var(--surface-1)] border-[var(--border-muted)]"
         >
-          {/* Left: Logo */}
+          {/* Left: Logo (pl-[72px] reserves space for macOS traffic lights with titleBarStyle: overlay) */}
           <div className="flex items-center">
             <LogoCompact size={24} />
           </div>

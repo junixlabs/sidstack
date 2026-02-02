@@ -1,6 +1,11 @@
 import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { Command } from '@oclif/core';
+
+import { checkPrerequisites } from '../lib/prerequisites.js';
+import { verifyInit } from '../lib/init-verify.js';
 
 export default class Doctor extends Command {
   static description = 'Run health checks and diagnostics';
@@ -52,9 +57,53 @@ export default class Doctor extends Command {
       this.log('✗ pnpm is not installed');
     }
 
+    // SidStack prerequisites
     this.log('');
-    this.log('Service health checks:');
-    this.log('  (Not yet implemented - services need to be running)');
+    this.log('SidStack Prerequisites:');
+    const prereqs = checkPrerequisites(process.cwd());
+    for (const r of prereqs.results) {
+      const icon = r.status === 'ok' ? '✓' : r.status === 'warn' ? '⚠' : '✗';
+      this.log(`  ${icon} ${r.message}`);
+    }
+
+    // SidStack project health
+    this.log('');
+    const sidstackDir = path.join(process.cwd(), '.sidstack');
+    if (fs.existsSync(sidstackDir)) {
+      this.log('SidStack Project Health:');
+
+      // Read config for version info
+      const configPath = path.join(sidstackDir, 'config.json');
+      let versionInfo = '';
+      if (fs.existsSync(configPath)) {
+        try {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+          if (config.version) versionInfo = ` (v${config.version})`;
+        } catch {
+          // ignore
+        }
+      }
+
+      const hasGovernance = fs.existsSync(path.join(sidstackDir, 'governance.md'));
+      const hasOpenSpec = fs.existsSync(path.join(process.cwd(), 'openspec', 'AGENTS.md'));
+
+      const verification = verifyInit(process.cwd(), {
+        governance: hasGovernance,
+        openspec: hasOpenSpec,
+      });
+
+      for (const check of verification.checks) {
+        const icon = check.passed ? '✓' : '✗';
+        const label = check.name === '.sidstack/config.json' && versionInfo
+          ? `${check.message}${versionInfo}`
+          : check.message;
+        this.log(`  ${icon} ${label}`);
+      }
+    } else {
+      this.log('SidStack Project Health:');
+      this.log('  ⚠ Not initialized (run `sidstack init` first)');
+    }
+
     this.log('');
   }
 }

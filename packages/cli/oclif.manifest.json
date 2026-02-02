@@ -121,10 +121,9 @@
       "examples": [
         "<%= config.bin %> init",
         "<%= config.bin %> init /path/to/project",
-        "<%= config.bin %> init --project-name my-app",
-        "<%= config.bin %> init --preset minimal",
-        "<%= config.bin %> init --no-frameworks  # Skip governance and openspec",
-        "<%= config.bin %> init --scan  # Scan codebase and generate knowledge docs"
+        "<%= config.bin %> init -n my-app --preset minimal",
+        "<%= config.bin %> init --scan",
+        "<%= config.bin %> init --json --force"
       ],
       "flags": {
         "project-name": {
@@ -155,20 +154,6 @@
           "name": "force",
           "allowNo": false,
           "type": "boolean"
-        },
-        "no-frameworks": {
-          "description": "Skip governance and openspec (minimal setup)",
-          "name": "no-frameworks",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "commands": {
-          "char": "c",
-          "description": "Install commands (all, core, optional, or comma-separated names)",
-          "name": "commands",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
         },
         "scan": {
           "char": "s",
@@ -625,47 +610,6 @@
         "show.js"
       ]
     },
-    "migrate:modules-to-capabilities": {
-      "aliases": [],
-      "args": {},
-      "description": "Convert module YAML definitions to capability YAML definitions",
-      "examples": [
-        "<%= config.bin %> migrate modules-to-capabilities",
-        "<%= config.bin %> migrate modules-to-capabilities --json",
-        "<%= config.bin %> migrate modules-to-capabilities --dry-run"
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "dry-run": {
-          "char": "d",
-          "description": "Preview migration without writing files",
-          "name": "dry-run",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "migrate:modules-to-capabilities",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "migrate",
-        "modules-to-capabilities.js"
-      ]
-    },
     "knowledge:create": {
       "aliases": [],
       "args": {
@@ -967,206 +911,6 @@
         "commands",
         "knowledge",
         "validate.js"
-      ]
-    },
-    "orchestrator:analytics": {
-      "aliases": [],
-      "args": {},
-      "description": "View MCP tool usage analytics and error reports",
-      "examples": [
-        "<%= config.bin %> orchestrator analytics",
-        "<%= config.bin %> orchestrator analytics --errors",
-        "<%= config.bin %> orchestrator analytics --since 24h",
-        "<%= config.bin %> orchestrator analytics --clear"
-      ],
-      "flags": {
-        "errors": {
-          "char": "e",
-          "description": "Show only errors",
-          "name": "errors",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "since": {
-          "char": "s",
-          "description": "Show stats since (e.g., 1h, 24h, 7d)",
-          "name": "since",
-          "default": "24h",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "clear": {
-          "description": "Clear all logs",
-          "name": "clear",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "json": {
-          "description": "Output as JSON",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "orchestrator:analytics",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "orchestrator",
-        "analytics.js"
-      ]
-    },
-    "orchestrator:ps": {
-      "aliases": [],
-      "args": {},
-      "description": "List running agent processes",
-      "examples": [
-        "<%= config.bin %> orchestrator ps"
-      ],
-      "flags": {},
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "orchestrator:ps",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "orchestrator",
-        "ps.js"
-      ]
-    },
-    "preset:list": {
-      "aliases": [],
-      "args": {},
-      "description": "List available initialization presets",
-      "examples": [
-        "<%= config.bin %> preset list",
-        "<%= config.bin %> preset list --json",
-        "<%= config.bin %> preset list --language typescript"
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format (agent-friendly)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output",
-          "name": "quiet",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "language": {
-          "char": "l",
-          "description": "Filter by language (typescript, python, go, any)",
-          "name": "language",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "type": {
-          "char": "t",
-          "description": "Filter by project type (fullstack, backend, general)",
-          "name": "type",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "preset:list",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "preset",
-        "list.js"
-      ]
-    },
-    "preset:show": {
-      "aliases": [],
-      "args": {
-        "name": {
-          "description": "Preset name",
-          "name": "name",
-          "required": true
-        }
-      },
-      "description": "Show detailed information about a preset",
-      "examples": [
-        "<%= config.bin %> preset show minimal",
-        "<%= config.bin %> preset show fullstack-typescript --json",
-        "<%= config.bin %> preset show typescript-backend --section agents"
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format (agent-friendly)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output",
-          "name": "quiet",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "section": {
-          "char": "s",
-          "description": "Show specific section (agents, skills, defaults, recommended)",
-          "name": "section",
-          "default": "all",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "options": [
-            "agents",
-            "skills",
-            "defaults",
-            "recommended",
-            "all"
-          ],
-          "type": "option"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "preset:show",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "preset",
-        "show.js"
       ]
     },
     "skill:add": {
@@ -1632,88 +1376,14 @@
         "validate.js"
       ]
     },
-    "module:graph": {
+    "preset:list": {
       "aliases": [],
       "args": {},
-      "description": "Generate module dependency graph",
+      "description": "List available initialization presets",
       "examples": [
-        "<%= config.bin %> module graph",
-        "<%= config.bin %> module graph --format mermaid",
-        "<%= config.bin %> module graph --mode flows",
-        "<%= config.bin %> module graph --mode features",
-        "<%= config.bin %> module graph --format json"
-      ],
-      "flags": {
-        "format": {
-          "char": "f",
-          "description": "Output format",
-          "name": "format",
-          "default": "mermaid",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "options": [
-            "mermaid",
-            "ascii",
-            "json",
-            "dot"
-          ],
-          "type": "option"
-        },
-        "mode": {
-          "char": "m",
-          "description": "Graph detail level: simple (deps only), flows (deps + data flows), features (grouped by domain), full (all relationships)",
-          "name": "mode",
-          "default": "simple",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "options": [
-            "simple",
-            "flows",
-            "features",
-            "full"
-          ],
-          "type": "option"
-        },
-        "json": {
-          "char": "j",
-          "description": "Output as JSON (equivalent to --format json)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output (just the graph)",
-          "name": "quiet",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "module:graph",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "module",
-        "graph.js"
-      ]
-    },
-    "module:list": {
-      "aliases": [],
-      "args": {},
-      "description": "List all modules in the project",
-      "examples": [
-        "<%= config.bin %> module list",
-        "<%= config.bin %> module list --json",
-        "<%= config.bin %> module list --status active",
-        "<%= config.bin %> module list --format json"
+        "<%= config.bin %> preset list",
+        "<%= config.bin %> preset list --json",
+        "<%= config.bin %> preset list --language typescript"
       ],
       "flags": {
         "json": {
@@ -1723,46 +1393,96 @@
           "allowNo": false,
           "type": "boolean"
         },
-        "format": {
-          "char": "f",
-          "description": "Output format",
-          "name": "format",
-          "default": "table",
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "language": {
+          "char": "l",
+          "description": "Filter by language (typescript, python, go, any)",
+          "name": "language",
           "hasDynamicHelp": false,
           "multiple": false,
-          "options": [
-            "table",
-            "json",
-            "yaml"
-          ],
           "type": "option"
         },
-        "status": {
+        "type": {
+          "char": "t",
+          "description": "Filter by project type (fullstack, backend, general)",
+          "name": "type",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "preset:list",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "preset",
+        "list.js"
+      ]
+    },
+    "preset:show": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Preset name",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Show detailed information about a preset",
+      "examples": [
+        "<%= config.bin %> preset show minimal",
+        "<%= config.bin %> preset show fullstack-typescript --json",
+        "<%= config.bin %> preset show typescript-backend --section agents"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "section": {
           "char": "s",
-          "description": "Filter by status",
-          "name": "status",
+          "description": "Show specific section (agents, skills, defaults, recommended)",
+          "name": "section",
           "default": "all",
           "hasDynamicHelp": false,
           "multiple": false,
           "options": [
-            "active",
-            "deprecated",
-            "planned",
+            "agents",
+            "skills",
+            "defaults",
+            "recommended",
             "all"
           ],
           "type": "option"
-        },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output (agent-friendly)",
-          "name": "quiet",
-          "allowNo": false,
-          "type": "boolean"
         }
       },
       "hasDynamicHelp": false,
       "hiddenAliases": [],
-      "id": "module:list",
+      "id": "preset:show",
       "pluginAlias": "@sidstack/cli",
       "pluginName": "@sidstack/cli",
       "pluginType": "core",
@@ -1772,123 +1492,10 @@
       "relativePath": [
         "dist",
         "commands",
-        "module",
-        "list.js"
-      ]
-    },
-    "module:show": {
-      "aliases": [],
-      "args": {
-        "id": {
-          "description": "Module ID to show",
-          "name": "id",
-          "required": true
-        }
-      },
-      "description": "Show detailed information about a module",
-      "examples": [
-        "<%= config.bin %> module show terminal",
-        "<%= config.bin %> module show api-server --json"
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format (agent-friendly)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output",
-          "name": "quiet",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "module:show",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "module",
+        "preset",
         "show.js"
-      ]
-    },
-    "module:validate": {
-      "aliases": [],
-      "args": {
-        "id": {
-          "description": "Specific module ID to validate (validates all if omitted)",
-          "name": "id",
-          "required": false
-        }
-      },
-      "description": "Validate module definitions (agent-friendly with JSON output and exit codes)",
-      "examples": [
-        "<%= config.bin %> module validate",
-        "<%= config.bin %> module validate terminal",
-        "<%= config.bin %> module validate --all --json",
-        "<%= config.bin %> module validate --strict",
-        "<%= config.bin %> module validate --fix"
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format (agent-friendly)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "all": {
-          "description": "Validate all modules",
-          "name": "all",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "strict": {
-          "description": "Treat warnings as errors (exit code 3 for any warning)",
-          "name": "strict",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "fix": {
-          "description": "Auto-fix simple issues (not implemented yet)",
-          "name": "fix",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output",
-          "name": "quiet",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "module:validate",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "module",
-        "validate.js"
       ]
     }
   },
-  "version": "0.3.2"
+  "version": "0.4.0"
 }

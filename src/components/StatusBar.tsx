@@ -49,7 +49,7 @@ export function StatusBar({ className, statusMessage = "Ready" }: StatusBarProps
 
         {/* Active agent indicator */}
         {activeCount > 0 && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-success)]/15 text-[var(--color-success)]">
+          <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-[var(--color-success)]/15 text-[var(--color-success)]">
             {activeCount} working
           </span>
         )}

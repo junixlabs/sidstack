@@ -65,6 +65,7 @@ export interface Task {
   updatedAt: number;
   progress: number;
   notes?: string;
+  branch?: string;
   // Governance fields (Phase 1)
   taskType?: TaskType;
   moduleId?: string;
@@ -310,9 +311,9 @@ export type LessonStatus = 'draft' | 'reviewed' | 'approved' | 'archived';
 export type SkillType = 'procedure' | 'checklist' | 'template' | 'rule';
 export type SkillStatus = 'draft' | 'active' | 'deprecated';
 export type RuleLevel = 'must' | 'should' | 'may';
-export type RuleEnforcement = 'block' | 'warn' | 'log';
+export type RuleEnforcement = 'manual' | 'hook' | 'gate';
 export type RuleStatus = 'active' | 'deprecated';
-export type FeedbackOutcome = 'success' | 'failure' | 'partial' | 'skipped';
+export type FeedbackOutcome = 'helped' | 'ignored' | 'hindered';
 
 export interface TrainingSession {
   id: string;
@@ -766,6 +767,11 @@ export class SidStackDB {
           this.db!.exec("ALTER TABLE tasks ADD COLUMN context TEXT");
           console.log('[SidStackDB] Migration: Added context column to tasks');
         }
+        if (!columnNames.includes('branch')) {
+          this.db!.exec("ALTER TABLE tasks ADD COLUMN branch TEXT");
+          this.db!.exec("CREATE INDEX IF NOT EXISTS idx_tasks_branch ON tasks(branch)");
+          console.log('[SidStackDB] Migration: Added branch column to tasks');
+        }
       }
     } catch (e) {
       // Table might not exist yet, that's ok
@@ -833,12 +839,14 @@ export class SidStackDB {
         governance TEXT DEFAULT '{}',
         acceptanceCriteria TEXT DEFAULT '[]',
         validation TEXT DEFAULT '{}',
-        context TEXT DEFAULT '{}'
+        context TEXT DEFAULT '{}',
+        branch TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(projectId);
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
       CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(taskType);
       CREATE INDEX IF NOT EXISTS idx_tasks_module ON tasks(moduleId);
+      CREATE INDEX IF NOT EXISTS idx_tasks_branch ON tasks(branch);
 
       -- =======================================================================
       -- GOVERNANCE VIOLATIONS
@@ -1500,8 +1508,8 @@ export class SidStackDB {
     const now = Date.now();
     const id = task.id || this.generateId('task');
 
-    this.db!.prepare(`INSERT INTO tasks (id, projectId, parentTaskId, title, description, status, priority, assignedAgent, createdBy, createdAt, updatedAt, progress, taskType, moduleId, governance, acceptanceCriteria, validation, context)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`).run(
+    this.db!.prepare(`INSERT INTO tasks (id, projectId, parentTaskId, title, description, status, priority, assignedAgent, createdBy, createdAt, updatedAt, progress, taskType, moduleId, governance, acceptanceCriteria, validation, context, branch)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`).run(
         id,
         task.projectId,
         task.parentTaskId || null,
@@ -1519,6 +1527,7 @@ export class SidStackDB {
         task.acceptanceCriteria || '[]',
         task.validation || '{}',
         task.context || '{}',
+        task.branch || null,
     );
 
     return { ...task, id, createdAt: now, updatedAt: now, progress: 0 };
@@ -1552,6 +1561,7 @@ export class SidStackDB {
     if (updates.acceptanceCriteria !== undefined) { sets.push('acceptanceCriteria = ?'); values.push(updates.acceptanceCriteria); }
     if (updates.validation !== undefined) { sets.push('validation = ?'); values.push(updates.validation); }
     if (updates.context !== undefined) { sets.push('context = ?'); values.push(updates.context); }
+    if (updates.branch !== undefined) { sets.push('branch = ?'); values.push(updates.branch); }
 
     if (sets.length === 0) return task;
 
@@ -1985,6 +1995,12 @@ export class SidStackDB {
   getTicket(id: string): Ticket | null {
     this.ensureInit();
     const row = this.db!.prepare(`SELECT * FROM tickets WHERE id = ?`).get(id) as Ticket | undefined;
+    return row ?? null;
+  }
+
+  getTicketByTaskId(taskId: string): Ticket | null {
+    this.ensureInit();
+    const row = this.db!.prepare(`SELECT * FROM tickets WHERE taskId = ?`).get(taskId) as Ticket | undefined;
     return row ?? null;
   }
 

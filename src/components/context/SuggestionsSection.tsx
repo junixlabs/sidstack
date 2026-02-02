@@ -54,7 +54,7 @@ export function SuggestionsSection({ className }: SuggestionsSectionProps) {
               <div className="flex items-center gap-2">
                 <span
                   className={cn(
-                    "px-1.5 py-0.5 text-[10px] font-medium rounded",
+                    "px-1.5 py-0.5 text-[11px] font-medium rounded",
                     suggestion.type === "spec"
                       ? "bg-[var(--surface-2)] text-[var(--text-secondary)]"
                       : "bg-[var(--surface-2)] text-[var(--text-secondary)]"
@@ -80,7 +80,7 @@ export function SuggestionsSection({ className }: SuggestionsSectionProps) {
                     style={{ width: `${suggestion.confidence * 100}%` }}
                   />
                 </div>
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-[11px] text-muted-foreground">
                   {Math.round(suggestion.confidence * 100)}%
                 </span>
               </div>

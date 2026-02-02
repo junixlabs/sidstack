@@ -91,7 +91,7 @@ const TeamCard = memo(function TeamCard({
         </div>
         <Badge
           variant={team.status === "active" ? "success" : team.status === "paused" ? "warning" : "secondary"}
-          className="text-[10px]"
+          className="text-[11px]"
         >
           <StatusIcon className="w-3 h-3 mr-1" />
           {STATUS_LABELS[team.status]}
@@ -122,7 +122,7 @@ const TeamCard = memo(function TeamCard({
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 text-[10px] px-2"
+            className="h-6 text-[11px] px-2"
             onClick={() => onResume?.(team.id)}
           >
             <Play className="w-3 h-3 mr-1" />
@@ -133,7 +133,7 @@ const TeamCard = memo(function TeamCard({
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 text-[10px] px-2"
+            className="h-6 text-[11px] px-2"
             onClick={() => onPause?.(team.id)}
           >
             <Pause className="w-3 h-3 mr-1" />
@@ -144,7 +144,7 @@ const TeamCard = memo(function TeamCard({
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 text-[10px] px-2 text-[var(--text-muted)]"
+            className="h-6 text-[11px] px-2 text-[var(--text-muted)]"
             onClick={() => onArchive?.(team.id)}
           >
             <Archive className="w-3 h-3 mr-1" />
@@ -171,15 +171,15 @@ function SummaryStats({ totalTeams, activeCount, pausedCount }: SummaryStatsProp
     <div className="grid grid-cols-3 gap-2 mb-4">
       <div className="p-2 rounded bg-[var(--surface-2)] text-center">
         <div className="text-lg font-bold text-[var(--text-primary)]">{totalTeams}</div>
-        <div className="text-[10px] text-[var(--text-muted)]">Total</div>
+        <div className="text-[11px] text-[var(--text-muted)]">Total</div>
       </div>
       <div className="p-2 rounded bg-[var(--surface-2)] text-center">
         <div className="text-lg font-bold text-[var(--text-secondary)]">{activeCount}</div>
-        <div className="text-[10px] text-[var(--text-muted)]">Active</div>
+        <div className="text-[11px] text-[var(--text-muted)]">Active</div>
       </div>
       <div className="p-2 rounded bg-[var(--surface-2)] text-center">
         <div className="text-lg font-bold text-[var(--text-secondary)]">{pausedCount}</div>
-        <div className="text-[10px] text-[var(--text-muted)]">Paused</div>
+        <div className="text-[11px] text-[var(--text-muted)]">Paused</div>
       </div>
     </div>
   );
@@ -299,7 +299,7 @@ export function TeamPanel({
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 text-[10px]"
+            className="h-6 text-[11px]"
             onClick={clearError}
           >
             Dismiss

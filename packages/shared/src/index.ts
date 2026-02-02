@@ -61,6 +61,10 @@ export type {
   KnowledgeStats,
   KnowledgeTreeNode,
   KnowledgeFilters,
+  CreateDocumentInput,
+  UpdateDocumentInput,
+  HealthCheckResult,
+  HealthIssue,
 } from './knowledge';
 
 // Re-export service factory and config constants
