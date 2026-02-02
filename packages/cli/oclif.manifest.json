@@ -625,66 +625,34 @@
         "show.js"
       ]
     },
-    "module:graph": {
+    "migrate:modules-to-capabilities": {
       "aliases": [],
       "args": {},
-      "description": "Generate module dependency graph",
+      "description": "Convert module YAML definitions to capability YAML definitions",
       "examples": [
-        "<%= config.bin %> module graph",
-        "<%= config.bin %> module graph --format mermaid",
-        "<%= config.bin %> module graph --mode flows",
-        "<%= config.bin %> module graph --mode features",
-        "<%= config.bin %> module graph --format json"
+        "<%= config.bin %> migrate modules-to-capabilities",
+        "<%= config.bin %> migrate modules-to-capabilities --json",
+        "<%= config.bin %> migrate modules-to-capabilities --dry-run"
       ],
       "flags": {
-        "format": {
-          "char": "f",
-          "description": "Output format",
-          "name": "format",
-          "default": "mermaid",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "options": [
-            "mermaid",
-            "ascii",
-            "json",
-            "dot"
-          ],
-          "type": "option"
-        },
-        "mode": {
-          "char": "m",
-          "description": "Graph detail level: simple (deps only), flows (deps + data flows), features (grouped by domain), full (all relationships)",
-          "name": "mode",
-          "default": "simple",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "options": [
-            "simple",
-            "flows",
-            "features",
-            "full"
-          ],
-          "type": "option"
-        },
         "json": {
           "char": "j",
-          "description": "Output as JSON (equivalent to --format json)",
+          "description": "Output in JSON format",
           "name": "json",
           "allowNo": false,
           "type": "boolean"
         },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output (just the graph)",
-          "name": "quiet",
+        "dry-run": {
+          "char": "d",
+          "description": "Preview migration without writing files",
+          "name": "dry-run",
           "allowNo": false,
           "type": "boolean"
         }
       },
       "hasDynamicHelp": false,
       "hiddenAliases": [],
-      "id": "module:graph",
+      "id": "migrate:modules-to-capabilities",
       "pluginAlias": "@sidstack/cli",
       "pluginName": "@sidstack/cli",
       "pluginType": "core",
@@ -694,19 +662,26 @@
       "relativePath": [
         "dist",
         "commands",
-        "module",
-        "graph.js"
+        "migrate",
+        "modules-to-capabilities.js"
       ]
     },
-    "module:list": {
+    "knowledge:create": {
       "aliases": [],
-      "args": {},
-      "description": "List all modules in the project",
+      "args": {
+        "output": {
+          "description": "Output file path (optional, derived from title if not provided)",
+          "name": "output",
+          "required": false
+        }
+      },
+      "description": "Create a new knowledge document from template",
       "examples": [
-        "<%= config.bin %> module list",
-        "<%= config.bin %> module list --json",
-        "<%= config.bin %> module list --status active",
-        "<%= config.bin %> module list --format json"
+        "<%= config.bin %> knowledge create --type business-logic --title \"User Authentication\"",
+        "<%= config.bin %> knowledge create --type api-endpoint --title \"GET /users\" --module api-server",
+        "<%= config.bin %> knowledge create --type database-table --title \"Users Table\" --var table_name=users",
+        "<%= config.bin %> knowledge create  # Interactive mode",
+        "<%= config.bin %> knowledge create --type module --title \"Auth Module\" --json"
       ],
       "flags": {
         "json": {
@@ -716,46 +691,174 @@
           "allowNo": false,
           "type": "boolean"
         },
-        "format": {
-          "char": "f",
-          "description": "Output format",
-          "name": "format",
-          "default": "table",
+        "type": {
+          "char": "t",
+          "description": "Template type (business-logic, api-endpoint, design-pattern, database-table, module)",
+          "name": "type",
           "hasDynamicHelp": false,
           "multiple": false,
-          "options": [
-            "table",
-            "json",
-            "yaml"
-          ],
+          "type": "option"
+        },
+        "title": {
+          "description": "Document title",
+          "name": "title",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "module": {
+          "char": "m",
+          "description": "Module ID",
+          "name": "module",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "var": {
+          "description": "Template variable in key=value format",
+          "name": "var",
+          "hasDynamicHelp": false,
+          "multiple": true,
+          "type": "option"
+        },
+        "force": {
+          "char": "f",
+          "description": "Overwrite existing file",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "dry-run": {
+          "description": "Preview the generated content without writing",
+          "name": "dry-run",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "output-dir": {
+          "char": "o",
+          "description": "Output directory (default: .sidstack/knowledge/<type>/)",
+          "name": "output-dir",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "yes": {
+          "char": "y",
+          "description": "Skip confirmation prompts (non-interactive)",
+          "name": "yes",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "knowledge:create",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "knowledge",
+        "create.js"
+      ]
+    },
+    "knowledge:init": {
+      "aliases": [],
+      "args": {},
+      "description": "Initialize knowledge documentation folder",
+      "examples": [
+        "<%= config.bin %> knowledge init",
+        "<%= config.bin %> knowledge init --path ./custom-knowledge"
+      ],
+      "flags": {
+        "path": {
+          "char": "p",
+          "description": "Custom path for knowledge folder",
+          "name": "path",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "force": {
+          "char": "f",
+          "description": "Overwrite existing files",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "knowledge:init",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "knowledge",
+        "init.js"
+      ]
+    },
+    "knowledge:list": {
+      "aliases": [],
+      "args": {},
+      "description": "List knowledge documentation files",
+      "examples": [
+        "<%= config.bin %> knowledge list",
+        "<%= config.bin %> knowledge list --type api-endpoint",
+        "<%= config.bin %> knowledge list --module orders"
+      ],
+      "flags": {
+        "type": {
+          "char": "t",
+          "description": "Filter by type (business-logic, api-endpoint, etc.)",
+          "name": "type",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "module": {
+          "char": "m",
+          "description": "Filter by module",
+          "name": "module",
+          "hasDynamicHelp": false,
+          "multiple": false,
           "type": "option"
         },
         "status": {
           "char": "s",
-          "description": "Filter by status",
+          "description": "Filter by status (draft, implemented, deprecated, planned)",
           "name": "status",
-          "default": "all",
           "hasDynamicHelp": false,
           "multiple": false,
-          "options": [
-            "active",
-            "deprecated",
-            "planned",
-            "all"
-          ],
           "type": "option"
         },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output (agent-friendly)",
-          "name": "quiet",
+        "json": {
+          "description": "Output as JSON",
+          "name": "json",
           "allowNo": false,
           "type": "boolean"
+        },
+        "path": {
+          "char": "p",
+          "description": "Path to knowledge folder",
+          "name": "path",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
         }
       },
       "hasDynamicHelp": false,
       "hiddenAliases": [],
-      "id": "module:list",
+      "id": "knowledge:list",
       "pluginAlias": "@sidstack/cli",
       "pluginName": "@sidstack/cli",
       "pluginType": "core",
@@ -765,23 +868,18 @@
       "relativePath": [
         "dist",
         "commands",
-        "module",
+        "knowledge",
         "list.js"
       ]
     },
-    "module:show": {
+    "knowledge:templates": {
       "aliases": [],
-      "args": {
-        "id": {
-          "description": "Module ID to show",
-          "name": "id",
-          "required": true
-        }
-      },
-      "description": "Show detailed information about a module",
+      "args": {},
+      "description": "List available knowledge document templates",
       "examples": [
-        "<%= config.bin %> module show terminal",
-        "<%= config.bin %> module show api-server --json"
+        "<%= config.bin %> knowledge templates",
+        "<%= config.bin %> knowledge templates --json",
+        "<%= config.bin %> knowledge templates --show api-endpoint"
       ],
       "flags": {
         "json": {
@@ -793,15 +891,23 @@
         },
         "quiet": {
           "char": "q",
-          "description": "Minimal output",
+          "description": "Minimal output (names only)",
           "name": "quiet",
           "allowNo": false,
           "type": "boolean"
+        },
+        "show": {
+          "char": "s",
+          "description": "Show details for a specific template",
+          "name": "show",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
         }
       },
       "hasDynamicHelp": false,
       "hiddenAliases": [],
-      "id": "module:show",
+      "id": "knowledge:templates",
       "pluginAlias": "@sidstack/cli",
       "pluginName": "@sidstack/cli",
       "pluginType": "core",
@@ -811,64 +917,45 @@
       "relativePath": [
         "dist",
         "commands",
-        "module",
-        "show.js"
+        "knowledge",
+        "templates.js"
       ]
     },
-    "module:validate": {
+    "knowledge:validate": {
       "aliases": [],
-      "args": {
-        "id": {
-          "description": "Specific module ID to validate (validates all if omitted)",
-          "name": "id",
-          "required": false
-        }
-      },
-      "description": "Validate module definitions (agent-friendly with JSON output and exit codes)",
+      "args": {},
+      "description": "Validate knowledge documentation files",
       "examples": [
-        "<%= config.bin %> module validate",
-        "<%= config.bin %> module validate terminal",
-        "<%= config.bin %> module validate --all --json",
-        "<%= config.bin %> module validate --strict",
-        "<%= config.bin %> module validate --fix"
+        "<%= config.bin %> knowledge validate",
+        "<%= config.bin %> knowledge validate --fix",
+        "<%= config.bin %> knowledge validate --path ./custom-knowledge"
       ],
       "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format (agent-friendly)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "all": {
-          "description": "Validate all modules",
-          "name": "all",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "strict": {
-          "description": "Treat warnings as errors (exit code 3 for any warning)",
-          "name": "strict",
-          "allowNo": false,
-          "type": "boolean"
+        "path": {
+          "char": "p",
+          "description": "Path to knowledge folder (default: .sidstack/knowledge)",
+          "name": "path",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
         },
         "fix": {
-          "description": "Auto-fix simple issues (not implemented yet)",
+          "char": "f",
+          "description": "Automatically fix common issues",
           "name": "fix",
           "allowNo": false,
           "type": "boolean"
         },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output",
-          "name": "quiet",
+        "json": {
+          "description": "Output results as JSON",
+          "name": "json",
           "allowNo": false,
           "type": "boolean"
         }
       },
       "hasDynamicHelp": false,
       "hiddenAliases": [],
-      "id": "module:validate",
+      "id": "knowledge:validate",
       "pluginAlias": "@sidstack/cli",
       "pluginName": "@sidstack/cli",
       "pluginType": "core",
@@ -878,8 +965,88 @@
       "relativePath": [
         "dist",
         "commands",
-        "module",
+        "knowledge",
         "validate.js"
+      ]
+    },
+    "orchestrator:analytics": {
+      "aliases": [],
+      "args": {},
+      "description": "View MCP tool usage analytics and error reports",
+      "examples": [
+        "<%= config.bin %> orchestrator analytics",
+        "<%= config.bin %> orchestrator analytics --errors",
+        "<%= config.bin %> orchestrator analytics --since 24h",
+        "<%= config.bin %> orchestrator analytics --clear"
+      ],
+      "flags": {
+        "errors": {
+          "char": "e",
+          "description": "Show only errors",
+          "name": "errors",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "since": {
+          "char": "s",
+          "description": "Show stats since (e.g., 1h, 24h, 7d)",
+          "name": "since",
+          "default": "24h",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "clear": {
+          "description": "Clear all logs",
+          "name": "clear",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "json": {
+          "description": "Output as JSON",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "orchestrator:analytics",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "orchestrator",
+        "analytics.js"
+      ]
+    },
+    "orchestrator:ps": {
+      "aliases": [],
+      "args": {},
+      "description": "List running agent processes",
+      "examples": [
+        "<%= config.bin %> orchestrator ps"
+      ],
+      "flags": {},
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "orchestrator:ps",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "orchestrator",
+        "ps.js"
       ]
     },
     "preset:list": {
@@ -1000,127 +1167,6 @@
         "commands",
         "preset",
         "show.js"
-      ]
-    },
-    "orchestrator:analytics": {
-      "aliases": [],
-      "args": {},
-      "description": "View MCP tool usage analytics and error reports",
-      "examples": [
-        "<%= config.bin %> orchestrator analytics",
-        "<%= config.bin %> orchestrator analytics --errors",
-        "<%= config.bin %> orchestrator analytics --since 24h",
-        "<%= config.bin %> orchestrator analytics --clear"
-      ],
-      "flags": {
-        "errors": {
-          "char": "e",
-          "description": "Show only errors",
-          "name": "errors",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "since": {
-          "char": "s",
-          "description": "Show stats since (e.g., 1h, 24h, 7d)",
-          "name": "since",
-          "default": "24h",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "clear": {
-          "description": "Clear all logs",
-          "name": "clear",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "json": {
-          "description": "Output as JSON",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "orchestrator:analytics",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "orchestrator",
-        "analytics.js"
-      ]
-    },
-    "orchestrator:ps": {
-      "aliases": [],
-      "args": {},
-      "description": "List running agent processes",
-      "examples": [
-        "<%= config.bin %> orchestrator ps"
-      ],
-      "flags": {},
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "orchestrator:ps",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "orchestrator",
-        "ps.js"
-      ]
-    },
-    "migrate:modules-to-capabilities": {
-      "aliases": [],
-      "args": {},
-      "description": "Convert module YAML definitions to capability YAML definitions",
-      "examples": [
-        "<%= config.bin %> migrate modules-to-capabilities",
-        "<%= config.bin %> migrate modules-to-capabilities --json",
-        "<%= config.bin %> migrate modules-to-capabilities --dry-run"
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "dry-run": {
-          "char": "d",
-          "description": "Preview migration without writing files",
-          "name": "dry-run",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "migrate:modules-to-capabilities",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "migrate",
-        "modules-to-capabilities.js"
       ]
     },
     "skill:add": {
@@ -1586,22 +1632,88 @@
         "validate.js"
       ]
     },
-    "knowledge:create": {
+    "module:graph": {
       "aliases": [],
-      "args": {
-        "output": {
-          "description": "Output file path (optional, derived from title if not provided)",
-          "name": "output",
-          "required": false
+      "args": {},
+      "description": "Generate module dependency graph",
+      "examples": [
+        "<%= config.bin %> module graph",
+        "<%= config.bin %> module graph --format mermaid",
+        "<%= config.bin %> module graph --mode flows",
+        "<%= config.bin %> module graph --mode features",
+        "<%= config.bin %> module graph --format json"
+      ],
+      "flags": {
+        "format": {
+          "char": "f",
+          "description": "Output format",
+          "name": "format",
+          "default": "mermaid",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "mermaid",
+            "ascii",
+            "json",
+            "dot"
+          ],
+          "type": "option"
+        },
+        "mode": {
+          "char": "m",
+          "description": "Graph detail level: simple (deps only), flows (deps + data flows), features (grouped by domain), full (all relationships)",
+          "name": "mode",
+          "default": "simple",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "simple",
+            "flows",
+            "features",
+            "full"
+          ],
+          "type": "option"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output as JSON (equivalent to --format json)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output (just the graph)",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
         }
       },
-      "description": "Create a new knowledge document from template",
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "module:graph",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "module",
+        "graph.js"
+      ]
+    },
+    "module:list": {
+      "aliases": [],
+      "args": {},
+      "description": "List all modules in the project",
       "examples": [
-        "<%= config.bin %> knowledge create --type business-logic --title \"User Authentication\"",
-        "<%= config.bin %> knowledge create --type api-endpoint --title \"GET /users\" --module api-server",
-        "<%= config.bin %> knowledge create --type database-table --title \"Users Table\" --var table_name=users",
-        "<%= config.bin %> knowledge create  # Interactive mode",
-        "<%= config.bin %> knowledge create --type module --title \"Auth Module\" --json"
+        "<%= config.bin %> module list",
+        "<%= config.bin %> module list --json",
+        "<%= config.bin %> module list --status active",
+        "<%= config.bin %> module list --format json"
       ],
       "flags": {
         "json": {
@@ -1611,174 +1723,46 @@
           "allowNo": false,
           "type": "boolean"
         },
-        "type": {
-          "char": "t",
-          "description": "Template type (business-logic, api-endpoint, design-pattern, database-table, module)",
-          "name": "type",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "title": {
-          "description": "Document title",
-          "name": "title",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "module": {
-          "char": "m",
-          "description": "Module ID",
-          "name": "module",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "var": {
-          "description": "Template variable in key=value format",
-          "name": "var",
-          "hasDynamicHelp": false,
-          "multiple": true,
-          "type": "option"
-        },
-        "force": {
+        "format": {
           "char": "f",
-          "description": "Overwrite existing file",
-          "name": "force",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "dry-run": {
-          "description": "Preview the generated content without writing",
-          "name": "dry-run",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "output-dir": {
-          "char": "o",
-          "description": "Output directory (default: .sidstack/knowledge/<type>/)",
-          "name": "output-dir",
+          "description": "Output format",
+          "name": "format",
+          "default": "table",
           "hasDynamicHelp": false,
           "multiple": false,
-          "type": "option"
-        },
-        "yes": {
-          "char": "y",
-          "description": "Skip confirmation prompts (non-interactive)",
-          "name": "yes",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "knowledge:create",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "knowledge",
-        "create.js"
-      ]
-    },
-    "knowledge:init": {
-      "aliases": [],
-      "args": {},
-      "description": "Initialize knowledge documentation folder",
-      "examples": [
-        "<%= config.bin %> knowledge init",
-        "<%= config.bin %> knowledge init --path ./custom-knowledge"
-      ],
-      "flags": {
-        "path": {
-          "char": "p",
-          "description": "Custom path for knowledge folder",
-          "name": "path",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "force": {
-          "char": "f",
-          "description": "Overwrite existing files",
-          "name": "force",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "knowledge:init",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "knowledge",
-        "init.js"
-      ]
-    },
-    "knowledge:list": {
-      "aliases": [],
-      "args": {},
-      "description": "List knowledge documentation files",
-      "examples": [
-        "<%= config.bin %> knowledge list",
-        "<%= config.bin %> knowledge list --type api-endpoint",
-        "<%= config.bin %> knowledge list --module orders"
-      ],
-      "flags": {
-        "type": {
-          "char": "t",
-          "description": "Filter by type (business-logic, api-endpoint, etc.)",
-          "name": "type",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "module": {
-          "char": "m",
-          "description": "Filter by module",
-          "name": "module",
-          "hasDynamicHelp": false,
-          "multiple": false,
+          "options": [
+            "table",
+            "json",
+            "yaml"
+          ],
           "type": "option"
         },
         "status": {
           "char": "s",
-          "description": "Filter by status (draft, implemented, deprecated, planned)",
+          "description": "Filter by status",
           "name": "status",
+          "default": "all",
           "hasDynamicHelp": false,
           "multiple": false,
+          "options": [
+            "active",
+            "deprecated",
+            "planned",
+            "all"
+          ],
           "type": "option"
         },
-        "json": {
-          "description": "Output as JSON",
-          "name": "json",
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output (agent-friendly)",
+          "name": "quiet",
           "allowNo": false,
           "type": "boolean"
-        },
-        "path": {
-          "char": "p",
-          "description": "Path to knowledge folder",
-          "name": "path",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
         }
       },
       "hasDynamicHelp": false,
       "hiddenAliases": [],
-      "id": "knowledge:list",
+      "id": "module:list",
       "pluginAlias": "@sidstack/cli",
       "pluginName": "@sidstack/cli",
       "pluginType": "core",
@@ -1788,18 +1772,23 @@
       "relativePath": [
         "dist",
         "commands",
-        "knowledge",
+        "module",
         "list.js"
       ]
     },
-    "knowledge:templates": {
+    "module:show": {
       "aliases": [],
-      "args": {},
-      "description": "List available knowledge document templates",
+      "args": {
+        "id": {
+          "description": "Module ID to show",
+          "name": "id",
+          "required": true
+        }
+      },
+      "description": "Show detailed information about a module",
       "examples": [
-        "<%= config.bin %> knowledge templates",
-        "<%= config.bin %> knowledge templates --json",
-        "<%= config.bin %> knowledge templates --show api-endpoint"
+        "<%= config.bin %> module show terminal",
+        "<%= config.bin %> module show api-server --json"
       ],
       "flags": {
         "json": {
@@ -1811,23 +1800,15 @@
         },
         "quiet": {
           "char": "q",
-          "description": "Minimal output (names only)",
+          "description": "Minimal output",
           "name": "quiet",
           "allowNo": false,
           "type": "boolean"
-        },
-        "show": {
-          "char": "s",
-          "description": "Show details for a specific template",
-          "name": "show",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
         }
       },
       "hasDynamicHelp": false,
       "hiddenAliases": [],
-      "id": "knowledge:templates",
+      "id": "module:show",
       "pluginAlias": "@sidstack/cli",
       "pluginName": "@sidstack/cli",
       "pluginType": "core",
@@ -1837,45 +1818,64 @@
       "relativePath": [
         "dist",
         "commands",
-        "knowledge",
-        "templates.js"
+        "module",
+        "show.js"
       ]
     },
-    "knowledge:validate": {
+    "module:validate": {
       "aliases": [],
-      "args": {},
-      "description": "Validate knowledge documentation files",
+      "args": {
+        "id": {
+          "description": "Specific module ID to validate (validates all if omitted)",
+          "name": "id",
+          "required": false
+        }
+      },
+      "description": "Validate module definitions (agent-friendly with JSON output and exit codes)",
       "examples": [
-        "<%= config.bin %> knowledge validate",
-        "<%= config.bin %> knowledge validate --fix",
-        "<%= config.bin %> knowledge validate --path ./custom-knowledge"
+        "<%= config.bin %> module validate",
+        "<%= config.bin %> module validate terminal",
+        "<%= config.bin %> module validate --all --json",
+        "<%= config.bin %> module validate --strict",
+        "<%= config.bin %> module validate --fix"
       ],
       "flags": {
-        "path": {
-          "char": "p",
-          "description": "Path to knowledge folder (default: .sidstack/knowledge)",
-          "name": "path",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "all": {
+          "description": "Validate all modules",
+          "name": "all",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "strict": {
+          "description": "Treat warnings as errors (exit code 3 for any warning)",
+          "name": "strict",
+          "allowNo": false,
+          "type": "boolean"
         },
         "fix": {
-          "char": "f",
-          "description": "Automatically fix common issues",
+          "description": "Auto-fix simple issues (not implemented yet)",
           "name": "fix",
           "allowNo": false,
           "type": "boolean"
         },
-        "json": {
-          "description": "Output results as JSON",
-          "name": "json",
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output",
+          "name": "quiet",
           "allowNo": false,
           "type": "boolean"
         }
       },
       "hasDynamicHelp": false,
       "hiddenAliases": [],
-      "id": "knowledge:validate",
+      "id": "module:validate",
       "pluginAlias": "@sidstack/cli",
       "pluginName": "@sidstack/cli",
       "pluginType": "core",
@@ -1885,10 +1885,10 @@
       "relativePath": [
         "dist",
         "commands",
-        "knowledge",
+        "module",
         "validate.js"
       ]
     }
   },
-  "version": "0.3.0"
+  "version": "0.3.2"
 }
