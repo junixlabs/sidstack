@@ -46,6 +46,13 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Trigger website rebuild
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.WEBSITE_DEPLOY_PAT }}
+          repository: junixlabs/sidstack-website
+          event-type: release-published
+
   # VS Code extension publish disabled — no VSCE_PAT configured yet
   # publish-vscode:
   #   name: Publish VS Code Extension
