@@ -62,6 +62,7 @@ logs/
 
 # Claude Code
 .claude/
+JOURNAL.md
 
 # MCP local config
 .mcp.json
