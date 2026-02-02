@@ -1,12 +1,6 @@
 # SidStack Documentation
 
-Welcome to SidStack's documentation. SidStack is a knowledge-powered AI coding assistant with project intelligence, impact analysis, and governance for Claude Code.
-
----
-
-## Product Strategy
-
-- **[PRODUCT_STRATEGY.md](PRODUCT_STRATEGY.md)** - Vision, target customers, value proposition
+Welcome to SidStack's documentation. SidStack is an AI-Powered Project Intelligence Platform with structured knowledge, impact analysis, and governance for Claude Code.
 
 ---
 
@@ -14,8 +8,14 @@ Welcome to SidStack's documentation. SidStack is a knowledge-powered AI coding a
 
 - **[QUICK_START.md](QUICK_START.md)** - Get from zero to productive
 - **[GETTING_STARTED.md](GETTING_STARTED.md)** - Detailed setup guide with governance
-- **[CLAUDE_CODE_INTEGRATION.md](CLAUDE_CODE_INTEGRATION.md)** - MCP configuration
+- **[CLAUDE_CODE_INTEGRATION.md](CLAUDE_CODE_INTEGRATION.md)** - MCP tools reference
 - **[API_REFERENCE.md](API_REFERENCE.md)** - REST API documentation
+
+---
+
+## Product Strategy
+
+- **[PRODUCT_STRATEGY.md](PRODUCT_STRATEGY.md)** - Vision, target customers, value proposition
 
 ---
 
@@ -27,9 +27,8 @@ Welcome to SidStack's documentation. SidStack is a knowledge-powered AI coding a
 
 ## Feature Guides
 
-- **[USER_GUIDE_VIEW_ONLY_APP.md](USER_GUIDE_VIEW_ONLY_APP.md)** - Desktop app usage guide
 - **[IMPACT_ANALYSIS.md](IMPACT_ANALYSIS.md)** - Change impact analyzer documentation
-- **[TEAM_MANAGEMENT.md](TEAM_MANAGEMENT.md)** - Multi-agent team coordination
+- **[DEMO_SCENARIOS.md](DEMO_SCENARIOS.md)** - Step-by-step demo scenarios
 
 ---
 
@@ -50,12 +49,14 @@ Welcome to SidStack's documentation. SidStack is a knowledge-powered AI coding a
 
 | Document | Status | Last Updated |
 |----------|--------|--------------|
-| PRODUCT_STRATEGY.md | Current | 2026-01 |
-| GETTING_STARTED.md | Current | 2026-01 |
+| QUICK_START.md | Current | 2026-02 |
+| GETTING_STARTED.md | Current | 2026-02 |
+| CLAUDE_CODE_INTEGRATION.md | Current | 2026-02 |
+| API_REFERENCE.md | Current | 2026-01 |
+| PRODUCT_STRATEGY.md | Current | 2026-02 |
 | ROADMAP_Q1_2026.md | Current | 2026-01 |
-| USER_GUIDE_VIEW_ONLY_APP.md | Current | 2026-01 |
 | IMPACT_ANALYSIS.md | Current | 2026-01 |
-| TEAM_MANAGEMENT.md | Current | 2026-01 |
+| DEMO_SCENARIOS.md | Current | 2026-02 |
 | TECHNICAL_DEBT.md | Current | 2026-01 |
 | ADR-002 | Accepted | 2025-11 |
 | ADR-004 | Accepted | 2025-11 |
@@ -67,7 +68,7 @@ Welcome to SidStack's documentation. SidStack is a knowledge-powered AI coding a
 | Component | Technology |
 |-----------|------------|
 | Desktop App | Tauri 2.x (Rust + React) |
-| CLI | Oclif v3 (TypeScript) |
+| CLI | Oclif (TypeScript) |
 | MCP Server | TypeScript (@modelcontextprotocol/sdk) |
 | API Server | Express.js |
 | Database | SQLite (embedded) |
@@ -78,11 +79,6 @@ Welcome to SidStack's documentation. SidStack is a knowledge-powered AI coding a
 
 ## Getting Help
 
-- Run `sidstack --help` for CLI help
+- Run `npx @sidstack/cli --help` for CLI help
 - Check `CLAUDE.md` in project root for AI assistant instructions
 - Review `.sidstack/governance.md` for agent governance
-
----
-
-**Documentation Version:** 3.0
-**Last Updated:** 2026-02-02

@@ -97,7 +97,7 @@ Step-by-step scenarios showcasing SidStack's key features.
 
 ### Steps
 
-1. **Open Sessions** (`⌘5`)
+1. **Open Task Manager** (`⌘2`)
 2. **Launch new session**:
    - Click "Launch Session" button
    - Select workspace path
@@ -164,7 +164,7 @@ Step-by-step scenarios showcasing SidStack's key features.
 
 ### Steps
 
-1. **Open Knowledge Browser** (`⌘2`)
+1. **Open Knowledge Browser** (`⌘3`)
 2. **Browse by type** - filter by:
    - Business Logic
    - API Endpoints
@@ -223,26 +223,25 @@ Step-by-step scenarios showcasing SidStack's key features.
 
 1. **Initialize governance** in a new project:
    ```bash
-   sidstack init --governance
+   npx @sidstack/cli init --scan
    ```
 2. **Show governance structure**:
    ```bash
-   sidstack governance show
+   npx @sidstack/cli governance show
    ```
 3. **Check compliance**:
    ```bash
-   sidstack governance check --json
+   npx @sidstack/cli governance check --json
    ```
-4. **Spawn a governed agent** in Claude Code:
+4. **Use in Claude Code**:
    ```
-   /sidstack:agent worker Implement user registration with email verification
+   /sidstack
    ```
 5. **Observe agent behavior**:
    - Agent reads principles before starting
    - Follows capability skill (implement/feature.md)
    - Creates task, tracks progress
    - Runs quality gates before completing
-   - Uses handoff protocol if spawning sub-agents
 
 ### What to highlight
 - Zero-config governance setup

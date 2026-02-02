@@ -1,78 +1,100 @@
 # SidStack Quick Start
 
-Get from zero to productive in under 5 minutes.
+Get from zero to productive in minutes.
 
 SidStack has two interfaces - use either or both:
-- **MCP Server** - Use from Claude Code with MCP tools
+- **MCP Server** - Use from Claude Code with 32 MCP tools
 - **Desktop App** - Visual project management (macOS)
 
 ---
 
 ## Option A: MCP Server (Claude Code)
 
-### 1. Add to Claude Code
-
-Add to your Claude Code MCP settings (`~/.claude/settings.json` or project `.mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "sidstack": {
-      "command": "npx",
-      "args": ["-y", "@sidstack/mcp-server"]
-    }
-  }
-}
-```
-
-### 2. Initialize Your Project
+### 1. Initialize Your Project
 
 ```bash
 cd your-project
-npx @sidstack/cli init
-```
-
-This creates:
-- `.sidstack/` - Config, governance rules, skills
-- `.mcp.json` - MCP server config for Claude Code
-- `.claude/` - Claude Code hooks and settings
-
-### 3. Scan Your Codebase (Optional)
-
-Auto-generate knowledge docs from your code:
-
-```bash
 npx @sidstack/cli init --scan
 ```
 
-Claude Code will analyze your codebase and create structured docs in `.sidstack/knowledge/`.
+This sets up everything in one command:
+- `.sidstack/` - Governance, skills, and knowledge docs
+- `.mcp.json` - MCP server config for Claude Code
+- `.claude/settings.local.json` - Tool auto-approval
 
-### 4. Use MCP Tools in Claude Code
+The `--scan` flag uses AI to analyze your codebase and generate knowledge docs in `.sidstack/knowledge/`.
 
-Once configured, Claude Code has access to these tools:
+Without scan:
+```bash
+npx @sidstack/cli init
+```
+
+### 2. Use MCP Tools in Claude Code
+
+Once initialized, Claude Code has access to 32 tools:
 
 **Knowledge (understand your project)**
 ```
-knowledge_search  - Search project knowledge
-knowledge_context - Build context for a task/module
-knowledge_list    - List all knowledge docs
+knowledge_context   - Build context for a task/module
+knowledge_search    - Search across knowledge docs
+knowledge_list      - List available docs
+knowledge_get       - Get single document
+knowledge_modules   - List modules with stats
+knowledge_create    - Create knowledge document
+knowledge_update    - Update knowledge document
+knowledge_delete    - Delete knowledge document
+knowledge_health    - Check coverage health
 ```
 
 **Tasks (track AI work)**
 ```
-task_create   - Create a task with governance
-task_update   - Update progress
-task_list     - List tasks
-task_complete - Complete with quality gate check
+task_create         - Create task with governance
+task_update         - Update status/progress
+task_list           - List tasks with filtering
+task_get            - Get task details
+task_complete       - Complete with quality gate check
 ```
 
 **Impact Analysis (assess risk before changes)**
 ```
-impact_analyze    - Analyze a planned change
-impact_check_gate - Check if safe to proceed
+impact_analyze      - Analyze a planned change
+impact_check_gate   - Check if safe to proceed
+impact_list         - List analyses
 ```
 
-**Example workflow in Claude Code:**
+**Tickets (external intake)**
+```
+ticket_create           - Create ticket
+ticket_list             - List/filter tickets
+ticket_update           - Update status
+ticket_convert_to_task  - Convert to task
+```
+
+**Training (learn from mistakes)**
+```
+incident_create         - Report an incident
+incident_list           - List incidents
+lesson_create           - Create lesson from incident
+lesson_list             - List lessons
+skill_create            - Create reusable skill
+skill_list              - List skills
+rule_check              - Check rules for context
+training_context_get    - Get training context for session
+```
+
+**OKRs (project goals)**
+```
+okr_list            - List objectives and key results
+okr_update          - Update key result progress
+```
+
+**Sessions**
+```
+session_launch      - Launch Claude session with context
+```
+
+### 3. Example Workflow
+
 ```
 1. "Create a task to add user authentication"
    → Claude calls task_create
@@ -89,21 +111,34 @@ impact_check_gate - Check if safe to proceed
    → Claude calls task_complete, runs quality gates
 ```
 
+Or configure MCP manually (without CLI init):
+
+```json
+{
+  "mcpServers": {
+    "sidstack": {
+      "command": "npx",
+      "args": ["-y", "@sidstack/mcp-server"]
+    }
+  }
+}
+```
+
 ---
 
 ## Option B: Desktop App (macOS)
 
 ### 1. Install
 
-Build from source:
+Download the `.dmg` from [Releases](https://github.com/junixlabs/sidstack/releases).
+
+Or build from source:
+
 ```bash
 git clone https://github.com/junixlabs/sidstack.git
 cd sidstack
-pnpm install
-pnpm tauri:build
+pnpm install && pnpm packages:build && pnpm tauri:build
 ```
-
-Or download the `.dmg` from releases.
 
 ### 2. Open Your Project
 
@@ -111,22 +146,15 @@ Launch SidStack and select your project folder. If not initialized, the app will
 
 ### 3. Explore the 7 Views
 
-| View | What It Does |
-|------|-------------|
-| **Project Hub** | Capability tree, entity connections, project overview |
-| **Task Manager** | Create/track tasks, 4 view modes (list, kanban, timeline, detail) |
-| **Knowledge Browser** | Browse `.sidstack/knowledge/` docs with tree view and search |
-| **Ticket Queue** | External ticket intake, review workflow, convert to tasks |
-| **Training Room** | Capture lessons from incidents, build rules over time |
-| **Settings** | Project configuration |
-| **Worktree Status** | Git branch and file status |
-
-### 4. Create Your First Task
-
-1. Open **Task Manager** (sidebar)
-2. Click **+ New Task**
-3. Set title, type, and priority
-4. Click **Launch Session** to start a Claude Code session with task context
+| View | Shortcut | Description |
+|------|----------|-------------|
+| **Project Hub** | `Cmd+1` | Capability tree, entity connections, OKR progress |
+| **Task Manager** | `Cmd+2` | Create/track tasks, 4 view modes (list, kanban, timeline, detail) |
+| **Knowledge Browser** | `Cmd+3` | Browse `.sidstack/knowledge/` docs with tree view and search |
+| **Ticket Queue** | `Cmd+4` | External ticket intake, review workflow, convert to tasks |
+| **Training Room** | `Cmd+5` | Capture lessons from incidents, build rules over time |
+| **Settings** | `Cmd+,` | Project configuration |
+| **Worktree Status** | - | Git branch and file status |
 
 ---
 
@@ -161,3 +189,4 @@ pnpm test       # Must pass
 
 - [Claude Code Integration](CLAUDE_CODE_INTEGRATION.md) - Full MCP setup details
 - [API Reference](API_REFERENCE.md) - REST API documentation
+- [Impact Analysis](IMPACT_ANALYSIS.md) - Change impact guide

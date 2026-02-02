@@ -4,36 +4,35 @@ Integrate SidStack with Claude Code via the Model Context Protocol (MCP).
 
 ## Setup
 
-### 1. Configure MCP Server
+### Option 1: CLI Init (Recommended)
 
-Add to your Claude Code settings (`.mcp.json` or MCP settings UI):
+```bash
+cd your-project
+npx @sidstack/cli init --scan
+```
+
+This automatically:
+- Creates `.mcp.json` with the MCP server config
+- Creates `.claude/settings.local.json` for tool auto-approval
+- Sets up governance (principles, skills)
+- Generates knowledge docs from your codebase
+
+### Option 2: Manual MCP Config
+
+Add to `.mcp.json` or Claude Code MCP settings:
 
 ```json
 {
   "mcpServers": {
     "sidstack": {
       "command": "npx",
-      "args": ["-y", "@sidstack/mcp-server"],
-      "env": {
-        "SIDSTACK_PROJECT_PATH": "/path/to/your/project",
-        "SIDSTACK_API_URL": "http://localhost:19432"
-      }
+      "args": ["-y", "@sidstack/mcp-server"]
     }
   }
 }
 ```
 
-### 2. Start the API Server
-
-The desktop app starts the API server automatically. For CLI-only usage:
-
-```bash
-sidstack serve
-```
-
-This starts the REST API on `localhost:19432`.
-
-### 3. Verify Connection
+### Verify Connection
 
 In Claude Code, ask:
 ```
@@ -42,96 +41,74 @@ List my SidStack tasks
 
 Claude should use the `task_list` MCP tool.
 
-## Available MCP Tools
+## Available MCP Tools (32)
 
-### Task Management
+### Knowledge (9)
 
 | Tool | Description |
 |------|-------------|
-| `task_create` | Create a new task with governance |
-| `task_list` | List tasks with filters |
-| `task_get` | Get task details |
+| `knowledge_context` | Build context for a task/module |
+| `knowledge_search` | Search across knowledge docs |
+| `knowledge_list` | List available docs |
+| `knowledge_get` | Get single document with full content |
+| `knowledge_modules` | List modules with stats |
+| `knowledge_create` | Create knowledge document |
+| `knowledge_update` | Update knowledge document |
+| `knowledge_delete` | Delete knowledge document |
+| `knowledge_health` | Check knowledge coverage health |
+
+### Tasks (5)
+
+| Tool | Description |
+|------|-------------|
+| `task_create` | Create task with governance |
 | `task_update` | Update status/progress |
-| `task_breakdown` | Split task into subtasks |
-| `task_complete` | Mark task as completed |
-| `task_governance_check` | Check governance compliance |
+| `task_list` | List tasks with filtering |
+| `task_get` | Get task details |
+| `task_complete` | Complete with quality gate check |
 
-### Session Management
-
-| Tool | Description |
-|------|-------------|
-| `session_launch` | Launch Claude session in terminal |
-| `session_list` | List active/recent sessions |
-| `session_get` | Get session details |
-| `session_update_status` | Update session status |
-| `session_resume` | Resume a previous session |
-| `session_stats` | Get session statistics |
-
-### Knowledge
+### Impact Analysis (3)
 
 | Tool | Description |
 |------|-------------|
-| `knowledge_list` | List knowledge documents |
-| `knowledge_get` | Get document content |
-| `knowledge_search` | Search documents by keyword |
-| `knowledge_context` | Build context for Claude sessions |
-| `knowledge_modules` | List modules with doc counts |
-
-### Tickets
-
-| Tool | Description |
-|------|-------------|
-| `ticket_create` | Create a ticket |
-| `ticket_list` | List tickets |
-| `ticket_get` | Get ticket details |
-| `ticket_update` | Update ticket status |
-| `ticket_start_session` | Start session for ticket |
-| `ticket_convert_to_task` | Convert ticket to task |
-
-### Impact Analysis
-
-| Tool | Description |
-|------|-------------|
-| `impact_analyze` | Run impact analysis |
-| `impact_check_gate` | Check gate status |
-| `impact_run_validation` | Run validation check |
-| `impact_approve_gate` | Approve gate |
+| `impact_analyze` | Run impact analysis on a change |
+| `impact_check_gate` | Check gate status (blocked/warning/clear) |
 | `impact_list` | List analyses |
 
-### Training Room
+### Tickets (4)
 
 | Tool | Description |
 |------|-------------|
-| `incident_create` | Create incident report |
+| `ticket_create` | Create ticket |
+| `ticket_list` | List/filter tickets |
+| `ticket_update` | Update ticket status |
+| `ticket_convert_to_task` | Convert ticket to task |
+
+### Training (8)
+
+| Tool | Description |
+|------|-------------|
+| `incident_create` | Report an incident |
+| `incident_list` | List incidents |
 | `lesson_create` | Create lesson from incident |
-| `lesson_approve` | Approve a lesson |
-| `skill_create` | Create skill from lesson |
-| `rule_create` | Create enforcement rule |
-| `rule_check` | Check rule compliance |
+| `lesson_list` | List lessons |
+| `skill_create` | Create reusable skill |
+| `skill_list` | List skills |
+| `rule_check` | Check rules for context |
+| `training_context_get` | Get training context for session |
 
-### Teams
+### OKRs (2)
 
 | Tool | Description |
 |------|-------------|
-| `team_create` | Create agent team |
-| `team_list` | List teams |
-| `team_add_member` | Add agent to team |
-| `team_remove_member` | Remove agent from team |
+| `okr_list` | List objectives and key results |
+| `okr_update` | Update key result progress |
 
-## Hook System
+### Sessions (1)
 
-SidStack includes hooks that run automatically during Claude Code sessions:
-
-### Pre-Edit Impact Check
-Before editing files, SidStack checks if the affected module has open impact analysis blockers. This provides warnings but does not block edits.
-
-Bypass with:
-```bash
-SIDSTACK_SKIP_IMPACT_CHECK=1
-```
-
-### Task Start Suggestion
-When a task starts, SidStack suggests running impact analysis for high-impact task types (feature, refactor, breaking_change, architecture).
+| Tool | Description |
+|------|-------------|
+| `session_launch` | Launch Claude session with context |
 
 ## Governance for Agents
 
@@ -141,7 +118,7 @@ Agents automatically follow governance rules from `.sidstack/governance.md`:
 Rules agents must follow (code quality, testing, security, collaboration).
 
 ### Skills
-Capability-based workflows agents use for implementation, design, testing, review, and deployment.
+Capability-based workflows agents use for implementation and review.
 
 ### Quality Gates
 ```bash
@@ -163,17 +140,16 @@ pnpm test       # Must pass
 3. "Analyze the impact of this change"
    → impact_analyze
 
-4. "Launch a session to implement this"
-   → session_launch
+4. [Implement the feature]
 
 5. "Mark the task as complete"
    → task_complete (runs quality gates)
 ```
 
-### Bug Fix
+### Bug Fix with Learning
 ```
 1. "Create a bugfix task for the login timeout"
-   → task_create (requires acceptance criteria)
+   → task_create
 
 2. "Start working on this task"
    → task_update (status: in_progress)
@@ -188,4 +164,37 @@ pnpm test       # Must pass
 
 6. "Complete the task"
    → task_complete
+```
+
+### Ticket-Driven Work
+```
+1. "Create a ticket for the Safari login bug"
+   → ticket_create
+
+2. "Approve the ticket and convert to task"
+   → ticket_update (status: approved)
+   → ticket_convert_to_task
+
+3. "Load context for this task"
+   → knowledge_context
+
+4. [Implement the fix]
+
+5. "Complete the task"
+   → task_complete
+```
+
+### OKR-Driven Work
+```
+1. "Show our project goals"
+   → okr_list
+
+2. "Create a task for KR-1.1"
+   → task_create
+
+3. [Implement the feature]
+
+4. "Complete the task and update OKR progress"
+   → task_complete
+   → okr_update
 ```

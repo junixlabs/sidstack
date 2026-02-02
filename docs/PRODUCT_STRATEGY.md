@@ -57,10 +57,7 @@ Capability tree, entity connections, and project overview.
 ### 2. Knowledge Persistence
 (AI remembers project context - covered below)
 
-### 3. Multi-Agent Orchestration
-(Multiple AI agents working together - covered below)
-
-### 4. Quality Governance
+### 3. Quality Governance
 (AI follows coding standards - covered below)
 
 ---
@@ -187,9 +184,9 @@ Capability tree, entity connections, and project overview.
 
 ### SidStack's Unique Position
 
-**"The middle ground that doesn't exist yet"**
+**"The project intelligence layer that doesn't exist yet"**
 
-- More powerful than single-agent tools (Claude Code, Cursor)
+- More context than single-agent tools (Claude Code, Cursor)
 - Simpler than enterprise platforms
 - Local-first (privacy)
 - Visual management (not just terminal)
@@ -214,23 +211,23 @@ Capability tree, entity connections, and project overview.
 
 ### Elevator Pitch (30 seconds)
 
-> "SidStack is a desktop app that lets you orchestrate multiple AI coding agents on your project. Unlike Claude Code which forgets everything each session, SidStack keeps your project knowledge persistent - so your AI agents always understand your codebase, follow your coding standards, and work together on complex tasks. It's local-first, so your code never leaves your machine."
+> "SidStack is a project intelligence platform for AI coding agents. Unlike Claude Code which forgets everything each session, SidStack keeps your project knowledge persistent - so your AI always understands your codebase, follows your coding standards, and learns from past mistakes. It's local-first, so your code never leaves your machine."
 
 ---
 
 ## Success Metrics
 
 ### North Star Metric
-**Weekly Active Orchestrations** - Number of users who run at least one multi-agent orchestration per week
+**Weekly Active Projects** - Number of projects with at least one MCP tool call per week
 
 ### Supporting Metrics
 
 | Metric | Target (6 months) | Why It Matters |
 |--------|-------------------|----------------|
 | Knowledge docs created | 500+ projects | Adoption indicator |
-| Projects with capabilities | 1000+ projects | Structured adoption |
+| Projects initialized | 1000+ projects | Setup adoption |
 | Impact analyses run | Track | Differentiator usage |
-| Avg agents per orchestration | 2.5+ | Multi-agent value |
+| MCP tool calls per session | 5+ | Tool engagement |
 | Session resume rate | >60% | Persistence value |
 | Quality gate pass rate | >80% | Governance working |
 | NPS | >40 | User satisfaction |
