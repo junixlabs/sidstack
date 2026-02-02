@@ -1,6 +1,6 @@
 {
   "name": "@sidstack/api-server",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "REST API server for SidStack Web UI",
   "license": "MIT",
   "publishConfig": {

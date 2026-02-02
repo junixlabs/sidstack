@@ -1,6 +1,6 @@
 {
   "name": "@sidstack/cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "SidStack CLI - AI Agent Orchestration Tool",
   "author": "SidStack Team",
   "license": "MIT",
@@ -31,26 +31,6 @@
       "import": "./dist/index.js",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./lib/erd-generator": {
-      "import": "./dist/lib/erd-generator.js",
-      "require": "./dist/lib/erd-generator.js",
-      "types": "./dist/lib/erd-generator.d.ts"
-    },
-    "./lib/diagram-metadata": {
-      "import": "./dist/lib/diagram-metadata.js",
-      "require": "./dist/lib/diagram-metadata.js",
-      "types": "./dist/lib/diagram-metadata.d.ts"
-    },
-    "./lib/document-diagram-generator": {
-      "import": "./dist/lib/document-diagram-generator.js",
-      "require": "./dist/lib/document-diagram-generator.js",
-      "types": "./dist/lib/document-diagram-generator.d.ts"
-    },
-    "./lib/parsers/mongoose-parser": {
-      "import": "./dist/lib/parsers/mongoose-parser.js",
-      "require": "./dist/lib/parsers/mongoose-parser.js",
-      "types": "./dist/lib/parsers/mongoose-parser.d.ts"
     }
   },
   "bin": {
