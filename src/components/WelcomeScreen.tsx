@@ -104,7 +104,7 @@ export function WelcomeScreen({ onOpenProject, onShowDocs }: WelcomeScreenProps)
             <ArrowRight className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
             <div className="text-center px-4">
               <div className="text-[var(--accent-primary)] font-medium">SidStack MCP</div>
-              <div className="text-xs text-[var(--text-muted)]">20 tools for Claude Code</div>
+              <div className="text-xs text-[var(--text-muted)]">32 tools for Claude Code</div>
             </div>
             <ArrowRight className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
             <div className="text-center px-4">

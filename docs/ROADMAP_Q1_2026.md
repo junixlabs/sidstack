@@ -382,7 +382,7 @@ Extend SidStack to VS Code as primary development environment integration.
 
 | KR | Metric | Target |
 |----|--------|--------|
-| KR-1 | MCP server works in VS Code agent mode | 20/20 tools accessible |
+| KR-1 | MCP server works in VS Code agent mode | 32/32 tools accessible |
 | KR-2 | MCP Apps UI renders project dashboard in chat | < 500ms load |
 | KR-3 | VS Code Marketplace listing published | Published |
 | KR-4 | Task management end-to-end in VS Code | Create -> Complete flow |

@@ -35,7 +35,7 @@ Start small. Run `sidstack init` to scaffold governance, then add knowledge docs
 | **Ticket Queue** | External ticket intake with status workflow and task conversion |
 | **Training Room** | Incidents, lessons, skills, and enforcement rules |
 | **Impact Analysis** | Risk scoring, scope detection, and validation gates |
-| **MCP Server** | 20 tools for Claude Code integration |
+| **MCP Server** | 32 tools for Claude Code integration |
 | **CLI** | Project initialization, knowledge management, and diagnostics |
 
 ## How It Works

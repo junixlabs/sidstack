@@ -144,7 +144,7 @@ Capture what goes wrong, learn from it, and prevent it from happening again.
 
 ## MCP Integration
 
-SidStack connects to Claude Code via a **Model Context Protocol (MCP) server** that provides 20 tools:
+SidStack connects to Claude Code via a **Model Context Protocol (MCP) server** that provides 32 tools:
 
 | Category | Tools | Purpose |
 |----------|-------|---------|

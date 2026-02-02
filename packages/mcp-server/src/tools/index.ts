@@ -2,7 +2,7 @@
  * MCP Tools Index
  *
  * Exports tool definitions and handler routing.
- * MVP: ~18 focused tools (down from 80+).
+ * MVP: 32 focused tools.
  */
 
 import { Tool } from '@modelcontextprotocol/sdk/types.js';

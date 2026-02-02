@@ -383,7 +383,7 @@ Guide the user through discovering SidStack features. Interview them about their
 
 ## Phase 1: Welcome
 1. Read CLAUDE.md and .sidstack/config.json to get the project name and path.
-2. Welcome the user. Briefly list what was installed: governance system (principles, skills, hooks), OpenSpec, MCP tools (20 tools for tasks, knowledge, impact, tickets, training, OKRs).
+2. Welcome the user. Briefly list what was installed: governance system (principles, skills, hooks), OpenSpec, MCP tools (32 tools for tasks, knowledge, impact, tickets, training, OKRs).
 3. Ask: "I'd like to learn about your project so I can set up the Project Hub with your business domains. Ready to get started?"
    - If user says skip/no → jump to Phase 3.
 

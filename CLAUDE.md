@@ -130,7 +130,7 @@ pnpm test                 # Run tests
 pnpm typecheck            # Type checking
 ```
 
-## MCP Tools (MVP - 20 tools)
+## MCP Tools (MVP - 32 tools)
 
 ### Knowledge (core value)
 | Tool | Purpose |
