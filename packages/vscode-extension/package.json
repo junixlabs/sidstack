@@ -1,0 +1,348 @@
+{
+  "name": "sidstack",
+  "displayName": "SidStack",
+  "description": "AI-Powered Project Intelligence - Tasks, Knowledge, Impact Analysis & Governance for Claude Code",
+  "version": "0.4.1",
+  "publisher": "sidstack",
+  "license": "MIT",
+  "icon": "media/sidstack-icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/junixlabs/sidstack.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "mcp",
+    "claude",
+    "ai-agent",
+    "task-management",
+    "knowledge-base",
+    "impact-analysis",
+    "governance"
+  ],
+  "activationEvents": [
+    "workspaceContains:.sidstack"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sidstack",
+          "title": "SidStack",
+          "icon": "media/sidstack-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "sidstack": [
+        {
+          "id": "sidstack.tasks",
+          "name": "Tasks",
+          "icon": "$(tasklist)"
+        },
+        {
+          "id": "sidstack.knowledge",
+          "name": "Knowledge",
+          "icon": "$(book)"
+        },
+        {
+          "id": "sidstack.tickets",
+          "name": "Tickets",
+          "icon": "$(inbox)"
+        },
+        {
+          "id": "sidstack.training",
+          "name": "Training",
+          "icon": "$(mortar-board)"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "sidstack.refreshAll",
+        "title": "SidStack: Refresh All Views",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sidstack.createTask",
+        "title": "SidStack: Create Task",
+        "icon": "$(add)"
+      },
+      {
+        "command": "sidstack.completeTask",
+        "title": "SidStack: Complete Task",
+        "icon": "$(check)"
+      },
+      {
+        "command": "sidstack.searchKnowledge",
+        "title": "SidStack: Search Knowledge"
+      },
+      {
+        "command": "sidstack.createTicket",
+        "title": "SidStack: Create Ticket",
+        "icon": "$(add)"
+      },
+      {
+        "command": "sidstack.convertTicketToTask",
+        "title": "SidStack: Convert Ticket to Task",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "sidstack.runImpactAnalysis",
+        "title": "SidStack: Run Impact Analysis"
+      },
+      {
+        "command": "sidstack.checkGate",
+        "title": "SidStack: Check Impact Gate"
+      },
+      {
+        "command": "sidstack.setupMcp",
+        "title": "SidStack: Setup MCP Server for Copilot"
+      },
+      {
+        "command": "sidstack.openDashboard",
+        "title": "SidStack: Open Dashboard"
+      },
+      {
+        "command": "sidstack.openTaskManager",
+        "title": "SidStack: Open Task Manager"
+      },
+      {
+        "command": "sidstack.openKnowledgeBrowser",
+        "title": "SidStack: Open Knowledge Browser"
+      },
+      {
+        "command": "sidstack.openTicketQueue",
+        "title": "SidStack: Open Ticket Queue"
+      },
+      {
+        "command": "sidstack.openTrainingRoom",
+        "title": "SidStack: Open Training Room"
+      },
+      {
+        "command": "sidstack.openImpactViewer",
+        "title": "SidStack: Open Impact Viewer"
+      },
+      {
+        "command": "sidstack.refreshTasks",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sidstack.refreshKnowledge",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sidstack.refreshTickets",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sidstack.refreshTraining",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sidstack.viewTask",
+        "title": "View Task Details"
+      },
+      {
+        "command": "sidstack.viewKnowledgeDoc",
+        "title": "View Document"
+      },
+      {
+        "command": "sidstack.viewTicket",
+        "title": "View Ticket Details"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "sidstack.refreshTasks",
+          "when": "view == sidstack.tasks",
+          "group": "navigation"
+        },
+        {
+          "command": "sidstack.createTask",
+          "when": "view == sidstack.tasks",
+          "group": "navigation"
+        },
+        {
+          "command": "sidstack.refreshKnowledge",
+          "when": "view == sidstack.knowledge",
+          "group": "navigation"
+        },
+        {
+          "command": "sidstack.refreshTickets",
+          "when": "view == sidstack.tickets",
+          "group": "navigation"
+        },
+        {
+          "command": "sidstack.createTicket",
+          "when": "view == sidstack.tickets",
+          "group": "navigation"
+        },
+        {
+          "command": "sidstack.refreshTraining",
+          "when": "view == sidstack.training",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "sidstack.refreshTasks",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.refreshKnowledge",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.refreshTickets",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.refreshTraining",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.viewTask",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.viewKnowledgeDoc",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.viewTicket",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.openDashboard",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.openTaskManager",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.openKnowledgeBrowser",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.openTicketQueue",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.openTrainingRoom",
+          "when": "false"
+        },
+        {
+          "command": "sidstack.openImpactViewer",
+          "when": "false"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "sidstack.completeTask",
+          "when": "view == sidstack.tasks && viewItem =~ /task-(pending|in_progress)/",
+          "group": "inline"
+        },
+        {
+          "command": "sidstack.convertTicketToTask",
+          "when": "view == sidstack.tickets && viewItem =~ /ticket-(new|reviewing|approved)/",
+          "group": "inline"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "sidstack.tasks",
+        "contents": "No tasks found.\n[Create Task](command:sidstack.createTask)\n[Refresh](command:sidstack.refreshTasks)",
+        "when": "sidstack.connected"
+      },
+      {
+        "view": "sidstack.tasks",
+        "contents": "SidStack API is not connected.\n[Refresh Connection](command:sidstack.refreshAll)",
+        "when": "!sidstack.connected"
+      },
+      {
+        "view": "sidstack.knowledge",
+        "contents": "No knowledge documents found.\n[Search Knowledge](command:sidstack.searchKnowledge)\n[Refresh](command:sidstack.refreshKnowledge)",
+        "when": "sidstack.connected"
+      },
+      {
+        "view": "sidstack.knowledge",
+        "contents": "SidStack API is not connected.\n[Refresh Connection](command:sidstack.refreshAll)",
+        "when": "!sidstack.connected"
+      },
+      {
+        "view": "sidstack.tickets",
+        "contents": "No tickets found.\n[Create Ticket](command:sidstack.createTicket)\n[Refresh](command:sidstack.refreshTickets)",
+        "when": "sidstack.connected"
+      },
+      {
+        "view": "sidstack.tickets",
+        "contents": "SidStack API is not connected.\n[Refresh Connection](command:sidstack.refreshAll)",
+        "when": "!sidstack.connected"
+      },
+      {
+        "view": "sidstack.training",
+        "contents": "No training materials found.\n[Refresh](command:sidstack.refreshTraining)",
+        "when": "sidstack.connected"
+      },
+      {
+        "view": "sidstack.training",
+        "contents": "SidStack API is not connected.\n[Refresh Connection](command:sidstack.refreshAll)",
+        "when": "!sidstack.connected"
+      }
+    ],
+    "configuration": {
+      "title": "SidStack",
+      "properties": {
+        "sidstack.apiPort": {
+          "type": "number",
+          "default": 19432,
+          "description": "Port for the SidStack API server"
+        },
+        "sidstack.autoStartServer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start the API server if not running"
+        },
+        "sidstack.refreshInterval": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 300,
+          "description": "Auto-refresh interval in seconds for sidebar views"
+        },
+        "sidstack.projectId": {
+          "type": "string",
+          "default": "sidstack",
+          "description": "Default project ID for task operations"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "watch": "node esbuild.config.js --watch",
+    "package": "npx vsce package --no-dependencies",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.4.0"
+  }
+}
