@@ -55,3 +55,16 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
+
+      - name: Upload fixed-name DMG
+        run: |
+          DMG_FILE=$(find src-tauri/target/${{ matrix.target }}/release/bundle/dmg -name "*.dmg" | head -1)
+          if [[ "${{ matrix.target }}" == "aarch64-apple-darwin" ]]; then
+            FIXED_NAME="SidStack_aarch64.dmg"
+          else
+            FIXED_NAME="SidStack_x64.dmg"
+          fi
+          cp "$DMG_FILE" "$FIXED_NAME"
+          gh release upload "${{ github.ref_name }}" "$FIXED_NAME" --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
