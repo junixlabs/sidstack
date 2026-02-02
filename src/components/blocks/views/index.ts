@@ -1,21 +1,26 @@
-// Block view exports
-// Each view registers itself in BlockRegistry on import
+// Block view registration
+// Uses setBlockViews() to pass component references directly,
+// preventing Rollup from tree-shaking the registrations.
 
-export { KnowledgeBrowserBlockView } from "./KnowledgeBrowserBlockView";
-export { TaskManagerBlockView } from "./TaskManagerBlockView";
-export { WorktreeStatusBlockView } from "./WorktreeStatusBlockView";
-export { WorktreeOverviewBlockView } from "./WorktreeOverviewBlockView";
-export { TicketQueueBlockView } from "./TicketQueueBlockView";
-export { SettingsBlockView } from "./SettingsBlockView";
-export { TrainingRoomBlockView } from "./TrainingRoomBlockView";
-export { default as ProjectHubBlockView } from "./ProjectHubBlockView";
+import { setBlockViews } from "../BlockRegistry";
+import { KnowledgeBrowserBlockView } from "./KnowledgeBrowserBlockView";
+import { TaskManagerBlockView } from "./TaskManagerBlockView";
+import { WorktreeStatusBlockView } from "./WorktreeStatusBlockView";
+import { WorktreeOverviewBlockView } from "./WorktreeOverviewBlockView";
+import { TicketQueueBlockView } from "./TicketQueueBlockView";
+import { SettingsBlockView } from "./SettingsBlockView";
+import { TrainingRoomBlockView } from "./TrainingRoomBlockView";
+import ProjectHubBlockView from "./ProjectHubBlockView";
 
-// Import all views to trigger registration
-import "./KnowledgeBrowserBlockView"; // Unified knowledge browser via REST API
-import "./TaskManagerBlockView";
-import "./WorktreeStatusBlockView";
-import "./WorktreeOverviewBlockView";
-import "./TicketQueueBlockView";
-import "./SettingsBlockView";
-import "./TrainingRoomBlockView";
-import "./ProjectHubBlockView";
+export function ensureBlockViewsRegistered(): void {
+  setBlockViews({
+    "knowledge-browser": KnowledgeBrowserBlockView,
+    "task-manager": TaskManagerBlockView,
+    "worktree-status": WorktreeStatusBlockView,
+    "worktree-overview": WorktreeOverviewBlockView,
+    "ticket-queue": TicketQueueBlockView,
+    "settings": SettingsBlockView,
+    "training-room": TrainingRoomBlockView,
+    "project-hub": ProjectHubBlockView,
+  });
+}

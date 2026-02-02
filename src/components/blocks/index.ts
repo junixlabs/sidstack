@@ -34,8 +34,9 @@ export type { CodeBlockProps } from "./CodeBlock";
 // New WaveTerm-style block system
 export { Block } from "./Block";
 export { BlockFrame } from "./BlockFrame";
-export { BlockRegistry, registerBlockView, getBlockView } from "./BlockRegistry";
+export { registerBlockView, getBlockView } from "./BlockRegistry";
 export { TileLayout } from "./layout";
 
-// Import views to trigger registration
-import "./views";
+// Explicit function call — not tree-shakeable
+import { ensureBlockViewsRegistered } from "./views";
+ensureBlockViewsRegistered();

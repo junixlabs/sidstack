@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.2] - 2026-02-03
+
+### Added
+- **Linux Build:** Release pipeline now builds `.deb` and `.AppImage` for x86_64 Linux
+- **Download Page:** Linux download with `.deb` (primary) and `.AppImage` (alt) options
+- **macOS Instructions:** Gatekeeper bypass guide for first-time app launch on macOS
+
+### Fixed
+- Block view registration tree-shaking issue in production builds (BlockRegistry refactor)
+
+### Changed
+- Updated download page SEO metadata to include Linux
+- Updated FinalCTA to reflect Linux platform support
+
 ## [0.4.0] - 2026-02-02
 
 ### Added

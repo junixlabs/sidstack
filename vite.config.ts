@@ -29,7 +29,7 @@ export default defineConfig(async () => ({
         },
       },
       treeshake: {
-        moduleSideEffects: false,
+        moduleSideEffects: true,
       },
     },
   },

@@ -2,22 +2,33 @@ import type { ComponentType } from "react";
 
 import type { BlockViewProps, BlockViewType } from "@/types/block";
 
-/**
- * Registry of block view components.
- * Maps view type to the component that renders it.
- *
- * Inspired by WaveTerm's BlockRegistry pattern.
- */
-export const BlockRegistry = new Map<BlockViewType, ComponentType<BlockViewProps>>();
+type ViewMap = Partial<Record<BlockViewType, ComponentType<BlockViewProps>>>;
 
 /**
- * Register a block view component
+ * Registry of block view components.
+ *
+ * Uses a plain object + getter function instead of Map to avoid
+ * Rollup tree-shaking the .set() calls in production builds.
+ *
+ * Views are registered via setBlockViews() called from views/index.ts.
+ */
+let views: ViewMap = {};
+
+/**
+ * Set all block views at once (called during app init)
+ */
+export function setBlockViews(map: ViewMap): void {
+  views = map;
+}
+
+/**
+ * Register a single block view component
  */
 export function registerBlockView(
   viewType: BlockViewType,
   component: ComponentType<BlockViewProps>
 ): void {
-  BlockRegistry.set(viewType, component);
+  views[viewType] = component;
 }
 
 /**
@@ -26,15 +37,12 @@ export function registerBlockView(
 export function getBlockView(
   viewType: BlockViewType
 ): ComponentType<BlockViewProps> | undefined {
-  return BlockRegistry.get(viewType);
+  return views[viewType];
 }
 
 /**
  * Check if a view type is registered
  */
 export function isViewTypeRegistered(viewType: BlockViewType): boolean {
-  return BlockRegistry.has(viewType);
+  return viewType in views;
 }
-
-// Note: Actual component registrations happen in the view files
-// This avoids circular dependencies

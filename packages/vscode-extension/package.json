@@ -2,7 +2,7 @@
   "name": "sidstack",
   "displayName": "SidStack",
   "description": "AI-Powered Project Intelligence - Tasks, Knowledge, Impact Analysis & Governance for Claude Code",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "publisher": "sidstack",
   "license": "MIT",
   "icon": "media/sidstack-icon.png",

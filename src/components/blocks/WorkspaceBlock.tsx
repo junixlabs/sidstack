@@ -12,9 +12,9 @@ import { memo, useCallback, Suspense } from "react";
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext";
 
 import { getBlockView } from "./BlockRegistry";
+import { ensureBlockViewsRegistered } from "./views";
 
-// Import views to trigger block registration
-import "./views";
+ensureBlockViewsRegistered();
 
 interface WorkspaceBlockProps {
   blockId: string;

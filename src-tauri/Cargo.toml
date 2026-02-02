@@ -1,6 +1,6 @@
 [package]
 name = "sidstack"
-version = "0.4.0"
+version = "0.4.2"
 description = "SidStack - AI-Powered Project Intelligence Platform"
 authors = ["SidStack Team"]
 edition = "2021"
