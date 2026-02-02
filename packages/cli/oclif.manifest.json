@@ -238,6 +238,124 @@
         "update.js"
       ]
     },
+    "governance:check": {
+      "aliases": [],
+      "args": {
+        "scope": {
+          "default": "all",
+          "description": "What to check: all, principles, skills, agents, modules, or \"module <id>\"",
+          "name": "scope",
+          "required": false
+        },
+        "target": {
+          "description": "Target ID when scope is \"module\"",
+          "name": "target",
+          "required": false
+        }
+      },
+      "description": "Validate governance compliance (agent-friendly with exit codes)",
+      "examples": [
+        "<%= config.bin %> governance check",
+        "<%= config.bin %> governance check --json",
+        "<%= config.bin %> governance check principles",
+        "<%= config.bin %> governance check modules --strict",
+        "<%= config.bin %> governance check module terminal"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "strict": {
+          "description": "Treat warnings as errors",
+          "name": "strict",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output (VALID/INVALID only)",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "governance:check",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "governance",
+        "check.js"
+      ]
+    },
+    "governance:show": {
+      "aliases": [],
+      "args": {},
+      "description": "Show governance system overview (agent-friendly with JSON output)",
+      "examples": [
+        "<%= config.bin %> governance show",
+        "<%= config.bin %> governance show --json",
+        "<%= config.bin %> governance show --section principles",
+        "<%= config.bin %> governance show --quiet"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "section": {
+          "char": "s",
+          "description": "Show specific section only",
+          "name": "section",
+          "default": "all",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "principles",
+            "skills",
+            "agents",
+            "all"
+          ],
+          "type": "option"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output (counts only)",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "governance:show",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "governance",
+        "show.js"
+      ]
+    },
     "command:add": {
       "aliases": [],
       "args": {
@@ -490,124 +608,6 @@
         "commands",
         "command",
         "update.js"
-      ]
-    },
-    "governance:check": {
-      "aliases": [],
-      "args": {
-        "scope": {
-          "default": "all",
-          "description": "What to check: all, principles, skills, agents, modules, or \"module <id>\"",
-          "name": "scope",
-          "required": false
-        },
-        "target": {
-          "description": "Target ID when scope is \"module\"",
-          "name": "target",
-          "required": false
-        }
-      },
-      "description": "Validate governance compliance (agent-friendly with exit codes)",
-      "examples": [
-        "<%= config.bin %> governance check",
-        "<%= config.bin %> governance check --json",
-        "<%= config.bin %> governance check principles",
-        "<%= config.bin %> governance check modules --strict",
-        "<%= config.bin %> governance check module terminal"
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format (agent-friendly)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "strict": {
-          "description": "Treat warnings as errors",
-          "name": "strict",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output (VALID/INVALID only)",
-          "name": "quiet",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "governance:check",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "governance",
-        "check.js"
-      ]
-    },
-    "governance:show": {
-      "aliases": [],
-      "args": {},
-      "description": "Show governance system overview (agent-friendly with JSON output)",
-      "examples": [
-        "<%= config.bin %> governance show",
-        "<%= config.bin %> governance show --json",
-        "<%= config.bin %> governance show --section principles",
-        "<%= config.bin %> governance show --quiet"
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format (agent-friendly)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "section": {
-          "char": "s",
-          "description": "Show specific section only",
-          "name": "section",
-          "default": "all",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "options": [
-            "principles",
-            "skills",
-            "agents",
-            "all"
-          ],
-          "type": "option"
-        },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output (counts only)",
-          "name": "quiet",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "governance:show",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "governance",
-        "show.js"
       ]
     },
     "knowledge:create": {
@@ -911,6 +911,126 @@
         "commands",
         "knowledge",
         "validate.js"
+      ]
+    },
+    "preset:list": {
+      "aliases": [],
+      "args": {},
+      "description": "List available initialization presets",
+      "examples": [
+        "<%= config.bin %> preset list",
+        "<%= config.bin %> preset list --json",
+        "<%= config.bin %> preset list --language typescript"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "language": {
+          "char": "l",
+          "description": "Filter by language (typescript, python, go, any)",
+          "name": "language",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "type": {
+          "char": "t",
+          "description": "Filter by project type (fullstack, backend, general)",
+          "name": "type",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "preset:list",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "preset",
+        "list.js"
+      ]
+    },
+    "preset:show": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Preset name",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Show detailed information about a preset",
+      "examples": [
+        "<%= config.bin %> preset show minimal",
+        "<%= config.bin %> preset show fullstack-typescript --json",
+        "<%= config.bin %> preset show typescript-backend --section agents"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "section": {
+          "char": "s",
+          "description": "Show specific section (agents, skills, defaults, recommended)",
+          "name": "section",
+          "default": "all",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "agents",
+            "skills",
+            "defaults",
+            "recommended",
+            "all"
+          ],
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "preset:show",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "preset",
+        "show.js"
       ]
     },
     "skill:add": {
@@ -1375,127 +1495,7 @@
         "skill",
         "validate.js"
       ]
-    },
-    "preset:list": {
-      "aliases": [],
-      "args": {},
-      "description": "List available initialization presets",
-      "examples": [
-        "<%= config.bin %> preset list",
-        "<%= config.bin %> preset list --json",
-        "<%= config.bin %> preset list --language typescript"
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format (agent-friendly)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output",
-          "name": "quiet",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "language": {
-          "char": "l",
-          "description": "Filter by language (typescript, python, go, any)",
-          "name": "language",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "type": {
-          "char": "t",
-          "description": "Filter by project type (fullstack, backend, general)",
-          "name": "type",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "preset:list",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "preset",
-        "list.js"
-      ]
-    },
-    "preset:show": {
-      "aliases": [],
-      "args": {
-        "name": {
-          "description": "Preset name",
-          "name": "name",
-          "required": true
-        }
-      },
-      "description": "Show detailed information about a preset",
-      "examples": [
-        "<%= config.bin %> preset show minimal",
-        "<%= config.bin %> preset show fullstack-typescript --json",
-        "<%= config.bin %> preset show typescript-backend --section agents"
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output in JSON format (agent-friendly)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "quiet": {
-          "char": "q",
-          "description": "Minimal output",
-          "name": "quiet",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "section": {
-          "char": "s",
-          "description": "Show specific section (agents, skills, defaults, recommended)",
-          "name": "section",
-          "default": "all",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "options": [
-            "agents",
-            "skills",
-            "defaults",
-            "recommended",
-            "all"
-          ],
-          "type": "option"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "preset:show",
-      "pluginAlias": "@sidstack/cli",
-      "pluginName": "@sidstack/cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "preset",
-        "show.js"
-      ]
     }
   },
-  "version": "0.4.0"
+  "version": "0.4.1"
 }

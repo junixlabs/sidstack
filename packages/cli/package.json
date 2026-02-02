@@ -1,7 +1,7 @@
 {
   "name": "@sidstack/cli",
-  "version": "0.4.0",
-  "description": "SidStack CLI - AI Agent Orchestration Tool",
+  "version": "0.4.1",
+  "description": "SidStack CLI - Project Intelligence for AI Coding Agents",
   "author": "SidStack Team",
   "license": "MIT",
   "publishConfig": {
