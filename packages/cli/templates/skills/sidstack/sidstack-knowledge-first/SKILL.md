@@ -1,24 +1,23 @@
 ---
 name: sidstack-knowledge-first
-description: Search SidStack knowledge before implementing features or making architectural decisions.
-user-invocable: false
+description: >
+  Search project knowledge before implementing. Trigger when: starting a new
+  feature, making architectural decisions, working in unfamiliar code, or
+  modifying business logic. Use knowledge_search and knowledge_context.
 ---
 
 # Knowledge-First Development
 
-Before implementing features or making architectural decisions, search existing knowledge to ensure consistency with the codebase.
+## When to Search Knowledge
 
-## When to Apply
-
-- Implementing a new feature
+- Starting a new feature implementation
 - Making architectural decisions
-- Modifying business logic
-- Changing data models or APIs
-- Working in unfamiliar parts of the codebase
+- Working in unfamiliar modules
+- Changing business logic or data models
 
 ## Process
 
-### Step 1: Search for Existing Patterns
+### 1. Search for Patterns
 
 ```
 knowledge_search({
@@ -27,15 +26,7 @@ knowledge_search({
 })
 ```
 
-Look for:
-- Similar implementations
-- Design patterns used
-- Business rules documented
-- API conventions
-
-### Step 2: Get Module Context
-
-If working in a specific module:
+### 2. Get Module Context
 
 ```
 knowledge_context({
@@ -44,31 +35,10 @@ knowledge_context({
 })
 ```
 
-This provides:
-- Module overview and purpose
-- Related documentation
-- Dependencies and relationships
+## What to Look For
+
+- Similar implementations
+- Design patterns used
+- Business rules
+- API conventions
 - Known constraints
-
-### Step 3: Check for Related Decisions
-
-Search for architectural decisions:
-
-```
-knowledge_search({
-  projectPath: ".",
-  query: "decision architecture"
-})
-```
-
-Look in:
-- `.sidstack/knowledge/` for documented patterns
-- `openspec/` for change proposals
-- `docs/` for technical documentation
-
-## Benefits
-
-- **Consistency**: Follow established patterns
-- **Efficiency**: Don't reinvent existing solutions
-- **Quality**: Build on proven approaches
-- **Context**: Understand why things are the way they are

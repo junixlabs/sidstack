@@ -1,72 +1,43 @@
 ---
 name: sidstack-impact-safe
-description: Run impact analysis before modifying core modules, APIs, or database schemas.
-user-invocable: false
+description: >
+  Run impact analysis before risky changes. Trigger when: modifying core modules
+  (shared, database, auth), changing APIs or schemas, touching security code,
+  or affecting multiple modules. Use impact_analyze then impact_check_gate.
 ---
 
 # Impact-Safe Changes
 
-Before modifying critical code, run impact analysis to understand risks and dependencies.
+## When to Run Impact Analysis
 
-## When to Apply
-
-Run `impact_analyze` before touching:
-
-- **Core modules**: packages/shared, src-tauri, database
-- **APIs**: Route handlers, request/response schemas
-- **Database**: Schema changes, migrations
-- **Security**: Authentication, authorization, encryption
-- **Integrations**: External services, MCP tools
+- Modifying core modules (database, auth, shared)
+- Changing API routes or response schemas
+- Database schema changes or migrations
+- Security-related code (auth, encryption)
+- Changes affecting 3+ files across modules
 
 ## Process
 
-### Step 1: Analyze Impact
+### 1. Analyze
 
 ```
 impact_analyze({
   description: "What you're changing and why",
-  targetModules: ["affected-module-1", "affected-module-2"],
-  changeType: "feature" | "refactor" | "bugfix" | "migration" | "deletion"
+  targetModules: ["module1", "module2"],
+  changeType: "feature" | "refactor" | "bugfix" | "migration"
 })
 ```
 
-### Step 2: Check Gate Status
+### 2. Check Gate
 
 ```
-impact_check_gate({
-  analysisId: "from-step-1"
-})
+impact_check_gate({ analysisId: "from-step-1" })
 ```
 
-### Step 3: Interpret Results
+### 3. Interpret
 
-| Status | Meaning | Action |
-|--------|---------|--------|
-| `clear` | Safe to proceed | Continue with implementation |
-| `warning` | Caution needed | Review risks, proceed carefully |
-| `blocked` | High risk | Address blockers before proceeding |
-
-## Risk Indicators
-
-**High Risk:**
-- Breaking API changes
-- Database schema modifications
-- Security-sensitive code changes
-- Multiple modules affected
-
-**Medium Risk:**
-- Internal API changes
-- Adding new dependencies
-- Modifying shared utilities
-
-**Low Risk:**
-- Isolated bug fixes
-- Documentation updates
-- Test additions
-
-## Best Practices
-
-1. **Always analyze before implementing** risky changes
-2. **Document the analysis** in your commit message
-3. **If blocked**, create tasks to address blockers first
-4. **If warning**, add extra tests for affected areas
+| Status | Action |
+|--------|--------|
+| `clear` | Safe to proceed |
+| `warning` | Proceed with extra care |
+| `blocked` | Fix blockers first |
