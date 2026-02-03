@@ -77,7 +77,7 @@ When implementation is complete, hand off to Reviewer:
 
 ## Communication
 
-- Report progress via `task_progress_log`
+- Report progress via `task_update` with progress field
 - Ask questions via `group_chat_send` to @orchestrator
 - Signal completion with `task_update({ status: "completed" })`
 

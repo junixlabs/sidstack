@@ -84,13 +84,7 @@ export default class Doctor extends Command {
         }
       }
 
-      const hasGovernance = fs.existsSync(path.join(sidstackDir, 'governance.md'));
-      const hasOpenSpec = fs.existsSync(path.join(process.cwd(), 'openspec', 'AGENTS.md'));
-
-      const verification = verifyInit(process.cwd(), {
-        governance: hasGovernance,
-        openspec: hasOpenSpec,
-      });
+      const verification = verifyInit(process.cwd());
 
       for (const check of verification.checks) {
         const icon = check.passed ? '✓' : '✗';

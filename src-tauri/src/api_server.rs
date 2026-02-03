@@ -83,6 +83,40 @@ fn get_project_root() -> Option<std::path::PathBuf> {
     None
 }
 
+/// Resolve the full path to a command by checking common locations.
+/// macOS GUI apps don't inherit the shell PATH, so `pnpm` may not be found.
+fn resolve_command(name: &str) -> String {
+    let search_paths = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/usr/bin",
+    ];
+    for dir in &search_paths {
+        let full = format!("{}/{}", dir, name);
+        if std::path::Path::new(&full).exists() {
+            return full;
+        }
+    }
+    name.to_string()
+}
+
+/// Build a PATH that includes common tool directories.
+/// Ensures child processes can find node, pnpm, cargo, etc.
+fn enriched_path() -> String {
+    let extra = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/usr/bin",
+        "/bin",
+    ];
+    let current = std::env::var("PATH").unwrap_or_default();
+    let mut parts: Vec<&str> = extra.to_vec();
+    if !current.is_empty() {
+        parts.push(&current);
+    }
+    parts.join(":")
+}
+
 /// Start the API server process
 pub async fn start_api_server(state: SharedApiServerState) -> Result<(), String> {
     // Check if already running on port
@@ -96,10 +130,14 @@ pub async fn start_api_server(state: SharedApiServerState) -> Result<(), String>
 
     eprintln!("[ApiServer] Starting API server from {:?}", project_root);
 
+    let pnpm = resolve_command("pnpm");
+    eprintln!("[ApiServer] Using pnpm at: {}", pnpm);
+
     // Use pnpm to start the API server (using 'start' which runs built dist)
-    let child = Command::new("pnpm")
+    let child = Command::new(&pnpm)
         .args(["--filter", "@sidstack/api-server", "start"])
         .current_dir(&project_root)
+        .env("PATH", enriched_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()

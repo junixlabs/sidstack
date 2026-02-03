@@ -7,7 +7,7 @@ import { Args, Command, Flags } from '@oclif/core';
 
 import { detectProject } from '../lib/project-detector.js';
 import { checkPrerequisites } from '../lib/prerequisites.js';
-import { runInitWizard } from '../lib/init-prompts.js';
+import { runInitWizard, type SetupMode } from '../lib/init-prompts.js';
 import { verifyInit } from '../lib/init-verify.js';
 import { PresetLoader, type PresetConfig } from '../lib/preset-loader.js';
 import { resolveTemplatesDir, resolveSkillsDir } from '../lib/resolve-paths.js';
@@ -125,8 +125,7 @@ export default class Init extends Command {
     // Resolve init parameters — either from wizard or flags
     let projectName: string;
     let presetConfig: PresetConfig | null = null;
-    let installGovernance = true;
-    let installOpenSpec = true;
+    let setupMode: SetupMode = 'custom';
     let runScan = flags.scan;
 
     if (isInteractive) {
@@ -136,7 +135,9 @@ export default class Init extends Command {
         if (projectInfo.isNew) {
           this.log(`  Detected: New project (${projectInfo.type})`);
         } else {
-          this.log(`  Detected: ${projectInfo.techStack?.language || 'Unknown'} / ${projectInfo.techStack?.framework || 'Unknown'} (existing project)`);
+          const lang = projectInfo.techStack?.language || 'Unknown';
+          const framework = projectInfo.techStack?.framework || 'Unknown';
+          this.log(`  Detected: ${lang} / ${framework} (existing project)`);
         }
         this.log('');
       }
@@ -154,8 +155,7 @@ export default class Init extends Command {
       }
 
       projectName = wizardResult.projectName;
-      installGovernance = wizardResult.installGovernance;
-      installOpenSpec = wizardResult.installOpenSpec;
+      setupMode = wizardResult.setupMode;
       runScan = wizardResult.runScan;
 
       if (wizardResult.preset) {
@@ -293,22 +293,10 @@ export default class Init extends Command {
       }
     }
 
-    // 8. Install frameworks based on resolved settings
-    const installedFrameworks: string[] = [];
-
-    if (installOpenSpec) {
-      this.log('');
-      this.log('Installing OpenSpec...');
-      this.initOpenSpec(projectPath, projectName);
-      installedFrameworks.push('OpenSpec');
-    }
-
-    if (installGovernance) {
-      this.log('');
-      this.log('Installing Governance...');
-      this.initGovernance(projectPath);
-      installedFrameworks.push('Governance');
-    }
+    // 8. Install Governance system (always installed)
+    this.log('');
+    this.log('Installing Governance...');
+    this.initGovernance(projectPath);
 
     // Done - output result
     if (flags.json) {
@@ -319,7 +307,7 @@ export default class Init extends Command {
         projectName,
         projectPath,
         preset: presetConfig?.name || null,
-        frameworks: installedFrameworks,
+        setupMode,
         agents: presetConfig ? Object.keys(presetConfig.agents) : [],
         recommended: presetConfig?.recommended || {},
       };
@@ -330,10 +318,7 @@ export default class Init extends Command {
     // Post-init verification
     this.log('');
     this.log('Verifying installation...');
-    const verification = verifyInit(projectPath, {
-      governance: installGovernance,
-      openspec: installOpenSpec,
-    });
+    const verification = verifyInit(projectPath);
 
     for (const check of verification.checks) {
       const icon = check.passed ? '✓' : '✗';
@@ -352,63 +337,163 @@ export default class Init extends Command {
       this.log(`  Agents: ${Object.keys(presetConfig.agents).join(', ')}`);
       this.log('');
     }
-    if (installedFrameworks.length > 0) {
-      this.log(`Installed: ${installedFrameworks.join(', ')}`);
-      this.log('');
-    }
 
-    // Launch Claude session or show completion guide
-    if (runScan) {
-      await this.launchScanSession(projectPath);
-    } else if (installGovernance) {
-      await this.launchOnboardingSession(projectPath, projectName, installedFrameworks);
+    // Launch based on setup mode
+    if (setupMode === 'guided') {
+      // Guided mode: always launch onboarding interview
+      await this.launchOnboardingSession(projectPath, projectName);
     } else {
+      // Custom mode: optionally run scan, then show guide
+      if (runScan) {
+        await this.launchScanSession(projectPath);
+      }
       this.logCompletionGuide(prereqs.claudeAvailable);
     }
   }
 
   private async launchOnboardingSession(
     projectPath: string,
-    _projectName: string,
-    _installedFrameworks: string[]
+    _projectName: string
   ): Promise<void> {
     this.log('Starting interactive onboarding with Claude Code...');
     this.log('Claude will interview you about your project and set up the Project Hub.');
     this.log('');
 
-    const initialPrompt = `You are the SidStack onboarding assistant. SidStack was just initialized in this project.
+    const initialPrompt = `You are the SidStack Business Discovery Assistant. Your job is to deeply understand this project's business context through a structured interview, then generate comprehensive documentation.
 
 ## Your Role
-Guide the user through discovering SidStack features. Interview them about their project to generate meaningful data for the Project Hub. Be conversational — ask questions, use MCP tools, and create files.
+Conduct a thorough but conversational interview to understand:
+- What the project does and why it exists
+- Who uses it and what value it provides
+- Core features and business rules
+- Technical architecture and constraints
+- Quality requirements and sensitive areas
 
-## Phase 1: Welcome
-1. Read CLAUDE.md and .sidstack/config.json to get the project name and path.
-2. Welcome the user. Briefly list what was installed: governance system (principles, skills, hooks), OpenSpec, MCP tools (32 tools for tasks, knowledge, impact, tickets, training, OKRs).
-3. Ask: "I'd like to learn about your project so I can set up the Project Hub with your business domains. Ready to get started?"
-   - If user says skip/no → jump to Phase 3.
+## Phase 1: Welcome & Context
+1. Read CLAUDE.md, .sidstack/config.json, and README.md (if exists) to get initial context.
+2. Welcome the user briefly. Mention SidStack is now installed.
+3. Say: "I'd like to understand your project thoroughly so I can set up intelligent documentation. This takes about 5-10 minutes and will make future AI sessions much more effective. Ready?"
+   - If skip → jump to Phase 5 (Quick Setup).
 
-## Phase 2: Business Logic Discovery
-Interview the user to understand their project structure. Use their answers to generate capability YAML files.
+## Phase 2: Project Identity (ask one at a time, be conversational)
 
-### Questions to ask (one at a time, conversational):
-1. "What are the 2-4 main domains or areas of your project? For example: Authentication, Payments, Dashboard, API..."
-2. For each domain: "What's the main goal of [domain]?" (becomes the purpose field)
-3. For each domain: "Any key business rules? For example: 'All payments must be idempotent' or 'Users must verify email before checkout'" (becomes businessRules)
-4. "How do these domains relate to each other? Which ones depend on others?" (becomes relationships)
+### 2.1 What & Why
+- "In one sentence, what does this project do?"
+  → Save as: product_description
 
-### Generate capability files:
-After collecting answers, create .sidstack/capabilities/ YAML files using the Write tool:
+- "What problem does it solve? Why would someone use it?"
+  → Save as: value_proposition
 
-**L0 root (project-level):**
+### 2.2 Who
+- "Who are the main users? Any distinct user types or personas?"
+  Examples: "End users", "Admin users", "API consumers", "Internal team"
+  → Save as: user_personas[]
+
+### 2.3 Stage
+- "What stage is the project in?"
+  Options: Idea/Planning, MVP/Early, Growth, Mature, Maintenance
+  → Save as: project_stage
+
+## Phase 3: Core Features & Domains
+
+### 3.1 Domain Discovery
+- "What are the main areas or modules of your project? For example: Authentication, Payments, Dashboard..."
+  → Save as: domains[]
+
+### 3.2 For EACH domain (iterate):
+- "Tell me about [domain]:"
+  a. "What's its main purpose?"
+  b. "What are the key features?"
+  c. "Any critical business rules that MUST always be true?"
+     Examples: "Orders must have at least 1 item", "Passwords must be hashed"
+  d. "Is this a core feature or supporting feature?"
+
+→ Save as: domain_details[domain] = { purpose, features[], businessRules[], isCoreFeature }
+
+### 3.3 Dependencies
+- "How do these domains relate? Which ones depend on others?"
+  → Save as: domain_relationships{}
+
+## Phase 4: Technical & Quality Context
+
+### 4.1 Architecture (quick)
+- "High-level architecture? Monolith, microservices, serverless?"
+  → Save as: architecture_type
+
+### 4.2 Integrations
+- "Any external services or APIs integrated? (payments, email, storage, etc.)"
+  → Save as: integrations[]
+
+### 4.3 Core Entities
+- "What are the main data entities? (User, Order, Product, etc.)"
+  → Save as: core_entities[]
+
+### 4.4 Sensitive Areas
+- "What code is most critical? What should never break?"
+  → Save as: sensitive_areas[]
+
+### 4.5 Known Gotchas
+- "Any tech debt, known issues, or gotchas that someone new should know?"
+  → Save as: known_issues[]
+
+## Phase 5: Generate Documentation
+
+After collecting answers, generate files:
+
+### 5.1 Project Profile (.sidstack/project-profile.yaml)
+\`\`\`yaml
+name: {project-name}
+description: {product_description}
+valueProposition: {value_proposition}
+stage: {project_stage}
+architecture: {architecture_type}
+
+users:
+  - name: {persona_name}
+    description: {persona_description}
+
+domains:
+  - id: {domain-id}
+    name: {domain-name}
+    purpose: {purpose}
+    isCoreFeature: {true/false}
+    features:
+      - {feature1}
+      - {feature2}
+    businessRules:
+      - {rule1}
+      - {rule2}
+    dependsOn:
+      - {dependency}
+
+integrations:
+  - name: {integration}
+    purpose: {why}
+
+coreEntities:
+  - {entity1}
+  - {entity2}
+
+sensitiveAreas:
+  - {area1}
+  - {area2}
+
+knownIssues:
+  - {issue1}
+\`\`\`
+
+### 5.2 Capability Map (.sidstack/capabilities/)
+
+**L0 root:**
 \`\`\`yaml
 id: {project-name}
 name: {Project Name}
 level: L0
-purpose: {user's project description or detected from README}
+purpose: {product_description}
+valueProposition: {value_proposition}
 status: active
-maturity: developing
-tags:
-  - project
+maturity: {stage → developing/stable/mature}
+users: {user_personas}
 \`\`\`
 
 **L1 per domain:**
@@ -417,59 +502,100 @@ id: {domain-id}
 name: {Domain Name}
 level: L1
 parent: {project-name}
-purpose: {user's answer about this domain's goal}
+purpose: {domain_details.purpose}
+isCoreFeature: {domain_details.isCoreFeature}
 status: active
-maturity: developing
-modules:
-  - {domain-id}
+features:
+  - {feature1}
+  - {feature2}
 businessRules:
-  - {rule 1 from user}
-  - {rule 2 from user}
+  - {rule1}
+  - {rule2}
 relationships:
-  dependsOn:
-    - {dependencies from user's answers}
-tags:
-  - {project-name}
+  dependsOn: {dependencies}
+sensitiveAreas: {if applicable}
 \`\`\`
 
-Tell the user: "I've created your Project Hub capability map. Open the SidStack app (Cmd+1) to see your project domains."
+**L2 per core feature (optional, for complex domains):**
+\`\`\`yaml
+id: {feature-id}
+name: {Feature Name}
+level: L2
+parent: {domain-id}
+purpose: {feature purpose}
+businessRules:
+  - {specific rules}
+\`\`\`
 
-## Phase 3: Seed Data
-Use MCP tools to create starter data. Ask before each action.
+### 5.3 Knowledge Docs (.sidstack/knowledge/)
 
-1. **Task Management** — "Let me create your first task."
-   → Use task_create with projectId = folder name (read from .sidstack/config.json), title "[docs] Review and customize project governance", relevant acceptance criteria.
+Create starter docs from interview:
 
-2. **Knowledge System** — "Let me show the knowledge system."
-   → Use knowledge_list with projectPath.
-   → If existing codebase: "Want me to scan your codebase to generate knowledge docs? It helps future sessions understand your project faster."
+**business-logic/{domain}-overview.md:**
+\`\`\`markdown
+---
+id: {domain}-overview
+type: business-logic
+title: {Domain Name} Overview
+module: {domain-id}
+status: active
+---
 
-3. **Ticket Queue** — "I'll create a sample ticket to demo the intake queue."
-   → Use ticket_create with a relevant customization ticket.
+# {Domain Name}
 
-4. **Governance** — "Let me show what rules apply here."
-   → Use rule_check with projectPath, moduleId from one of the domains created above, role "dev", taskType "feature".
+## Purpose
+{domain_details.purpose}
 
-5. **OKRs** — "Let me check project OKRs."
-   → Use okr_list with projectPath.
+## Key Features
+{list features}
 
-## Phase 4: Feature Tour
-Briefly explain remaining features:
-- **Impact Analysis**: impact_analyze before risky changes — shows scope, risks, validation checklist
-- **Training Room**: Lessons auto-suggested after complex debugging — captures problem, root cause, solution
-- **Session Manager**: session_launch for parallel Claude sessions in external terminals
-- **Slash Commands**: /sidstack (hub), /sidstack:agent worker [task] (spawn governed agent), /sidstack:knowledge build (generate knowledge)
-- **Desktop App**: 7 views — Project Hub (Cmd+1), Task Manager (Cmd+2), Knowledge Browser (Cmd+3), Ticket Queue (Cmd+4), Training Room (Cmd+5), Settings (Cmd+,)
+## Business Rules
+{list rules with explanations}
 
-Ask: "What would you like to work on first?"
+## Dependencies
+{list what this domain depends on and why}
+\`\`\`
+
+**constraints/business-rules.md:**
+\`\`\`markdown
+---
+id: business-rules
+type: guide
+title: Business Rules & Invariants
+status: active
+---
+
+# Business Rules
+
+## Critical Invariants
+{rules that MUST always be true}
+
+## Domain-Specific Rules
+{rules per domain}
+\`\`\`
+
+### 5.4 Summary
+Tell the user what was created:
+- "Created Project Profile with {N} domains, {M} business rules"
+- "Generated {X} capability files for Project Hub"
+- "Created {Y} knowledge docs in .sidstack/knowledge/"
+- "Open SidStack Desktop (Cmd+1) to see your Project Hub"
+
+## Phase 6: Quick Actions
+Offer follow-up actions:
+1. "Want me to scan your codebase to enhance these docs with actual code patterns?"
+2. "Should I create your first task to review and refine this documentation?"
+3. "Ready to start working? What would you like to do first?"
 
 ## Rules
-- Be conversational. Ask one question at a time.
-- Always ask before creating data or files. If user says "skip", move on.
-- Use the folder name as projectId for MCP tool calls (read from .sidstack/config.json).
-- For capability YAML files, use the Write tool to create files in .sidstack/capabilities/.
-- Keep explanations concise — show by doing, don't lecture.
-- If user seems impatient, offer to skip ahead at any point.`;
+- Be conversational, not robotic. React to answers naturally.
+- Ask ONE question at a time. Wait for answer before proceeding.
+- If user gives short answers, probe deeper: "Can you tell me more about...?"
+- If user says "skip" or seems impatient, offer: "I can do a quick setup instead. Skip to essentials?"
+- Summarize what you understood before generating files: "Let me confirm I understood correctly..."
+- Use the folder name as projectId for MCP tool calls.
+- After generating files, always verify they were created successfully.`;
+
 
     return new Promise((resolve) => {
       const claude = spawn('claude', [initialPrompt], {
@@ -537,11 +663,51 @@ Ask: "What would you like to work on first?"
       claude.on('close', (code) => {
         if (code === 0) {
           this.log('');
-          this.log('Knowledge scan complete! Check .sidstack/knowledge/ for generated docs.');
+
+          // Count generated docs by category
+          const categories = ['modules', 'api', 'database', 'business-logic', 'patterns'];
+          let totalDocs = 0;
+          const found: string[] = [];
+          for (const cat of categories) {
+            const catDir = path.join(knowledgeDir, cat);
+            const count = this.countMarkdownFiles(catDir);
+            if (count > 0) {
+              found.push(`${cat} (${count})`);
+              totalDocs += count;
+            }
+          }
+
+          if (totalDocs === 0) {
+            this.log('Warning: No knowledge docs were generated. You can re-run with:');
+            this.log('  sidstack init --scan --force');
+          } else {
+            this.log(`Knowledge scan complete!`);
+            this.log(`  ${totalDocs} docs generated: ${found.join(', ')}`);
+            this.log('');
+            this.log('MCP tools now available in Claude Code:');
+            this.log('  knowledge_search  - search across all docs');
+            this.log('  knowledge_context - inject project context into sessions');
+            this.log('  knowledge_health  - check coverage and quality');
+          }
         }
         resolve();
       });
     });
+  }
+
+  private countMarkdownFiles(dir: string): number {
+    if (!fs.existsSync(dir)) return 0;
+    let count = 0;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        count += this.countMarkdownFiles(fullPath);
+      } else if (entry.name.endsWith('.md') && !entry.name.startsWith('_')) {
+        count++;
+      }
+    }
+    return count;
   }
 
   private logCompletionGuide(claudeAvailable: boolean): void {
@@ -558,117 +724,6 @@ Ask: "What would you like to work on first?"
       this.log('  3. View governance:         cat .sidstack/governance.md');
     }
     this.log('');
-  }
-
-  private initOpenSpec(projectPath: string, projectName: string): void {
-    const openspecDir = path.join(projectPath, 'openspec');
-    const changesDir = path.join(openspecDir, 'changes');
-    const archiveDir = path.join(changesDir, 'archive');
-    const specsDir = path.join(openspecDir, 'specs');
-
-    // Create directories
-    fs.mkdirSync(archiveDir, { recursive: true });
-    fs.mkdirSync(specsDir, { recursive: true });
-    this.log('✓ Created openspec/ directory structure');
-
-    // Create AGENTS.md
-    const agentsMd = `# OpenSpec Instructions
-
-Instructions for AI coding assistants using OpenSpec for spec-driven development.
-
-## Quick Start
-
-\`\`\`bash
-# List active changes
-openspec list
-
-# Show a change or spec
-openspec show [item]
-
-# Validate changes
-openspec validate [item] --strict
-
-# Archive after deployment
-openspec archive <change-id>
-\`\`\`
-
-## Workflow
-
-### 1. Creating Changes
-Create a proposal when you need to:
-- Add features or functionality
-- Make breaking changes
-- Change architecture or patterns
-
-\`\`\`bash
-mkdir -p openspec/changes/add-feature-name/specs
-\`\`\`
-
-### 2. Proposal Structure
-\`\`\`
-openspec/changes/[change-id]/
-├── proposal.md     # Why and what
-├── tasks.md        # Implementation checklist
-├── design.md       # Technical decisions (optional)
-└── specs/          # Delta changes
-    └── [capability]/
-        └── spec.md # ADDED/MODIFIED/REMOVED
-\`\`\`
-
-### 3. Spec Delta Format
-\`\`\`markdown
-## ADDED Requirements
-### Requirement: Feature Name
-The system SHALL...
-
-#### Scenario: Success case
-- **WHEN** action happens
-- **THEN** expected result
-\`\`\`
-
-## Directory Structure
-\`\`\`
-openspec/
-├── AGENTS.md       # This file
-├── project.md      # Project context
-├── specs/          # Current truth - what IS built
-└── changes/        # Proposals - what SHOULD change
-    └── archive/    # Completed changes
-\`\`\`
-
-## Best Practices
-- Default to simple solutions (<100 lines)
-- One capability per spec
-- Always validate before implementing
-- Archive changes after deployment
-`;
-
-    fs.writeFileSync(path.join(openspecDir, 'AGENTS.md'), agentsMd);
-    this.log('✓ Created AGENTS.md');
-
-    // Create project.md
-    const projectMd = `# Project Context
-
-## Purpose
-${projectName} - [Add project description here]
-
-## Tech Stack
-- [Add technologies]
-
-## Conventions
-- [Add coding conventions]
-
-## Constraints
-- [Add constraints]
-`;
-
-    fs.writeFileSync(path.join(openspecDir, 'project.md'), projectMd);
-    this.log('✓ Created project.md');
-
-    // Create .gitkeep in archive and specs
-    fs.writeFileSync(path.join(archiveDir, '.gitkeep'), '');
-    fs.writeFileSync(path.join(specsDir, '.gitkeep'), '');
-    this.log('✓ Created placeholder files');
   }
 
   private initGovernance(projectPath: string): void {
@@ -764,6 +819,27 @@ ${projectName} - [Add project description here]
       this.log('✓ Created .claude/scripts/ (helper scripts)');
     }
 
+    // Copy SidStack skills to .claude/skills/ (auto-trigger behaviors)
+    // Skills follow Claude Code format: skill-name/SKILL.md
+    const sidstackSkillsSource = resolveTemplatesDir(__dirname, 'skills/sidstack');
+    const targetSkillsDir = path.join(projectPath, '.claude/skills');
+    if (fs.existsSync(sidstackSkillsSource)) {
+      fs.mkdirSync(targetSkillsDir, { recursive: true });
+      const skillDirs = fs.readdirSync(sidstackSkillsSource, { withFileTypes: true });
+      let copiedCount = 0;
+      for (const entry of skillDirs) {
+        if (entry.isDirectory()) {
+          const skillSourceDir = path.join(sidstackSkillsSource, entry.name);
+          const skillTargetDir = path.join(targetSkillsDir, entry.name);
+          this.copyDirectorySync(skillSourceDir, skillTargetDir);
+          copiedCount++;
+        }
+      }
+      if (copiedCount > 0) {
+        this.log(`✓ Created .claude/skills/ (${copiedCount} auto-trigger skills)`);
+      }
+    }
+
     // Create or merge CLAUDE.md
     const claudeMdPath = path.join(projectPath, 'CLAUDE.md');
     const templateFile = path.join(templatesDir, 'CLAUDE.md.template');
@@ -797,6 +873,7 @@ ${projectName} - [Add project description here]
     this.log('Governance installed:');
     this.log('  Principles: task-management, code-quality, testing, security, collaboration, quality-gates');
     this.log('  Skills: implement (4), design (3), test (3), review (3), deploy (2), shared (2), knowledge (1)');
+    this.log('  Auto-skills: sidstack-aware, sidstack-knowledge-first, sidstack-impact-safe');
     this.log('  Workflows: new-feature');
     this.log('  Commands: /sidstack (hub), /sidstack:agent, /sidstack:knowledge');
     this.log('  Hooks: SessionStart, PreCompact, UserPromptSubmit, PreToolUse, PostToolUse');
@@ -816,6 +893,13 @@ ${projectName} - [Add project description here]
       path.join(projectPath, '.claude', 'scripts'),
     ];
 
+    // SidStack-managed skill folders only (preserve user's custom skills)
+    const managedSkillDirs = [
+      path.join(projectPath, '.claude', 'skills', 'sidstack-aware'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-knowledge-first'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-impact-safe'),
+    ];
+
     // Files managed by SidStack (hub command)
     const managedFiles = [
       path.join(projectPath, '.claude', 'commands', 'sidstack.md'),
@@ -824,6 +908,13 @@ ${projectName} - [Add project description here]
     for (const dir of managedDirs) {
       if (fs.existsSync(dir)) {
         fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    // Only remove SidStack-managed skills, preserve user's custom skills
+    for (const skillDir of managedSkillDirs) {
+      if (fs.existsSync(skillDir)) {
+        fs.rmSync(skillDir, { recursive: true, force: true });
       }
     }
 

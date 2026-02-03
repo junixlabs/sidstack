@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.3] - 2026-02-03
+
+### Changed
+- **Simplified Init Flow:** Streamlined from 5 questions to 2 setup modes
+  - Guided Setup (~10 min): Claude interviews you and generates comprehensive docs
+  - Custom Setup (~3 min): Quick install with optional preset and AI scan
+- **Removed OpenSpec from init:** OpenSpec is no longer installed by default
+- **Improved Tech Stack Detection:** Added PHP/Laravel, Ruby/Rails, Java/Spring, Go detection
+
+### Added
+- **Auto-Learning System:** New skills for lesson detection and training context injection
+  - `sidstack-lesson-detector`: Suggests creating lessons after debugging
+  - `sidstack-training-context`: Auto-injects training at task start
+- **Training Command:** `/sidstack:training` for managing incidents, lessons, skills, rules
+
+### Removed
+- OpenSpec installation from init wizard
+- "Components to install" checkbox
+- "Proceed?" confirmation step
+
 ## [0.4.2] - 2026-02-03
 
 ### Added

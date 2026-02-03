@@ -1,6 +1,6 @@
 {
   "name": "@sidstack/mcp-server",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "MCP Server for SidStack - task management, knowledge, and impact analysis for Claude Code",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

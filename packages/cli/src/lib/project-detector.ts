@@ -179,8 +179,27 @@ function detectTechStack(
     }
   } else if (detectedFiles.includes('go.mod')) {
     stack.language = 'Go';
+    // Detect Go framework
+    try {
+      const goMod = fs.readFileSync(path.join(projectPath, 'go.mod'), 'utf-8');
+      if (goMod.includes('github.com/gin-gonic/gin')) stack.framework = 'Gin';
+      else if (goMod.includes('github.com/labstack/echo')) stack.framework = 'Echo';
+      else if (goMod.includes('github.com/gofiber/fiber')) stack.framework = 'Fiber';
+    } catch {
+      // Ignore
+    }
   } else if (detectedFiles.includes('Cargo.toml')) {
     stack.language = 'Rust';
+    // Detect Rust framework
+    try {
+      const cargo = fs.readFileSync(path.join(projectPath, 'Cargo.toml'), 'utf-8');
+      if (cargo.includes('actix-web')) stack.framework = 'Actix';
+      else if (cargo.includes('axum')) stack.framework = 'Axum';
+      else if (cargo.includes('rocket')) stack.framework = 'Rocket';
+      else if (cargo.includes('tauri')) stack.framework = 'Tauri';
+    } catch {
+      // Ignore
+    }
   } else if (
     detectedFiles.includes('requirements.txt') ||
     detectedFiles.includes('pyproject.toml')
@@ -197,6 +216,61 @@ function detectTechStack(
         else if (content.includes('fastapi')) stack.framework = 'FastAPI';
         else if (content.includes('flask')) stack.framework = 'Flask';
       }
+    } catch {
+      // Ignore
+    }
+  } else if (detectedFiles.includes('composer.json')) {
+    // PHP detection
+    stack.language = 'PHP';
+    stack.packageManager = 'composer';
+
+    try {
+      const composer = JSON.parse(fs.readFileSync(path.join(projectPath, 'composer.json'), 'utf-8'));
+      const deps = { ...composer.require, ...composer['require-dev'] };
+
+      if (deps['laravel/framework']) stack.framework = 'Laravel';
+      else if (deps['symfony/symfony'] || deps['symfony/framework-bundle']) stack.framework = 'Symfony';
+      else if (deps['slim/slim']) stack.framework = 'Slim';
+      else if (deps['yiisoft/yii2']) stack.framework = 'Yii2';
+      else if (deps['cakephp/cakephp']) stack.framework = 'CakePHP';
+    } catch {
+      // Ignore
+    }
+  } else if (detectedFiles.includes('Gemfile')) {
+    // Ruby detection
+    stack.language = 'Ruby';
+    stack.packageManager = 'bundler';
+
+    try {
+      const gemfile = fs.readFileSync(path.join(projectPath, 'Gemfile'), 'utf-8');
+      if (gemfile.includes("'rails'") || gemfile.includes('"rails"')) stack.framework = 'Rails';
+      else if (gemfile.includes("'sinatra'")) stack.framework = 'Sinatra';
+      else if (gemfile.includes("'hanami'")) stack.framework = 'Hanami';
+    } catch {
+      // Ignore
+    }
+  } else if (detectedFiles.includes('pom.xml')) {
+    // Java Maven detection
+    stack.language = 'Java';
+    stack.packageManager = 'maven';
+
+    try {
+      const pom = fs.readFileSync(path.join(projectPath, 'pom.xml'), 'utf-8');
+      if (pom.includes('spring-boot')) stack.framework = 'Spring Boot';
+      else if (pom.includes('quarkus')) stack.framework = 'Quarkus';
+      else if (pom.includes('micronaut')) stack.framework = 'Micronaut';
+    } catch {
+      // Ignore
+    }
+  } else if (detectedFiles.includes('build.gradle')) {
+    // Java/Kotlin Gradle detection
+    stack.language = 'Java/Kotlin';
+    stack.packageManager = 'gradle';
+
+    try {
+      const gradle = fs.readFileSync(path.join(projectPath, 'build.gradle'), 'utf-8');
+      if (gradle.includes('spring-boot')) stack.framework = 'Spring Boot';
+      else if (gradle.includes('android')) stack.framework = 'Android';
     } catch {
       // Ignore
     }

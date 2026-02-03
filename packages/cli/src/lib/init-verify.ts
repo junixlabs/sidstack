@@ -87,17 +87,6 @@ function checkGovernance(projectPath: string): VerificationCheck {
   };
 }
 
-function checkOpenSpec(projectPath: string): VerificationCheck {
-  const agentsPath = path.join(projectPath, 'openspec', 'AGENTS.md');
-  const projectMdPath = path.join(projectPath, 'openspec', 'project.md');
-  const allGood = fs.existsSync(agentsPath) && fs.existsSync(projectMdPath);
-  return {
-    name: 'OpenSpec',
-    passed: allGood,
-    message: allGood ? 'OpenSpec' : 'OpenSpec — incomplete',
-  };
-}
-
 function checkGitignore(projectPath: string): VerificationCheck {
   const gitignorePath = path.join(projectPath, '.gitignore');
   if (!fs.existsSync(gitignorePath)) {
@@ -112,25 +101,15 @@ function checkGitignore(projectPath: string): VerificationCheck {
   };
 }
 
-export function verifyInit(
-  projectPath: string,
-  options: { governance: boolean; openspec: boolean }
-): VerificationResult {
+export function verifyInit(projectPath: string): VerificationResult {
   const checks: VerificationCheck[] = [
     checkJsonValid(path.join(projectPath, '.sidstack', 'config.json'), '.sidstack/config.json'),
     checkMcpConfig(projectPath),
     checkClaudeSettings(projectPath),
+    checkGovernance(projectPath),
+    checkFileExists(path.join(projectPath, 'CLAUDE.md'), 'CLAUDE.md'),
+    checkGitignore(projectPath),
   ];
-
-  if (options.governance) {
-    checks.push(checkGovernance(projectPath));
-  }
-  if (options.openspec) {
-    checks.push(checkOpenSpec(projectPath));
-  }
-
-  checks.push(checkFileExists(path.join(projectPath, 'CLAUDE.md'), 'CLAUDE.md'));
-  checks.push(checkGitignore(projectPath));
 
   return {
     checks,

@@ -141,7 +141,7 @@ export function validateTaskCompletion(
       message: `Insufficient progress updates: ${progressHistory.length}/${minUpdates} required for ${taskType}`,
       details: { current: progressHistory.length, required: minUpdates },
     });
-    hints.push(`Use task_progress_log to record progress at each major step`);
+    hints.push(`Use task_update with progress field to record progress at each major step`);
   }
 
   // Rule 2: Title Format Check

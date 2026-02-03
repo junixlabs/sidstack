@@ -274,23 +274,6 @@ Examples:
     },
   },
   {
-    name: 'task_progress_log',
-    description: 'Log progress for a task',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'string', description: 'Task ID' },
-        sessionId: { type: 'string', description: 'Session ID' },
-        progress: { type: 'number', minimum: 0, maximum: 100, description: 'Progress percentage' },
-        status: { type: 'string', enum: ['pending', 'in_progress', 'blocked', 'completed', 'failed'] },
-        currentStep: { type: 'string', description: 'Current step description' },
-        notes: { type: 'string', description: 'Notes' },
-        artifacts: { type: 'array', items: { type: 'string' }, description: 'List of artifact paths' },
-      },
-      required: ['taskId', 'sessionId', 'progress', 'status'],
-    },
-  },
-  {
     name: 'task_progress_history',
     description: 'Get progress history for a task',
     inputSchema: {
@@ -709,11 +692,9 @@ export async function handleSqliteTool(
     case 'task_update': {
       const taskId = args.taskId as string;
       const newStatus = args.status as string | undefined;
-      const updates: Record<string, unknown> = {};
-      if (newStatus) updates.status = newStatus;
-      if (args.progress !== undefined) updates.progress = args.progress;
-      if (args.notes) updates.notes = args.notes;
-      if (args.branch !== undefined) updates.branch = args.branch;
+      const newProgress = args.progress as number | undefined;
+      const notes = args.notes as string | undefined;
+      const branch = args.branch as string | undefined;
 
       // Validate subtasks when completing a task
       if (newStatus === 'completed') {
@@ -753,7 +734,52 @@ export async function handleSqliteTool(
         }
       }
 
-      const task = database.updateTask(taskId, updates);
+      // Auto-log to task_progress_log when progress changes
+      if (newProgress !== undefined) {
+        const currentTask = database.getTask(taskId);
+        if (!currentTask) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Task not found' }) }],
+          };
+        }
+
+        if (currentTask.progress !== newProgress) {
+          // logTaskProgress handles both the log entry AND updating the task's progress/status/notes
+          database.logTaskProgress({
+            taskId,
+            sessionId: 'direct',
+            progress: newProgress,
+            status: (newStatus || currentTask.status) as 'pending' | 'in_progress' | 'blocked' | 'completed' | 'failed',
+            notes: notes,
+            artifacts: '[]',
+          });
+
+          // Update branch separately if provided (logTaskProgress doesn't handle it)
+          if (branch !== undefined) {
+            database.updateTask(taskId, { branch });
+          }
+        } else {
+          // Progress didn't change — just do a normal update
+          const updates: Record<string, unknown> = {};
+          if (newStatus) updates.status = newStatus;
+          if (notes) updates.notes = notes;
+          if (branch !== undefined) updates.branch = branch;
+          if (Object.keys(updates).length > 0) {
+            database.updateTask(taskId, updates);
+          }
+        }
+      } else {
+        // No progress in this update — normal path
+        const updates: Record<string, unknown> = {};
+        if (newStatus) updates.status = newStatus;
+        if (notes) updates.notes = notes;
+        if (branch !== undefined) updates.branch = branch;
+        if (Object.keys(updates).length > 0) {
+          database.updateTask(taskId, updates);
+        }
+      }
+
+      const task = database.getTask(taskId);
       if (!task) {
         return {
           content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Task not found' }) }],
@@ -1134,21 +1160,6 @@ export async function handleSqliteTool(
       );
       return {
         content: [{ type: 'text', text: JSON.stringify({ success: true, entries, total }, null, 2) }],
-      };
-    }
-
-    case 'task_progress_log': {
-      const progressLog = database.logTaskProgress({
-        taskId: args.taskId as string,
-        sessionId: args.sessionId as string,
-        progress: args.progress as number,
-        status: args.status as 'pending' | 'in_progress' | 'blocked' | 'completed' | 'failed',
-        currentStep: args.currentStep as string | undefined,
-        notes: args.notes as string | undefined,
-        artifacts: JSON.stringify(args.artifacts || []),
-      });
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, progressLog }, null, 2) }],
       };
     }
 
