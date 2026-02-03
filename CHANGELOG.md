@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.4] - 2026-02-03
+
+### Fixed
+- **Skills Format:** Rewrote all SidStack skills to follow skill-creator standard
+  - Removed invalid `user-invocable` field from frontmatter
+  - Added clear trigger keywords in descriptions
+  - Trimmed verbose content for better Claude Code integration
+
 ## [0.4.3] - 2026-02-03
 
 ### Changed
