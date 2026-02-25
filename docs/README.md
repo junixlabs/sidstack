@@ -68,12 +68,14 @@ Welcome to SidStack's documentation. SidStack is an AI-Powered Project Intellige
 | Component | Technology |
 |-----------|------------|
 | Desktop App | Tauri 2.x (Rust + React) |
+| Web UI | React SPA (Vite + Caddy) |
 | CLI | Oclif (TypeScript) |
 | MCP Server | TypeScript (@modelcontextprotocol/sdk) |
 | API Server | Express.js |
-| Database | SQLite (embedded) |
+| Database | SQLite (better-sqlite3) |
 | State | Zustand (React) |
 | Styling | Tailwind CSS |
+| Deployment | Docker Compose + Caddy (auto TLS) |
 
 ---
 

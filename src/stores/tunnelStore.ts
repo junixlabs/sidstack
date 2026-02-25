@@ -5,8 +5,9 @@
  */
 
 import { create } from 'zustand';
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
 
-const API_BASE = 'http://localhost:19432/api/tunnel';
+const API_BASE = `${getApiBaseUrl()}/api/tunnel`;
 
 export type TunnelProvider = 'cloudflared' | 'ngrok';
 export type TunnelStatus = 'stopped' | 'starting' | 'running' | 'error';
@@ -44,7 +45,7 @@ const DEFAULT_INFO: TunnelInfo = {
   provider: null,
   status: 'stopped',
   publicUrl: null,
-  webhookUrl: 'http://localhost:19432/api/tickets',
+  webhookUrl: `${getApiBaseUrl()}/api/tickets`,
   error: null,
   startedAt: null,
 };
@@ -59,7 +60,7 @@ export const useTunnelStore = create<TunnelStore>((set, get) => ({
   // Fetch current tunnel status
   fetchStatus: async () => {
     try {
-      const res = await fetch(`${API_BASE}/status`);
+      const res = await apiFetch(`${API_BASE}/status`);
       const data = await res.json();
 
       if (data.success) {
@@ -82,7 +83,7 @@ export const useTunnelStore = create<TunnelStore>((set, get) => ({
   // Fetch available providers
   fetchProviders: async () => {
     try {
-      const res = await fetch(`${API_BASE}/providers`);
+      const res = await apiFetch(`${API_BASE}/providers`);
       const data = await res.json();
 
       if (data.success) {
@@ -101,7 +102,7 @@ export const useTunnelStore = create<TunnelStore>((set, get) => ({
     set({ isLoading: true });
 
     try {
-      const res = await fetch(`${API_BASE}/start`, {
+      const res = await apiFetch(`${API_BASE}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider }),
@@ -140,7 +141,7 @@ export const useTunnelStore = create<TunnelStore>((set, get) => ({
     set({ isLoading: true });
 
     try {
-      const res = await fetch(`${API_BASE}/stop`, {
+      const res = await apiFetch(`${API_BASE}/stop`, {
         method: 'POST',
       });
       const data = await res.json();

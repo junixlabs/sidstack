@@ -12,17 +12,16 @@ import { useTaskStore } from "@/stores/taskStore";
 interface UseTasksOptions {
   projectId?: string;
   autoFetch?: boolean;
-  refreshInterval?: number; // ms, 0 to disable
 }
 
 /**
- * Hook for accessing tasks in a view-only manner
+ * Hook for accessing tasks in a view-only manner.
+ * Note: Views should use useAutoRefresh for polling — this hook no longer polls.
  */
 export function useTasks(options: UseTasksOptions = {}) {
   const {
     projectId = "default",
     autoFetch = true,
-    refreshInterval = 30000, // 30 seconds default
   } = options;
 
   const {
@@ -60,17 +59,6 @@ export function useTasks(options: UseTasksOptions = {}) {
       fetchTasks(projectId);
     }
   }, [autoFetch, projectId, fetchTasks]);
-
-  // Auto-refresh
-  useEffect(() => {
-    if (refreshInterval <= 0) return;
-
-    const interval = setInterval(() => {
-      fetchTasks(projectId);
-    }, refreshInterval);
-
-    return () => clearInterval(interval);
-  }, [refreshInterval, projectId, fetchTasks]);
 
   // Get selected task
   const selectedTask = selectedTaskId

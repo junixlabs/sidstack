@@ -126,3 +126,6 @@ packages/cli/templates/skills/core/progress-reporting.md
 
 # API server data (session artifacts)
 packages/api-server/data/
+
+# Agent Desk worktrees
+desks/

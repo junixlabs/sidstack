@@ -1,8 +1,8 @@
 /**
  * Impact Analysis MCP Tool Handlers
  *
- * Direct integration with shared impact modules and SQLite.
- * No api-server dependency required.
+ * Thin wrappers that delegate to the SidStack API server via HTTP.
+ * All analysis logic (parse, scope, risks, validations, gate) runs server-side.
  *
  * Tools:
  * - impact_analyze: Run impact analysis on a change
@@ -14,27 +14,9 @@
  */
 
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
-import {
-  getDB,
-  changeParser,
-  scopeDetector,
-  riskAssessor,
-  validationGenerator,
-  impactDataFlowAnalyzer,
-  gateController,
-  type ChangeInput,
-  type ImpactAnalysis,
-  type IdentifiedRisk,
-  type ValidationItem,
-  type ValidationCategory,
-  type ValidationStatus,
-  type ImpactDataFlow,
-  type ScopedModule,
-  type ScopedFile,
-  type GateBlocker,
-  type GateWarning,
-  type ParsedOperation,
-} from '@sidstack/shared';
+import { createApiClient, ApiClientError } from '@sidstack/shared';
+
+const apiClient = createApiClient();
 
 // =============================================================================
 // Tool Definitions
@@ -202,116 +184,6 @@ export const impactTools: Tool[] = [
 ];
 
 // =============================================================================
-// Database Helpers
-// =============================================================================
-
-interface DbValidation {
-  id: string;
-  analysisId: string;
-  title: string;
-  description?: string;
-  category: string;
-  status: string;
-  isBlocking: number;
-  autoVerifiable: number;
-  verifyCommand?: string;
-  expectedPattern?: string;
-  riskId?: string;
-  dataFlowId?: string;
-  moduleId?: string;
-  resultJson?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-function convertDbValidation(dbVal: DbValidation | null): ValidationItem | null {
-  if (!dbVal) return null;
-  return {
-    id: dbVal.id,
-    title: dbVal.title,
-    description: dbVal.description || '',
-    category: dbVal.category as ValidationCategory,
-    status: dbVal.status as ValidationStatus,
-    isBlocking: dbVal.isBlocking === 1,
-    autoVerifiable: dbVal.autoVerifiable === 1,
-    verifyCommand: dbVal.verifyCommand,
-    expectedPattern: dbVal.expectedPattern,
-    riskId: dbVal.riskId,
-    dataFlowId: dbVal.dataFlowId,
-    moduleId: dbVal.moduleId,
-  };
-}
-
-function convertDbValidations(dbVals: (DbValidation | null)[]): ValidationItem[] {
-  return dbVals
-    .map(convertDbValidation)
-    .filter((v): v is ValidationItem => v !== null);
-}
-
-function buildAnalysisFromRecord(
-  record: {
-    id: string;
-    projectId: string;
-    taskId?: string;
-    specId?: string;
-    changeType?: string;
-    status: string;
-    inputJson: string;
-    parsedJson?: string;
-    scopeJson?: string;
-    dataFlowsJson?: string;
-    risksJson?: string;
-    validationsJson?: string;
-    gateJson?: string;
-    error?: string;
-    createdAt: number;
-    updatedAt: number;
-  },
-  validations: ValidationItem[]
-): ImpactAnalysis {
-  const input = JSON.parse(record.inputJson) as ChangeInput;
-  const parsed = record.parsedJson ? JSON.parse(record.parsedJson) : null;
-  const scope = record.scopeJson ? JSON.parse(record.scopeJson) : null;
-  const dataFlows = record.dataFlowsJson ? JSON.parse(record.dataFlowsJson) : [];
-  const risks = record.risksJson ? JSON.parse(record.risksJson) : [];
-  const gate = record.gateJson ? JSON.parse(record.gateJson) : {
-    status: 'clear',
-    blockers: [],
-    warnings: [],
-    evaluatedAt: Date.now(),
-  };
-
-  return {
-    id: record.id,
-    projectId: record.projectId,
-    input,
-    status: record.status as ImpactAnalysis['status'],
-    parsed: parsed || {
-      entities: [],
-      operations: [],
-      keywords: [],
-      changeType: input.changeType || 'feature',
-      confidence: 0,
-    },
-    scope: scope || {
-      primaryModules: [],
-      primaryFiles: [],
-      dependentModules: [],
-      affectedFiles: [],
-      affectedEntities: [],
-      expansionDepth: 0,
-    },
-    dataFlows,
-    risks,
-    validations,
-    gate,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
-    error: record.error,
-  };
-}
-
-// =============================================================================
 // Result Helpers
 // =============================================================================
 
@@ -325,13 +197,20 @@ function errorResult(error: string): ToolResult {
   return { content: [{ type: 'text', text: `Error: ${error}` }] };
 }
 
+function apiErrorMessage(error: unknown): string {
+  if (error instanceof ApiClientError) {
+    return error.message;
+  }
+  return error instanceof Error ? error.message : 'Unknown error';
+}
+
 // =============================================================================
-// Tool Handlers - Direct SQLite + Shared Modules
+// Tool Handlers - API Client Wrappers
 // =============================================================================
 
 /**
  * Handle impact_analyze tool
- * Runs the full analysis pipeline: parse → scope → flows → risks → validations → gate
+ * Delegates full analysis pipeline to the API server.
  */
 export async function handleImpactAnalyze(args: Record<string, unknown>): Promise<ToolResult> {
   const {
@@ -357,111 +236,24 @@ export async function handleImpactAnalyze(args: Record<string, unknown>): Promis
   }
 
   try {
-    const db = await getDB();
-    const input: ChangeInput = {
+    const result = await apiClient.impact.analyze({
       description,
       projectId: projectId || 'default',
       taskId,
       specId,
-      changeType: changeType as ChangeInput['changeType'],
+      changeType,
       targetFiles,
       targetModules,
-    };
-
-    // Create initial analysis record
-    const { id } = db.createImpactAnalysis({
-      projectId: input.projectId || 'default',
-      taskId: input.taskId,
-      specId: input.specId,
-      changeType: input.changeType || 'feature',
-      inputJson: JSON.stringify(input),
     });
 
-    let stage = 'init';
-    try {
-      // Step 1: Parse the change
-      stage = 'parse';
-      const parsed = changeParser.parse(input);
-
-      // Step 2: Detect scope
-      stage = 'scope';
-      const scope = scopeDetector.detect(input, parsed);
-
-      // Step 3: Analyze data flows
-      stage = 'data-flows';
-      const mockDataFlows: ImpactDataFlow[] = [];
-      const impactFlows = impactDataFlowAnalyzer.analyzeForImpact(
-        mockDataFlows.map(f => ({
-          from: f.from,
-          to: f.to,
-          entities: f.entities,
-          flowType: f.flowType,
-          strength: f.strength,
-          relationships: f.relationships,
-        })),
-        scope,
-        parsed
-      );
-
-      // Step 4: Assess risks
-      stage = 'risks';
-      const risks = riskAssessor.assess(input, parsed, scope, impactFlows);
-
-      // Step 5: Generate validations
-      stage = 'validations';
-      const validationItems = validationGenerator.generate(scope, impactFlows, risks);
-
-      // Step 6: Evaluate gate
-      stage = 'gate';
-      const gate = gateController.evaluate(risks, validationItems);
-
-      // Update analysis with results
-      db.updateImpactAnalysis(id, {
-        status: 'completed',
-        parsedJson: JSON.stringify(parsed),
-        scopeJson: JSON.stringify(scope),
-        dataFlowsJson: JSON.stringify(impactFlows),
-        risksJson: JSON.stringify(risks),
-        gateJson: JSON.stringify(gate),
-      });
-
-      // Create validation records
-      for (const validation of validationItems) {
-        db.createImpactValidation({
-          analysisId: id,
-          title: validation.title,
-          description: validation.description,
-          category: validation.category,
-          isBlocking: validation.isBlocking,
-          autoVerifiable: validation.autoVerifiable,
-          verifyCommand: validation.verifyCommand,
-          expectedPattern: validation.expectedPattern,
-          riskId: validation.riskId,
-          dataFlowId: validation.dataFlowId,
-          moduleId: validation.moduleId,
-        });
-      }
-
-      // Build and return analysis summary
-      const record = db.getImpactAnalysis(id);
-      if (!record) {
-        return errorResult('Failed to retrieve analysis after creation');
-      }
-
-      const validations = db.getImpactValidations(id);
-      const analysis = buildAnalysisFromRecord(record, convertDbValidations(validations as DbValidation[]));
-
-      return textResult(formatAnalysisSummary(analysis));
-    } catch (analyzeError) {
-      const errMsg = analyzeError instanceof Error ? analyzeError.message : String(analyzeError);
-      db.updateImpactAnalysis(id, {
-        status: 'failed',
-        error: `[${stage}] ${errMsg}`,
-      });
-      return errorResult(`Analysis failed at stage '${stage}': ${errMsg} (ID: ${id})`);
+    const analysis = result.analysis;
+    if (!analysis) {
+      return errorResult('API returned no analysis');
     }
+
+    return textResult(formatAnalysisSummary(analysis));
   } catch (error) {
-    return errorResult(`Failed to run analysis: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return errorResult(`Failed to run analysis: ${apiErrorMessage(error)}`);
   }
 }
 
@@ -476,17 +268,16 @@ export async function handleImpactCheckGate(args: Record<string, unknown>): Prom
   };
 
   try {
-    const db = await getDB();
     let id = analysisId;
 
-    // Find analysis by taskId or specId if not provided
+    // Resolve analysisId from taskId or specId
     if (!id) {
       if (taskId) {
-        const record = db.getImpactAnalysisByTask(taskId);
-        id = record?.id;
+        const result = await apiClient.impact.getByTask(taskId);
+        id = result.analysis?.id;
       } else if (specId) {
-        const record = db.getImpactAnalysisBySpec(specId);
-        id = record?.id;
+        const result = await apiClient.impact.getBySpec(specId);
+        id = result.analysis?.id;
       } else {
         return errorResult('Must provide analysisId, taskId, or specId');
       }
@@ -496,21 +287,26 @@ export async function handleImpactCheckGate(args: Record<string, unknown>): Prom
       return errorResult('No analysis found');
     }
 
-    const analysis = db.getImpactAnalysis(id);
-    if (!analysis) {
-      return errorResult('Analysis not found');
-    }
-
-    const gate = analysis.gateJson ? JSON.parse(analysis.gateJson) : {
+    const result = await apiClient.impact.getGate(id);
+    const gate = result.gate || {
       status: 'clear',
       blockers: [],
       warnings: [],
       evaluatedAt: Date.now(),
     };
 
-    // Get scope info for richer context
-    const scope = analysis.scopeJson ? JSON.parse(analysis.scopeJson) : null;
-    const risks: IdentifiedRisk[] = analysis.risksJson ? JSON.parse(analysis.risksJson) : [];
+    // Fetch full analysis for scope/risk context
+    let scope: any = null;
+    let risks: any[] = [];
+    try {
+      const analysisResult = await apiClient.impact.get(id);
+      if (analysisResult.analysis) {
+        scope = analysisResult.analysis.scope;
+        risks = analysisResult.analysis.risks || [];
+      }
+    } catch {
+      // Non-critical: gate info is sufficient
+    }
 
     const statusIcon = {
       blocked: '⛔',
@@ -527,9 +323,8 @@ export async function handleImpactCheckGate(args: Record<string, unknown>): Prom
     if (gate.blockers && gate.blockers.length > 0) {
       text += `Blockers (${gate.blockers.length}):\n`;
       for (const blocker of gate.blockers) {
-        // Find matching risk for extra context
         const matchingRisk = blocker.type === 'risk'
-          ? risks.find((r: IdentifiedRisk) => blocker.description.includes(r.name))
+          ? risks.find((r: any) => blocker.description.includes(r.name))
           : null;
         text += `  - ${blocker.description}\n`;
         if (matchingRisk?.affectedAreas && matchingRisk.affectedAreas.length > 0) {
@@ -559,7 +354,7 @@ export async function handleImpactCheckGate(args: Record<string, unknown>): Prom
 
     return textResult(text);
   } catch (error) {
-    return errorResult(`Failed to check gate: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return errorResult(`Failed to check gate: ${apiErrorMessage(error)}`);
   }
 }
 
@@ -577,67 +372,54 @@ export async function handleImpactRunValidation(args: Record<string, unknown>): 
   }
 
   try {
-    const db = await getDB();
-    const validation = db.getImpactValidation(validationId);
-    if (!validation) {
-      return errorResult('Validation not found');
-    }
-
-    if (!validation.autoVerifiable || !validation.verifyCommand) {
-      return errorResult('Validation is not auto-verifiable');
-    }
-
-    // Execute the command
-    const { exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify(exec);
-
-    const startTime = Date.now();
-    let output: string;
-    let passed: boolean;
-
-    try {
-      const result = await execAsync(validation.verifyCommand, {
-        cwd: process.cwd(),
-        timeout: 60000,
-      });
-      output = result.stdout + (result.stderr || '');
-
-      if (validation.expectedPattern) {
-        const pattern = new RegExp(validation.expectedPattern, 'i');
-        passed = pattern.test(output);
-      } else {
-        passed = true;
-      }
-    } catch (execError: unknown) {
-      const error = execError as { stdout?: string; stderr?: string; message?: string };
-      output = (error.stdout || '') + (error.stderr || error.message || '');
-      passed = false;
-    }
-
-    const duration = Date.now() - startTime;
-    const newStatus = passed ? 'passed' : 'failed';
-
-    // Update validation
-    db.updateImpactValidation(validationId, {
-      status: newStatus,
-      resultJson: JSON.stringify({ output, runAt: Date.now() }),
+    const result = await apiClient.impact.runValidation(analysisId, validationId, {
+      cwd: process.cwd(),
     });
 
-    // Re-evaluate gate
-    const analysis = db.getImpactAnalysis(analysisId);
-    if (analysis) {
-      const validations = convertDbValidations(db.getImpactValidations(analysisId) as DbValidation[]);
-      const risks = analysis.risksJson ? JSON.parse(analysis.risksJson) : [];
-      const existingGate = analysis.gateJson ? JSON.parse(analysis.gateJson) : undefined;
-      const newGate = gateController.evaluate(risks, validations, existingGate?.approval);
-      db.updateImpactAnalysis(analysisId, {
-        gateJson: JSON.stringify(newGate),
-      });
+    const passed = result.passed;
+    const output = result.output || '';
+    const duration = result.duration || 0;
+    const newStatus = result.status || (passed ? 'passed' : 'failed');
+
+    // Store validation failures in mem0 for future learning (fire-and-forget)
+    if (!passed) {
+      try {
+        const { getMem0ClientIfAvailable } = await import('./memory.js');
+        const mem0 = await getMem0ClientIfAvailable();
+        if (mem0) {
+          // Fetch analysis for context
+          let taskTitle = '';
+          let projectId = 'default';
+          try {
+            const analysisResult = await apiClient.impact.get(analysisId);
+            if (analysisResult.analysis) {
+              taskTitle = analysisResult.analysis.input?.description || '';
+              projectId = analysisResult.analysis.projectId || 'default';
+            }
+          } catch {
+            // Non-critical
+          }
+
+          const memContent = [
+            `Validation failed: ${result.validationId || validationId}`,
+            `Status: ${newStatus}`,
+            `Error: ${output.substring(0, 500)}`,
+            taskTitle ? `Task: ${taskTitle}` : '',
+          ].filter(Boolean).join('\n');
+
+          mem0.addSmart(memContent, projectId, {
+            sourceType: 'validation_failure',
+            validationId,
+            analysisId,
+          }).catch(() => {});
+        }
+      } catch {
+        // Non-blocking
+      }
     }
 
     const statusIcon = passed ? '✅' : '❌';
-    let text = `${statusIcon} Validation: ${validation.title}\n`;
+    let text = `${statusIcon} Validation: ${validationId}\n`;
     text += `Status: ${newStatus}\n`;
     text += `Duration: ${duration}ms\n\n`;
     if (output) {
@@ -646,7 +428,7 @@ export async function handleImpactRunValidation(args: Record<string, unknown>): 
 
     return textResult(text);
   } catch (error) {
-    return errorResult(`Failed to run validation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return errorResult(`Failed to run validation: ${apiErrorMessage(error)}`);
   }
 }
 
@@ -664,14 +446,21 @@ export async function handleImpactGetContext(args: Record<string, unknown>): Pro
   }
 
   try {
-    const db = await getDB();
-    const record = db.getImpactAnalysis(analysisId);
-    if (!record) {
+    // Fetch the analysis and its validations
+    const [analysisResult, validationsResult] = await Promise.all([
+      apiClient.impact.get(analysisId),
+      apiClient.impact.getValidations(analysisId),
+    ]);
+
+    const analysis = analysisResult.analysis;
+    if (!analysis) {
       return errorResult('Analysis not found');
     }
 
-    const validations = convertDbValidations(db.getImpactValidations(analysisId) as DbValidation[]);
-    const analysis = buildAnalysisFromRecord(record, validations);
+    // Merge validations from the validations endpoint if available
+    if (validationsResult.validations) {
+      analysis.validations = validationsResult.validations;
+    }
 
     if (format === 'summary') {
       return textResult(formatAnalysisSummary(analysis));
@@ -683,7 +472,7 @@ export async function handleImpactGetContext(args: Record<string, unknown>): Pro
 
     return textResult(generateClaudeContext(analysis));
   } catch (error) {
-    return errorResult(`Failed to get context: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return errorResult(`Failed to get context: ${apiErrorMessage(error)}`);
   }
 }
 
@@ -703,40 +492,16 @@ export async function handleImpactApproveGate(args: Record<string, unknown>): Pr
   }
 
   try {
-    const db = await getDB();
-    const analysis = db.getImpactAnalysis(analysisId);
-    if (!analysis) {
-      return errorResult('Analysis not found');
-    }
-
-    const currentGate = analysis.gateJson ? JSON.parse(analysis.gateJson) : {
-      status: 'blocked',
-      blockers: [],
-      warnings: [],
-      evaluatedAt: Date.now(),
-    };
-
-    const { gate: newGate } = gateController.approve(
-      { approver, reason, blockerIds: blockerIds || [] },
-      currentGate
-    );
-
-    // Save approval record
-    db.createGateApproval({
-      analysisId,
+    const result = await apiClient.impact.approveGate(analysisId, {
       approver,
       reason,
-      approvedBlockersJson: JSON.stringify(blockerIds || []),
+      blockerIds: blockerIds || [],
     });
 
-    // Update analysis
-    db.updateImpactAnalysis(analysisId, {
-      gateJson: JSON.stringify(newGate),
-    });
-
-    return textResult(`✅ Gate approved by ${approver}\n\nNew status: ${newGate.status}\nReason: ${reason}`);
+    const newGate = result.gate || {};
+    return textResult(`✅ Gate approved by ${approver}\n\nNew status: ${newGate.status || 'unknown'}\nReason: ${reason}`);
   } catch (error) {
-    return errorResult(`Failed to approve gate: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return errorResult(`Failed to approve gate: ${apiErrorMessage(error)}`);
   }
 }
 
@@ -753,28 +518,41 @@ export async function handleImpactList(args: Record<string, unknown>): Promise<T
   };
 
   try {
-    const db = await getDB();
-
-    type AnalysisRecord = ReturnType<typeof db.getImpactAnalysis>;
-    let records: (AnalysisRecord)[] = [];
+    let analyses: any[] = [];
 
     if (taskId) {
-      const record = db.getImpactAnalysisByTask(taskId);
-      if (record) records = [record];
+      try {
+        const result = await apiClient.impact.getByTask(taskId);
+        if (result.analysis) analyses = [result.analysis];
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 404) {
+          // No analysis found for task -- return empty
+        } else {
+          throw error;
+        }
+      }
     } else if (specId) {
-      const record = db.getImpactAnalysisBySpec(specId);
-      if (record) records = [record];
+      try {
+        const result = await apiClient.impact.getBySpec(specId);
+        if (result.analysis) analyses = [result.analysis];
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 404) {
+          // No analysis found for spec -- return empty
+        } else {
+          throw error;
+        }
+      }
     } else {
       const pid = projectId || 'default';
-      records = db.listImpactAnalyses(pid, { status, limit });
+      const result = await apiClient.impact.list(pid);
+      analyses = result.analyses || [];
     }
 
-    const analyses = records
-      .filter((r): r is NonNullable<typeof r> => r !== null)
-      .map(record => {
-        const validations = db.getImpactValidations(record.id);
-        return buildAnalysisFromRecord(record, convertDbValidations(validations as DbValidation[]));
-      });
+    // Client-side filtering for status and limit
+    if (status) {
+      analyses = analyses.filter((a: any) => a.status === status);
+    }
+    analyses = analyses.slice(0, limit);
 
     if (analyses.length === 0) {
       return textResult('No analyses found');
@@ -783,20 +561,21 @@ export async function handleImpactList(args: Record<string, unknown>): Promise<T
     let text = `Impact Analyses (${analyses.length}):\n\n`;
 
     for (const analysis of analyses) {
+      const gateStatus = analysis.gate?.status as string;
       const gateIcon = {
         blocked: '⛔',
         warning: '⚠️',
         clear: '✅',
-      }[analysis.gate?.status as string] || '❓';
+      }[gateStatus] || '❓';
 
-      text += `${gateIcon} ${analysis.id.slice(0, 8)}\n`;
-      text += `   ${analysis.input?.description?.slice(0, 50) || 'No description'}...\n`;
+      text += `${gateIcon} ${(analysis.id || '').slice(0, 8)}\n`;
+      text += `   ${(analysis.input?.description || 'No description').slice(0, 50)}...\n`;
       text += `   Status: ${analysis.status} | Risks: ${analysis.risks?.length || 0}\n\n`;
     }
 
     return textResult(text);
   } catch (error) {
-    return errorResult(`Failed to list analyses: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return errorResult(`Failed to list analyses: ${apiErrorMessage(error)}`);
   }
 }
 
@@ -804,7 +583,7 @@ export async function handleImpactList(args: Record<string, unknown>): Promise<T
 // Helper Functions
 // =============================================================================
 
-function formatAnalysisSummary(analysis: ImpactAnalysis): string {
+function formatAnalysisSummary(analysis: any): string {
   const lines: string[] = [];
 
   const gateStatus = analysis.gate?.status || 'unknown';
@@ -818,16 +597,16 @@ function formatAnalysisSummary(analysis: ImpactAnalysis): string {
   lines.push(`ID: ${analysis.id}`);
   lines.push('');
 
-  // Scope - show actual names
+  // Scope
   const modules = analysis.scope?.primaryModules || [];
   const files = analysis.scope?.primaryFiles || [];
-  const deps = (analysis.scope?.dependentModules || []) as ScopedModule[];
+  const deps = analysis.scope?.dependentModules || [];
   lines.push('Scope:');
   if (modules.length > 0) {
     lines.push(`  Modules: ${modules.join(', ')}`);
   }
   if (deps.length > 0) {
-    lines.push(`  Dependencies: ${deps.map(d => d.moduleName || d.moduleId).join(', ')}`);
+    lines.push(`  Dependencies: ${deps.map((d: any) => d.moduleName || d.moduleId).join(', ')}`);
   }
   if (files.length > 0) {
     const fileList = files.length <= 5
@@ -840,7 +619,7 @@ function formatAnalysisSummary(analysis: ImpactAnalysis): string {
   }
   lines.push('');
 
-  // Risks - show details
+  // Risks
   if (analysis.risks && analysis.risks.length > 0) {
     lines.push('Risks:');
     for (const r of analysis.risks) {
@@ -857,9 +636,9 @@ function formatAnalysisSummary(analysis: ImpactAnalysis): string {
   }
 
   // Gate blockers
-  if (analysis.gate?.blockers && (analysis.gate.blockers as GateBlocker[]).length > 0) {
+  if (analysis.gate?.blockers && analysis.gate.blockers.length > 0) {
     lines.push('Blockers:');
-    for (const b of analysis.gate.blockers as GateBlocker[]) {
+    for (const b of analysis.gate.blockers) {
       lines.push(`  - ${b.description}`);
       lines.push(`    Resolution: ${b.resolution}`);
     }
@@ -868,8 +647,8 @@ function formatAnalysisSummary(analysis: ImpactAnalysis): string {
 
   // Validations
   if (analysis.validations && analysis.validations.length > 0) {
-    const blocking = analysis.validations.filter(v => v.isBlocking && v.status === 'pending').length;
-    const passed = analysis.validations.filter(v => v.status === 'passed').length;
+    const blocking = analysis.validations.filter((v: any) => v.isBlocking && v.status === 'pending').length;
+    const passed = analysis.validations.filter((v: any) => v.status === 'passed').length;
     lines.push(`Validations: ${passed}/${analysis.validations.length} passed`);
     if (blocking > 0) {
       lines.push(`  ${blocking} blocking validation(s) pending`);
@@ -882,7 +661,7 @@ function formatAnalysisSummary(analysis: ImpactAnalysis): string {
   return lines.join('\n');
 }
 
-function generateClaudeContext(analysis: ImpactAnalysis): string {
+function generateClaudeContext(analysis: any): string {
   const lines: string[] = [];
 
   lines.push('# Impact Analysis Context');
@@ -891,10 +670,10 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
   lines.push(`> Analysis ID: ${analysis.id}`);
   lines.push('');
 
-  lines.push(`## Gate Status: ${analysis.gate.status.toUpperCase()}`);
+  lines.push(`## Gate Status: ${(analysis.gate?.status || 'unknown').toUpperCase()}`);
   lines.push('');
 
-  if (analysis.gate.status === 'blocked') {
+  if (analysis.gate?.status === 'blocked') {
     lines.push('**IMPLEMENTATION BLOCKED** - Resolve blockers before proceeding.');
     lines.push('');
   }
@@ -902,30 +681,34 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
   lines.push('## Scope');
   lines.push('');
   lines.push('### Primary Modules');
-  if (analysis.scope.primaryModules.length > 0) {
-    analysis.scope.primaryModules.forEach((m: string) => lines.push(`- ${m}`));
+  const primaryModules = analysis.scope?.primaryModules || [];
+  if (primaryModules.length > 0) {
+    primaryModules.forEach((m: string) => lines.push(`- ${m}`));
   } else {
     lines.push('- None identified');
   }
   lines.push('');
 
-  if (analysis.scope.dependentModules && analysis.scope.dependentModules.length > 0) {
+  const dependentModules = analysis.scope?.dependentModules || [];
+  if (dependentModules.length > 0) {
     lines.push('### Dependent Modules');
-    analysis.scope.dependentModules.forEach((m: ScopedModule) => {
+    dependentModules.forEach((m: any) => {
       lines.push(`- ${m.moduleName || m.moduleId} (${m.impactLevel}): ${m.reason}`);
     });
     lines.push('');
   }
 
-  if (analysis.scope.primaryFiles && analysis.scope.primaryFiles.length > 0) {
+  const primaryFiles = analysis.scope?.primaryFiles || [];
+  if (primaryFiles.length > 0) {
     lines.push('### Files in Scope');
-    analysis.scope.primaryFiles.forEach((f: string) => lines.push(`- ${f}`));
+    primaryFiles.forEach((f: string) => lines.push(`- ${f}`));
     lines.push('');
   }
 
   lines.push('### Affected Entities');
-  if (analysis.scope.affectedEntities.length > 0) {
-    analysis.scope.affectedEntities.forEach((e: string) => lines.push(`- ${e}`));
+  const affectedEntities = analysis.scope?.affectedEntities || [];
+  if (affectedEntities.length > 0) {
+    affectedEntities.forEach((e: string) => lines.push(`- ${e}`));
   } else {
     lines.push('- None identified');
   }
@@ -933,9 +716,10 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
 
   lines.push('## Risks to Watch');
   lines.push('');
-  const criticalRisks = analysis.risks.filter((r: IdentifiedRisk) => r.severity === 'critical' || r.severity === 'high');
+  const risks = analysis.risks || [];
+  const criticalRisks = risks.filter((r: any) => r.severity === 'critical' || r.severity === 'high');
   if (criticalRisks.length > 0) {
-    criticalRisks.forEach((r: IdentifiedRisk) => {
+    criticalRisks.forEach((r: any) => {
       lines.push(`### ${r.severity.toUpperCase()}: ${r.name}`);
       lines.push(r.description);
       lines.push(`**Mitigation:** ${r.mitigation}`);
@@ -948,9 +732,10 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
 
   lines.push('## Required Validations');
   lines.push('');
-  const blockingValidations = analysis.validations.filter((v: ValidationItem) => v.isBlocking);
+  const validations = analysis.validations || [];
+  const blockingValidations = validations.filter((v: any) => v.isBlocking);
   if (blockingValidations.length > 0) {
-    blockingValidations.forEach((v: ValidationItem) => {
+    blockingValidations.forEach((v: any) => {
       const status = v.status === 'passed' ? '[x]' : '[ ]';
       lines.push(`- ${status} ${v.title}`);
       if (v.verifyCommand) {
@@ -967,7 +752,7 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
   lines.push('1. **Check scope** - Only modify files within the identified scope');
   lines.push('2. **Test coverage** - Ensure all blocking validations can pass');
   lines.push('3. **Risk mitigation** - Follow mitigation strategies for identified risks');
-  if (analysis.gate.status === 'blocked') {
+  if (analysis.gate?.status === 'blocked') {
     lines.push('4. **BLOCKED** - Do not proceed until gate is cleared');
   }
   lines.push('');
@@ -975,7 +760,7 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
   return lines.join('\n');
 }
 
-function generateReport(analysis: ImpactAnalysis): string {
+function generateReport(analysis: any): string {
   const lines: string[] = [];
 
   lines.push('# Impact Analysis Report');
@@ -989,27 +774,30 @@ function generateReport(analysis: ImpactAnalysis): string {
 
   lines.push('## Change Description');
   lines.push('');
-  lines.push(analysis.input.description);
+  lines.push(analysis.input?.description || 'No description');
   lines.push('');
 
   lines.push('## Scope Analysis');
   lines.push('');
-  lines.push(`- Primary modules: ${analysis.scope.primaryModules.join(', ') || 'none'}`);
-  if (analysis.scope.dependentModules?.length > 0) {
-    lines.push(`- Dependent modules: ${(analysis.scope.dependentModules as ScopedModule[]).map(m => m.moduleName || m.moduleId).join(', ')}`);
+  lines.push(`- Primary modules: ${(analysis.scope?.primaryModules || []).join(', ') || 'none'}`);
+  const deps = analysis.scope?.dependentModules || [];
+  if (deps.length > 0) {
+    lines.push(`- Dependent modules: ${deps.map((m: any) => m.moduleName || m.moduleId).join(', ')}`);
   }
-  if (analysis.scope.primaryFiles?.length > 0) {
-    lines.push(`- Files: ${analysis.scope.primaryFiles.join(', ')}`);
+  const scopeFiles = analysis.scope?.primaryFiles || [];
+  if (scopeFiles.length > 0) {
+    lines.push(`- Files: ${scopeFiles.join(', ')}`);
   }
-  lines.push(`- Affected entities: ${analysis.scope.affectedEntities.join(', ') || 'none'}`);
+  lines.push(`- Affected entities: ${(analysis.scope?.affectedEntities || []).join(', ') || 'none'}`);
   lines.push('');
 
   lines.push('## Risk Assessment');
   lines.push('');
-  if (analysis.risks.length > 0) {
+  const risks = analysis.risks || [];
+  if (risks.length > 0) {
     lines.push('| Severity | Name | Blocking | Affects |');
     lines.push('|----------|------|----------|---------|');
-    analysis.risks.forEach((r: IdentifiedRisk) => {
+    risks.forEach((r: any) => {
       const affects = r.affectedAreas?.join(', ') || '-';
       lines.push(`| ${r.severity} | ${r.name} | ${r.isBlocking ? 'Yes' : 'No'} | ${affects} |`);
     });
@@ -1020,7 +808,8 @@ function generateReport(analysis: ImpactAnalysis): string {
 
   lines.push('## Validation Checklist');
   lines.push('');
-  analysis.validations.forEach((v: ValidationItem) => {
+  const validations = analysis.validations || [];
+  validations.forEach((v: any) => {
     const statusIcon = v.status === 'passed' ? '✅' : v.status === 'failed' ? '❌' : '⏳';
     const blockingTag = v.isBlocking ? ' [BLOCKING]' : '';
     lines.push(`- ${statusIcon} ${v.title}${blockingTag}`);
@@ -1029,11 +818,12 @@ function generateReport(analysis: ImpactAnalysis): string {
 
   lines.push('## Gate');
   lines.push('');
-  lines.push(`Status: ${analysis.gate.status.toUpperCase()}`);
-  if (analysis.gate.blockers.length > 0) {
+  lines.push(`Status: ${(analysis.gate?.status || 'unknown').toUpperCase()}`);
+  const blockers = analysis.gate?.blockers || [];
+  if (blockers.length > 0) {
     lines.push('');
     lines.push('Blockers:');
-    analysis.gate.blockers.forEach((b: GateBlocker) => {
+    blockers.forEach((b: any) => {
       lines.push(`- ${b.description} (Resolution: ${b.resolution})`);
     });
   }

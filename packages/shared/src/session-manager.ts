@@ -5,7 +5,7 @@
  * linking them to tasks/modules, and managing session lifecycle.
  */
 
-import type { TerminalApp, LaunchMode, WindowMode } from './external-session';
+import type { TerminalApp, LaunchMode, WindowMode } from './project-settings';
 
 // Re-export for convenience
 export type { TerminalApp, LaunchMode, WindowMode };

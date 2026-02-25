@@ -1,0 +1,19 @@
+# SidStack Reverse Proxy
+# Auto TLS via Let's Encrypt
+# Update domain names to match your deployment
+
+{$API_DOMAIN:api.sidstack.dev} {
+	reverse_proxy api-server:19432
+}
+
+{$MCP_DOMAIN:mcp.sidstack.dev} {
+	reverse_proxy mcp-server:19433
+}
+
+{$BOT_DOMAIN:bot.sidstack.dev} {
+	reverse_proxy bot-server:3222
+}
+
+{$APP_DOMAIN:app.sidstack.dev} {
+	reverse_proxy web-ui:5174
+}

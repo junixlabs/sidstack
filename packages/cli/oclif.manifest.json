@@ -1,0 +1,2228 @@
+{
+  "commands": {
+    "analyze": {
+      "aliases": [],
+      "args": {
+        "path": {
+          "description": "Project path (defaults to current directory)",
+          "name": "path",
+          "required": false
+        }
+      },
+      "description": "Prepare codebase analysis context for Claude Code CLI",
+      "examples": [
+        "<%= config.bin %> analyze",
+        "<%= config.bin %> analyze /path/to/project",
+        "<%= config.bin %> analyze --specs           # Generate .sidstack/ spec files",
+        "<%= config.bin %> analyze --specs --force   # Regenerate spec files",
+        "<%= config.bin %> analyze --validate        # Validate spec files",
+        "<%= config.bin %> analyze --list-files      # Show key files to read",
+        "<%= config.bin %> analyze --generate-prompt # Generate analysis prompt"
+      ],
+      "flags": {
+        "specs": {
+          "char": "s",
+          "description": "Generate .sidstack/ spec files (Markdown + Mermaid)",
+          "name": "specs",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "validate": {
+          "char": "v",
+          "description": "Validate existing .sidstack/ spec files",
+          "name": "validate",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "force": {
+          "char": "f",
+          "description": "Force regenerate spec files (use with --specs)",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "list-files": {
+          "char": "l",
+          "description": "List key files for Claude Code to read",
+          "name": "list-files",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "generate-prompt": {
+          "char": "p",
+          "description": "Generate analysis prompt with code samples",
+          "name": "generate-prompt",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "depth": {
+          "char": "d",
+          "description": "Analysis depth",
+          "name": "depth",
+          "default": "standard",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "quick",
+            "standard",
+            "deep"
+          ],
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "analyze",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "analyze.js"
+      ]
+    },
+    "doctor": {
+      "aliases": [],
+      "args": {},
+      "description": "Run health checks and diagnostics",
+      "examples": [
+        "<%= config.bin %> doctor"
+      ],
+      "flags": {},
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "doctor",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "doctor.js"
+      ]
+    },
+    "init": {
+      "aliases": [],
+      "args": {
+        "path": {
+          "description": "Project path (defaults to current directory)",
+          "name": "path",
+          "required": false
+        }
+      },
+      "description": "Initialize SidStack workspace",
+      "examples": [
+        "<%= config.bin %> init",
+        "<%= config.bin %> init /path/to/project",
+        "<%= config.bin %> init -n my-app --preset minimal",
+        "<%= config.bin %> init --scan",
+        "<%= config.bin %> init --with-agents",
+        "<%= config.bin %> init --json --force"
+      ],
+      "flags": {
+        "project-name": {
+          "char": "n",
+          "description": "Project name",
+          "name": "project-name",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "preset": {
+          "char": "p",
+          "description": "Use a preset configuration (minimal, fullstack-typescript, typescript-backend, python-data)",
+          "name": "preset",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "list-presets": {
+          "description": "List available presets and exit",
+          "name": "list-presets",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "force": {
+          "char": "f",
+          "description": "Force initialization (overwrite existing)",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "scan": {
+          "char": "s",
+          "description": "After init, scan codebase with AI to generate knowledge docs",
+          "name": "scan",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "with-agents": {
+          "description": "Copy SidStack Worker/Reviewer agents to project .claude/agents/",
+          "name": "with-agents",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "workspace": {
+          "char": "w",
+          "description": "Initialize as workspace with git bare repo structure (supports worktrees)",
+          "name": "workspace",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "init",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "init.js"
+      ]
+    },
+    "migrate": {
+      "aliases": [],
+      "args": {},
+      "description": "Migrate a legacy SidStack project to workspace structure with worktree support",
+      "examples": [
+        "<%= config.bin %> migrate",
+        "<%= config.bin %> migrate --dry-run",
+        "<%= config.bin %> migrate --no-backup",
+        "<%= config.bin %> migrate --rollback"
+      ],
+      "flags": {
+        "dry-run": {
+          "char": "d",
+          "description": "Show what would be done without making changes",
+          "name": "dry-run",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "no-backup": {
+          "description": "Skip creating backup before migration",
+          "name": "no-backup",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "rollback": {
+          "char": "r",
+          "description": "Rollback a previous migration using backup",
+          "name": "rollback",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "force": {
+          "char": "f",
+          "description": "Force migration even if already a workspace",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "migrate",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "migrate.js"
+      ]
+    },
+    "new": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Workspace name",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Create a new managed workspace with git bare repo structure",
+      "examples": [
+        "<%= config.bin %> new my-project",
+        "<%= config.bin %> new my-app --repo git@github.com:user/repo.git",
+        "<%= config.bin %> new my-project --local /path/to/project",
+        "<%= config.bin %> new my-project --json"
+      ],
+      "flags": {
+        "repo": {
+          "char": "r",
+          "description": "Git repository URL to clone",
+          "name": "repo",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "local": {
+          "char": "l",
+          "description": "Path to local repository to convert",
+          "name": "local",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "branch": {
+          "char": "b",
+          "description": "Default branch name (default: main)",
+          "name": "branch",
+          "default": "main",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "workspace-dir": {
+          "description": "Custom workspace directory (default: ~/.sidstack/workspaces/)",
+          "name": "workspace-dir",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "skip-worktree": {
+          "description": "Skip creating initial wt-1 worktree",
+          "name": "skip-worktree",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "new",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "new.js"
+      ]
+    },
+    "update": {
+      "aliases": [],
+      "args": {
+        "path": {
+          "description": "Project path (defaults to current directory)",
+          "name": "path",
+          "required": false
+        }
+      },
+      "description": "Update existing SidStack project to latest version",
+      "examples": [
+        "<%= config.bin %> update",
+        "<%= config.bin %> update /path/to/project",
+        "<%= config.bin %> update --governance",
+        "<%= config.bin %> update --governance-only"
+      ],
+      "flags": {
+        "governance": {
+          "char": "g",
+          "description": "Update governance files (if installed)",
+          "name": "governance",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "governance-only": {
+          "description": "Only update governance, skip other updates",
+          "name": "governance-only",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "force": {
+          "char": "f",
+          "description": "Force update even if versions match",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "update",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "update.js"
+      ]
+    },
+    "command:add": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Command name to add (omit if using --all-optional)",
+          "name": "name",
+          "required": false
+        }
+      },
+      "description": "Add a Claude Code command to project or user directory",
+      "examples": [
+        "<%= config.bin %> command add knowledge --global",
+        "<%= config.bin %> command add agent --force",
+        "<%= config.bin %> command add --all-optional"
+      ],
+      "flags": {
+        "global": {
+          "char": "g",
+          "description": "Add to user directory (~/.sidstack/commands/)",
+          "name": "global",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "force": {
+          "char": "f",
+          "description": "Overwrite if command already exists",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "all-optional": {
+          "description": "Add all optional commands from bundle",
+          "name": "all-optional",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "all-core": {
+          "description": "Add all core commands from bundle",
+          "name": "all-core",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "command:add",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "command",
+        "add.js"
+      ]
+    },
+    "command:list": {
+      "aliases": [],
+      "args": {},
+      "description": "List all available Claude Code commands",
+      "examples": [
+        "<%= config.bin %> command list",
+        "<%= config.bin %> command list --json",
+        "<%= config.bin %> command list --source bundle",
+        "<%= config.bin %> command list --category optional"
+      ],
+      "flags": {
+        "json": {
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "source": {
+          "char": "s",
+          "description": "Filter by source (project, user, bundle)",
+          "name": "source",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "project",
+            "user",
+            "bundle"
+          ],
+          "type": "option"
+        },
+        "category": {
+          "char": "c",
+          "description": "Filter by category (core, optional)",
+          "name": "category",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "core",
+            "optional"
+          ],
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "command:list",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "command",
+        "list.js"
+      ]
+    },
+    "command:remove": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Command name to remove",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Remove a Claude Code command from project or user directory",
+      "examples": [
+        "<%= config.bin %> command remove knowledge",
+        "<%= config.bin %> command remove sidstack --global"
+      ],
+      "flags": {
+        "global": {
+          "char": "g",
+          "description": "Remove from user directory (~/.sidstack/commands/)",
+          "name": "global",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "command:remove",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "command",
+        "remove.js"
+      ]
+    },
+    "command:show": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Command name to show",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Show details of a Claude Code command",
+      "examples": [
+        "<%= config.bin %> command show knowledge",
+        "<%= config.bin %> command show agent --json"
+      ],
+      "flags": {
+        "json": {
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "content": {
+          "description": "Show full content of the command file",
+          "name": "content",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "command:show",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "command",
+        "show.js"
+      ]
+    },
+    "command:update": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Command name to update (omit to check all)",
+          "name": "name",
+          "required": false
+        }
+      },
+      "description": "Update Claude Code commands from bundle",
+      "examples": [
+        "<%= config.bin %> command update",
+        "<%= config.bin %> command update knowledge",
+        "<%= config.bin %> command update --check",
+        "<%= config.bin %> command update --all"
+      ],
+      "flags": {
+        "check": {
+          "description": "Only check for updates, do not apply",
+          "name": "check",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "all": {
+          "description": "Update all outdated commands",
+          "name": "all",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "force": {
+          "char": "f",
+          "description": "Force update even if version is same",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "command:update",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "command",
+        "update.js"
+      ]
+    },
+    "governance:check": {
+      "aliases": [],
+      "args": {
+        "scope": {
+          "default": "all",
+          "description": "What to check: all, principles, skills, agents, modules, or \"module <id>\"",
+          "name": "scope",
+          "required": false
+        },
+        "target": {
+          "description": "Target ID when scope is \"module\"",
+          "name": "target",
+          "required": false
+        }
+      },
+      "description": "Validate governance compliance (agent-friendly with exit codes)",
+      "examples": [
+        "<%= config.bin %> governance check",
+        "<%= config.bin %> governance check --json",
+        "<%= config.bin %> governance check principles",
+        "<%= config.bin %> governance check modules --strict",
+        "<%= config.bin %> governance check module terminal"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "strict": {
+          "description": "Treat warnings as errors",
+          "name": "strict",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output (VALID/INVALID only)",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "governance:check",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "governance",
+        "check.js"
+      ]
+    },
+    "governance:show": {
+      "aliases": [],
+      "args": {},
+      "description": "Show governance system overview (agent-friendly with JSON output)",
+      "examples": [
+        "<%= config.bin %> governance show",
+        "<%= config.bin %> governance show --json",
+        "<%= config.bin %> governance show --section principles",
+        "<%= config.bin %> governance show --quiet"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "section": {
+          "char": "s",
+          "description": "Show specific section only",
+          "name": "section",
+          "default": "all",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "principles",
+            "skills",
+            "agents",
+            "all"
+          ],
+          "type": "option"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output (counts only)",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "governance:show",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "governance",
+        "show.js"
+      ]
+    },
+    "skill:add": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Skill name to add",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Add a skill to project or user directory",
+      "examples": [
+        "<%= config.bin %> skill add implementation-analysis",
+        "<%= config.bin %> skill add code-review --global",
+        "<%= config.bin %> skill add research-first --force"
+      ],
+      "flags": {
+        "global": {
+          "char": "g",
+          "description": "Add to user directory (~/.sidstack/skills/)",
+          "name": "global",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "force": {
+          "char": "f",
+          "description": "Overwrite if skill already exists",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "skill:add",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "skill",
+        "add.js"
+      ]
+    },
+    "skill:create": {
+      "aliases": [],
+      "args": {},
+      "description": "Create a new custom skill",
+      "examples": [
+        "<%= config.bin %> skill create",
+        "<%= config.bin %> skill create --global",
+        "<%= config.bin %> skill create --name my-skill --description \"My custom skill\""
+      ],
+      "flags": {
+        "global": {
+          "char": "g",
+          "description": "Create in user directory (~/.sidstack/skills/)",
+          "name": "global",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "name": {
+          "char": "n",
+          "description": "Skill name",
+          "name": "name",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "description": {
+          "char": "d",
+          "description": "Skill description",
+          "name": "description",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "category": {
+          "char": "c",
+          "description": "Skill category (core, optional)",
+          "name": "category",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "core",
+            "optional"
+          ],
+          "type": "option"
+        },
+        "priority": {
+          "char": "p",
+          "description": "Skill priority (critical, high, medium, low)",
+          "name": "priority",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ],
+          "type": "option"
+        },
+        "body-file": {
+          "description": "Path to file containing skill body content",
+          "name": "body-file",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "skill:create",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "skill",
+        "create.js"
+      ]
+    },
+    "skill:eject": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Bundle skill name to eject",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Copy a bundle skill for customization",
+      "examples": [
+        "<%= config.bin %> skill eject implementation-analysis",
+        "<%= config.bin %> skill eject code-review --global",
+        "<%= config.bin %> skill eject research-first --as my-research"
+      ],
+      "flags": {
+        "global": {
+          "char": "g",
+          "description": "Eject to user directory (~/.sidstack/skills/)",
+          "name": "global",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "as": {
+          "description": "Rename the skill when ejecting",
+          "name": "as",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "force": {
+          "char": "f",
+          "description": "Overwrite if skill already exists",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "skill:eject",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "skill",
+        "eject.js"
+      ]
+    },
+    "skill:list": {
+      "aliases": [],
+      "args": {},
+      "description": "List all available skills",
+      "examples": [
+        "<%= config.bin %> skill list",
+        "<%= config.bin %> skill list --json",
+        "<%= config.bin %> skill list --source bundle",
+        "<%= config.bin %> skill list --category core"
+      ],
+      "flags": {
+        "json": {
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "source": {
+          "char": "s",
+          "description": "Filter by source (project, user, bundle)",
+          "name": "source",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "project",
+            "user",
+            "bundle"
+          ],
+          "type": "option"
+        },
+        "category": {
+          "char": "c",
+          "description": "Filter by category (core, optional)",
+          "name": "category",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "core",
+            "optional"
+          ],
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "skill:list",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "skill",
+        "list.js"
+      ]
+    },
+    "skill:remove": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Skill name to remove",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Remove a skill from project or user directory",
+      "examples": [
+        "<%= config.bin %> skill remove my-skill",
+        "<%= config.bin %> skill remove my-skill --global",
+        "<%= config.bin %> skill remove my-skill --force"
+      ],
+      "flags": {
+        "global": {
+          "char": "g",
+          "description": "Remove from user directory (~/.sidstack/skills/)",
+          "name": "global",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "force": {
+          "char": "f",
+          "description": "Skip confirmation prompt",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "skill:remove",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "skill",
+        "remove.js"
+      ]
+    },
+    "skill:show": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Skill name",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Show skill details and content",
+      "examples": [
+        "<%= config.bin %> skill show implementation-analysis",
+        "<%= config.bin %> skill show code-review --full",
+        "<%= config.bin %> skill show research-first --json"
+      ],
+      "flags": {
+        "full": {
+          "char": "f",
+          "description": "Show complete skill content",
+          "name": "full",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "json": {
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "skill:show",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "skill",
+        "show.js"
+      ]
+    },
+    "skill:update": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Skill name to update",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Update an existing skill metadata or content",
+      "examples": [
+        "<%= config.bin %> skill update my-skill --priority high",
+        "<%= config.bin %> skill update my-skill --edit",
+        "<%= config.bin %> skill update my-skill --body-file ./new-content.md"
+      ],
+      "flags": {
+        "priority": {
+          "char": "p",
+          "description": "Update skill priority",
+          "name": "priority",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ],
+          "type": "option"
+        },
+        "category": {
+          "char": "c",
+          "description": "Update skill category",
+          "name": "category",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "core",
+            "optional"
+          ],
+          "type": "option"
+        },
+        "description": {
+          "char": "d",
+          "description": "Update skill description",
+          "name": "description",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "body-file": {
+          "description": "Path to file containing new skill body content",
+          "name": "body-file",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "edit": {
+          "char": "e",
+          "description": "Open skill in $EDITOR for editing",
+          "name": "edit",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "skill:update",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "skill",
+        "update.js"
+      ]
+    },
+    "skill:validate": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Specific skill name to validate (validates all if omitted)",
+          "name": "name",
+          "required": false
+        }
+      },
+      "description": "Validate skill format and configuration",
+      "examples": [
+        "<%= config.bin %> skill validate",
+        "<%= config.bin %> skill validate my-skill",
+        "<%= config.bin %> skill validate --strict",
+        "<%= config.bin %> skill validate --json"
+      ],
+      "flags": {
+        "strict": {
+          "description": "Enable strict validation (additional checks)",
+          "name": "strict",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "json": {
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "skill:validate",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "skill",
+        "validate.js"
+      ]
+    },
+    "knowledge:create": {
+      "aliases": [],
+      "args": {
+        "output": {
+          "description": "Output file path (optional, derived from title if not provided)",
+          "name": "output",
+          "required": false
+        }
+      },
+      "description": "Create a new knowledge document from template",
+      "examples": [
+        "<%= config.bin %> knowledge create --type guide --title \"Getting Started\"",
+        "<%= config.bin %> knowledge create --type decision --title \"Adopt REST over GraphQL\"",
+        "<%= config.bin %> knowledge create --type spec --title \"User Auth Feature\" --module auth",
+        "<%= config.bin %> knowledge create  # Interactive mode",
+        "<%= config.bin %> knowledge create --type reference --title \"API Schema\" --json"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "type": {
+          "char": "t",
+          "description": "Template type (guide, spec, decision, reference, pattern)",
+          "name": "type",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "title": {
+          "description": "Document title",
+          "name": "title",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "module": {
+          "char": "m",
+          "description": "Module ID",
+          "name": "module",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "var": {
+          "description": "Template variable in key=value format",
+          "name": "var",
+          "hasDynamicHelp": false,
+          "multiple": true,
+          "type": "option"
+        },
+        "force": {
+          "char": "f",
+          "description": "Overwrite existing file",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "dry-run": {
+          "description": "Preview the generated content without writing",
+          "name": "dry-run",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "output-dir": {
+          "char": "o",
+          "description": "Output directory (default: .sidstack/knowledge/<type>/)",
+          "name": "output-dir",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "yes": {
+          "char": "y",
+          "description": "Skip confirmation prompts (non-interactive)",
+          "name": "yes",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "knowledge:create",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "knowledge",
+        "create.js"
+      ]
+    },
+    "knowledge:init": {
+      "aliases": [],
+      "args": {},
+      "description": "Initialize knowledge documentation folder",
+      "examples": [
+        "<%= config.bin %> knowledge init",
+        "<%= config.bin %> knowledge init --path ./custom-knowledge"
+      ],
+      "flags": {
+        "path": {
+          "char": "p",
+          "description": "Custom path for knowledge folder",
+          "name": "path",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "force": {
+          "char": "f",
+          "description": "Overwrite existing files",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "knowledge:init",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "knowledge",
+        "init.js"
+      ]
+    },
+    "knowledge:list": {
+      "aliases": [],
+      "args": {},
+      "description": "List knowledge documentation files",
+      "examples": [
+        "<%= config.bin %> knowledge list",
+        "<%= config.bin %> knowledge list --type guide",
+        "<%= config.bin %> knowledge list --module orders"
+      ],
+      "flags": {
+        "type": {
+          "char": "t",
+          "description": "Filter by type (guide, spec, decision, reference, pattern, etc.)",
+          "name": "type",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "module": {
+          "char": "m",
+          "description": "Filter by module",
+          "name": "module",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "status": {
+          "char": "s",
+          "description": "Filter by status (draft, implemented, deprecated, planned)",
+          "name": "status",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "json": {
+          "description": "Output as JSON",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "path": {
+          "char": "p",
+          "description": "Path to knowledge folder",
+          "name": "path",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "knowledge:list",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "knowledge",
+        "list.js"
+      ]
+    },
+    "knowledge:sync": {
+      "aliases": [],
+      "args": {},
+      "description": "Sync local knowledge files to remote API server",
+      "examples": [
+        "<%= config.bin %> knowledge sync",
+        "<%= config.bin %> knowledge sync --dry-run",
+        "<%= config.bin %> knowledge sync --api-url http://remote:19432",
+        "<%= config.bin %> knowledge sync --json"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "dry-run": {
+          "description": "Preview sync without making changes",
+          "name": "dry-run",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "api-url": {
+          "description": "API server URL (default: SIDSTACK_API_URL or http://localhost:19432)",
+          "name": "api-url",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "api-key": {
+          "description": "API key (default: SIDSTACK_API_KEY env var)",
+          "name": "api-key",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "path": {
+          "char": "p",
+          "description": "Path to knowledge folder",
+          "name": "path",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "knowledge:sync",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "knowledge",
+        "sync.js"
+      ]
+    },
+    "knowledge:templates": {
+      "aliases": [],
+      "args": {},
+      "description": "List available knowledge document templates",
+      "examples": [
+        "<%= config.bin %> knowledge templates",
+        "<%= config.bin %> knowledge templates --json",
+        "<%= config.bin %> knowledge templates --show guide"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output (names only)",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "show": {
+          "char": "s",
+          "description": "Show details for a specific template",
+          "name": "show",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "knowledge:templates",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "knowledge",
+        "templates.js"
+      ]
+    },
+    "knowledge:validate": {
+      "aliases": [],
+      "args": {},
+      "description": "Validate knowledge documentation files",
+      "examples": [
+        "<%= config.bin %> knowledge validate",
+        "<%= config.bin %> knowledge validate --fix",
+        "<%= config.bin %> knowledge validate --path ./custom-knowledge"
+      ],
+      "flags": {
+        "path": {
+          "char": "p",
+          "description": "Path to knowledge folder (default: .sidstack/knowledge)",
+          "name": "path",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "fix": {
+          "char": "f",
+          "description": "Automatically fix common issues",
+          "name": "fix",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "json": {
+          "description": "Output results as JSON",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "knowledge:validate",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "knowledge",
+        "validate.js"
+      ]
+    },
+    "preset:list": {
+      "aliases": [],
+      "args": {},
+      "description": "List available initialization presets",
+      "examples": [
+        "<%= config.bin %> preset list",
+        "<%= config.bin %> preset list --json",
+        "<%= config.bin %> preset list --language typescript"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "language": {
+          "char": "l",
+          "description": "Filter by language (typescript, python, go, any)",
+          "name": "language",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "type": {
+          "char": "t",
+          "description": "Filter by project type (fullstack, backend, general)",
+          "name": "type",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "preset:list",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "preset",
+        "list.js"
+      ]
+    },
+    "preset:show": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Preset name",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Show detailed information about a preset",
+      "examples": [
+        "<%= config.bin %> preset show minimal",
+        "<%= config.bin %> preset show fullstack-typescript --json",
+        "<%= config.bin %> preset show typescript-backend --section agents"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format (agent-friendly)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "quiet": {
+          "char": "q",
+          "description": "Minimal output",
+          "name": "quiet",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "section": {
+          "char": "s",
+          "description": "Show specific section (agents, skills, defaults, recommended)",
+          "name": "section",
+          "default": "all",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "agents",
+            "skills",
+            "defaults",
+            "recommended",
+            "all"
+          ],
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "preset:show",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "preset",
+        "show.js"
+      ]
+    },
+    "desk:acquire": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Desk name to acquire (auto-selects first idle worker if omitted)",
+          "name": "name",
+          "required": false
+        }
+      },
+      "description": "Acquire an idle desk for a task (create feature branch, mark working)",
+      "examples": [
+        "<%= config.bin %> desk acquire --task task-123 --branch feat/auth-module",
+        "<%= config.bin %> desk acquire desk-1 --task task-456 --branch fix/login-bug",
+        "<%= config.bin %> desk acquire --task task-789 --branch feat/api --json"
+      ],
+      "flags": {
+        "task": {
+          "char": "t",
+          "description": "Task ID to assign to the desk",
+          "name": "task",
+          "required": true,
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "branch": {
+          "char": "b",
+          "description": "Branch name to create (e.g., \"feat/auth-module\")",
+          "name": "branch",
+          "required": true,
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "desk:acquire",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "desk",
+        "acquire.js"
+      ]
+    },
+    "desk:add": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Agent desk name (e.g., worker-1, reviewer-1)",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Add a new agent desk to the workspace",
+      "examples": [
+        "<%= config.bin %> desk add worker-1",
+        "<%= config.bin %> desk add worker-2 -b feature/auth",
+        "<%= config.bin %> desk add reviewer-1 --branch main",
+        "<%= config.bin %> desk add worker-3 --json"
+      ],
+      "flags": {
+        "branch": {
+          "char": "b",
+          "description": "Git branch to checkout (creates new if not exists)",
+          "name": "branch",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "from-branch": {
+          "description": "Create new branch from this branch (default: current branch)",
+          "name": "from-branch",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "force": {
+          "char": "f",
+          "description": "Force creation even if desk exists",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "role": {
+          "char": "r",
+          "description": "Agent role (worker or reviewer)",
+          "name": "role",
+          "default": "worker",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "options": [
+            "worker",
+            "reviewer"
+          ],
+          "type": "option"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "desk:add",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "desk",
+        "add.js"
+      ]
+    },
+    "desk:init": {
+      "aliases": [],
+      "args": {},
+      "description": "Initialize a desk pool for the workspace",
+      "examples": [
+        "<%= config.bin %> desk init --pool 3",
+        "<%= config.bin %> desk init --pool 4 --workers 3 --reviewers 1",
+        "<%= config.bin %> desk init --pool 2 --bootstrap \"npm install\"",
+        "<%= config.bin %> desk init --pool 3 --json"
+      ],
+      "flags": {
+        "pool": {
+          "char": "p",
+          "description": "Number of desks to create (1-10)",
+          "name": "pool",
+          "required": true,
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "workers": {
+          "char": "w",
+          "description": "Number of worker desks (default: pool - 1)",
+          "name": "workers",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "reviewers": {
+          "char": "r",
+          "description": "Number of reviewer desks (default: 1)",
+          "name": "reviewers",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "bootstrap": {
+          "description": "Bootstrap command to run in each desk (e.g., \"pnpm install\")",
+          "name": "bootstrap",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "run-bootstrap": {
+          "description": "Run bootstrap command after creating desks",
+          "name": "run-bootstrap",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "desk:init",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "desk",
+        "init.js"
+      ]
+    },
+    "desk:list": {
+      "aliases": [],
+      "args": {},
+      "description": "List all agent desks in the workspace",
+      "examples": [
+        "<%= config.bin %> desk list",
+        "<%= config.bin %> desk list --json",
+        "<%= config.bin %> desk list --verbose"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "verbose": {
+          "char": "v",
+          "description": "Show detailed information including git status",
+          "name": "verbose",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "desk:list",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "desk",
+        "list.js"
+      ]
+    },
+    "desk:release": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Desk name to release",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Release a desk after task completion (reset to main, clear task)",
+      "examples": [
+        "<%= config.bin %> desk release desk-1",
+        "<%= config.bin %> desk release desk-2 --force",
+        "<%= config.bin %> desk release desk-1 --json"
+      ],
+      "flags": {
+        "force": {
+          "char": "f",
+          "description": "Force release even with uncommitted changes",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "delete-branch": {
+          "description": "Delete the feature branch after release (default: true)",
+          "name": "delete-branch",
+          "allowNo": true,
+          "type": "boolean"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "desk:release",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "desk",
+        "release.js"
+      ]
+    },
+    "desk:remove": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Agent desk name to remove",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Remove an agent desk from the workspace",
+      "examples": [
+        "<%= config.bin %> desk remove worker-1",
+        "<%= config.bin %> desk remove worker-2 --force",
+        "<%= config.bin %> desk remove worker-3 --json"
+      ],
+      "flags": {
+        "force": {
+          "char": "f",
+          "description": "Force removal even if desk has uncommitted changes",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "keep-branch": {
+          "description": "Keep the git branch after removing desk",
+          "name": "keep-branch",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "desk:remove",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "desk",
+        "remove.js"
+      ]
+    },
+    "worktree:add": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Worktree slot name (e.g., wt-1, wt-2)",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Add a new worktree slot to the workspace",
+      "examples": [
+        "<%= config.bin %> worktree add wt-1",
+        "<%= config.bin %> worktree add wt-2 -b feature/auth",
+        "<%= config.bin %> worktree add dev --branch main",
+        "<%= config.bin %> worktree add wt-3 --json"
+      ],
+      "flags": {
+        "branch": {
+          "char": "b",
+          "description": "Git branch to checkout (creates new if not exists)",
+          "name": "branch",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "from-branch": {
+          "description": "Create new branch from this branch (default: current branch)",
+          "name": "from-branch",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "force": {
+          "char": "f",
+          "description": "Force creation even if worktree exists",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "worktree:add",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "worktree",
+        "add.js"
+      ]
+    },
+    "worktree:list": {
+      "aliases": [],
+      "args": {},
+      "description": "List all worktrees in the workspace",
+      "examples": [
+        "<%= config.bin %> worktree list",
+        "<%= config.bin %> worktree list --json",
+        "<%= config.bin %> worktree list --verbose"
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "verbose": {
+          "char": "v",
+          "description": "Show detailed information including git status",
+          "name": "verbose",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "worktree:list",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "worktree",
+        "list.js"
+      ]
+    },
+    "worktree:remove": {
+      "aliases": [],
+      "args": {
+        "name": {
+          "description": "Worktree name to remove",
+          "name": "name",
+          "required": true
+        }
+      },
+      "description": "Remove a worktree from the workspace",
+      "examples": [
+        "<%= config.bin %> worktree remove wt-1",
+        "<%= config.bin %> worktree remove wt-2 --force",
+        "<%= config.bin %> worktree remove wt-3 --json"
+      ],
+      "flags": {
+        "force": {
+          "char": "f",
+          "description": "Force removal even if worktree has uncommitted changes",
+          "name": "force",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "json": {
+          "char": "j",
+          "description": "Output in JSON format",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "keep-branch": {
+          "description": "Keep the git branch after removing worktree",
+          "name": "keep-branch",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "worktree:remove",
+      "pluginAlias": "@sidstack/cli",
+      "pluginName": "@sidstack/cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "worktree",
+        "remove.js"
+      ]
+    }
+  },
+  "version": "0.5.0"
+}

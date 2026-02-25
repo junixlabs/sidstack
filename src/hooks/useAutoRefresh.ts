@@ -50,11 +50,28 @@ export function useAutoRefresh({
   const interval = intervalOverride ?? settings.sync.autoRefreshIntervalSeconds;
   const shouldRefreshOnFocus = refreshOnFocus ?? settings.sync.syncOnWindowFocus;
 
-  // Memoized refresh function
+  // Use ref for onRefresh to avoid restarting intervals when callback changes
+  const onRefreshRef = useRef(onRefresh);
+  useEffect(() => {
+    onRefreshRef.current = onRefresh;
+  }, [onRefresh]);
+
+  // Stable refresh function — never changes, so intervals don't restart
   const refresh = useCallback(() => {
     lastRefreshRef.current = Date.now();
-    onRefresh();
-  }, [onRefresh]);
+    onRefreshRef.current();
+  }, []);
+
+  // Refresh immediately when enabled transitions from false → true (workspace activation).
+  // This ensures global stores (tasks, tickets, etc.) reload the correct project's data
+  // when switching between workspaces, since all views share a single store instance.
+  const prevEnabledRef = useRef(autoRefreshEnabled);
+  useEffect(() => {
+    if (autoRefreshEnabled && !prevEnabledRef.current) {
+      refresh();
+    }
+    prevEnabledRef.current = autoRefreshEnabled;
+  }, [autoRefreshEnabled, refresh]);
 
   // Set up interval
   useEffect(() => {
@@ -90,7 +107,8 @@ export function useAutoRefresh({
       }
       clearInterval(countdownInterval);
     };
-  }, [autoRefreshEnabled, interval, refresh, refreshOnMount]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh is stable (useCallback with [])
+  }, [autoRefreshEnabled, interval, refreshOnMount]);
 
   // Set up focus listener
   useEffect(() => {
@@ -110,6 +128,13 @@ export function useAutoRefresh({
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [autoRefreshEnabled, shouldRefreshOnFocus, refresh]);
+
+  // Listen for global ⌘R refresh event
+  useEffect(() => {
+    const handler = () => refresh();
+    window.addEventListener('sidstack:refresh', handler);
+    return () => window.removeEventListener('sidstack:refresh', handler);
+  }, [refresh]);
 
   return {
     isActive: autoRefreshEnabled,

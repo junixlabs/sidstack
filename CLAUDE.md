@@ -17,90 +17,27 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 <!-- OPENSPEC:END -->
 
-<!-- TASK-MANAGEMENT:START -->
-## MANDATORY: Task Management Protocol
+<!-- GOVERNANCE:START -->
+## Governance
+Task lifecycle, quality gates, lesson detection: managed by `sidstack-aware` skill. Use `/sidstack-dev` for structured workflows. SidStack MCP tasks (`mcp__sidstack__task_*`) for persistence; built-in tasks for session-local sub-steps only.
 
-**Only create tasks for explicit implementation/code change requests.**
-
-### When to CREATE a task
-- User requests a code change, feature, bugfix, refactor, or deployment
-
-### When NOT to create a task
-- Questions, discussions, research, planning, auditing without changes
-
-### CRITICAL: Analyze BEFORE creating a task
-1. **Understand** - Read the request, clarify if ambiguous
-2. **Analyze** - Explore code, identify root cause, understand scope
-3. **Plan** - Determine solution approach
-4. **Then create** - With substantive description reflecting analysis
-
-### Task creation requirements
-- **Title**: `[TYPE] clear imperative description`
-- **Description**: Problem statement, root cause, solution approach (min 20 chars)
-- **Acceptance criteria**: At least 1 specific, verifiable criterion
-
-### Workflow
-
-| Phase | Action | MCP Tool |
-|-------|--------|----------|
-| Before | Check existing tasks | `task_list` |
-| Before | Analyze the problem | (use Read, Grep, Explore) |
-| Before | Create task | `task_create` (projectId: `sidstack`) |
-| Start | Mark in_progress | `task_update` (status: `in_progress`) |
-| During | Update progress | `task_update` (progress: 0-100) |
-| Done | Mark completed | `task_update` (status: `completed`, progress: 100) |
-<!-- TASK-MANAGEMENT:END -->
-
-<!-- QUALITY-GATES:START -->
-## MANDATORY: Quality Gates Before Task Completion
-
-### Required Checklist
-- [ ] `pnpm typecheck` - no new errors
-- [ ] `pnpm build` - build succeeds
-- [ ] `cargo check` (if Rust changes) - compiles
-- [ ] Start the app and verify basic functionality
-<!-- QUALITY-GATES:END -->
-
-<!-- LESSON-DETECTION:START -->
-## PROACTIVE: Lesson Detection
-
-After fixing bugs or solving non-trivial problems, suggest creating a lesson.
-
-| Trigger | Action |
-|---------|--------|
-| Bug >30min to debug | Ask: "Create a lesson?" |
-| Reusable pattern | Ask: "Document as skill?" |
-| Preventable error | Ask: "Create a rule?" |
-
-Flow: `incident_create -> lesson_create -> skill_create -> rule_create`
-Rules: Ask first, be selective, use English.
-<!-- LESSON-DETECTION:END -->
+**Integrated workflow — always follow this pattern:**
+1. **Before work:** `knowledge_search` + `memory_search` → find context. `entity_link` → link relevant docs to task.
+2. **During work:** `entity_context` → get linked context. `task_update` → track progress.
+3. **After work:** `test_result_create` → persist test results. `memory_add` → store learnings. `task_complete` → finish.
+<!-- GOVERNANCE:END -->
 
 # SidStack - Claude Code Instructions
 
 ## Project Overview
-
 **SidStack** = AI-Powered Project Intelligence Platform
-
-Core mission:
-- **Knowledge System** with AI auto-bootstrap for persistent context
-- **Impact Analysis** for change risk assessment
-- **Task Management** with governance and quality gates
-- **Ticket Queue** for external issue intake
-- **Training Room** for lessons-learned capture
-
-**Path:** (project root)
+Core: Knowledge System, Impact Analysis, Task Management, Ticket Queue, Training Room.
 
 ## Technology Stack
+Tauri 2.x (Rust + React) desktop | TypeScript MCP server | Express.js API | SQLite (better-sqlite3) | Zustand | Tailwind CSS
 
-| Component | Technology |
-|-----------|------------|
-| Desktop App | Tauri 2.x (Rust + React) |
-| MCP Server | TypeScript (@modelcontextprotocol/sdk) |
-| API Server | Express.js |
-| Database | SQLite (better-sqlite3) |
-| State | Zustand (React) |
-| Styling | Tailwind CSS |
+## Database Architecture
+**GLOBAL only** — `~/.sidstack/sidstack.db` shared by all projects (`projectId` field). Project-local: `.sidstack/` (config, knowledge). **DO NOT** create per-project databases.
 
 ## Project Structure
 
@@ -115,7 +52,7 @@ sidstack/
 │   └── shared/            # Shared types + SQLite
 ├── openspec/              # Change proposals
 ├── docs/                  # Documentation
-└── .sidstack/             # Local data (SQLite, configs)
+└── .sidstack/             # Local data (configs, knowledge)
 ```
 
 ## Development Commands
@@ -130,129 +67,25 @@ pnpm test                 # Run tests
 pnpm typecheck            # Type checking
 ```
 
-## MCP Tools (MVP - 32 tools)
+## Architecture Reference
 
-### Knowledge (core value)
-| Tool | Purpose |
-|------|---------|
-| `knowledge_context` | Build context for Claude session |
-| `knowledge_search` | Search knowledge docs |
-| `knowledge_list` | List available docs |
-| `knowledge_get` | Get single document |
-| `knowledge_modules` | List modules with stats |
-
-### Tasks (workflow)
-| Tool | Purpose |
-|------|---------|
-| `task_create` | Create task with governance |
-| `task_update` | Update status/progress |
-| `task_list` | List tasks |
-| `task_get` | Get task details |
-| `task_complete` | Complete with quality gate check |
-
-### Impact (differentiator)
-| Tool | Purpose |
-|------|---------|
-| `impact_analyze` | Run impact analysis |
-| `impact_check_gate` | Check if safe to proceed |
-| `impact_list` | List analyses |
-
-### Tickets (intake)
-| Tool | Purpose |
-|------|---------|
-| `ticket_create` | Create ticket |
-| `ticket_list` | List/filter tickets |
-| `ticket_update` | Update status |
-| `ticket_convert_to_task` | Convert to task |
-
-### Training (learning)
-| Tool | Purpose |
-|------|---------|
-| `lesson_create` | Create lesson from incident |
-| `rule_check` | Check rules for context |
-
-### Sessions
-| Tool | Purpose |
-|------|---------|
-| `session_launch` | Launch Claude session with role + skills |
-
-## Desktop App - 7 Views
-
-| View | Shortcut | Description |
-|------|----------|-------------|
-| Project Hub | ⌘1 | Capability tree, entity references |
-| Task Manager | ⌘2 | 4 view modes, governance, detail panel |
-| Knowledge Browser | ⌘3 | Tree + preview, search, type filtering |
-| Ticket Queue | ⌘4 | Status workflow, convert to task |
-| Training Room | ⌘5 | Incidents, lessons, skills, rules |
-| Settings | ⌘, | Project configuration |
-| Worktree Status | - | Git branch/status (via sidebar) |
-
-## Agent Roles (Governance, NOT Orchestration)
-
-| Role | MVP Usage |
-|------|-----------|
-| **Worker** | Default for implementation. Gets `implement/*` skills. |
-| **Reviewer** | For verification. Gets `review/*` skills. |
-
-Key files:
-- `packages/shared/src/types.ts` - `AgentRole`, `normalizeRole()`
-- `.sidstack/skills/capabilities/` - Role-specific skills
-
-## Governance System
-
-```
-.sidstack/
-├── governance.md           # Master overview
-├── principles/             # MUST follow rules
-├── skills/capabilities/    # Role-specific skills
-│   ├── implement/          # feature, bugfix, refactor, build-resolve
-│   ├── review/             # code, security, performance
-│   └── ...
-└── workflows/              # End-to-end processes
-```
-
-Quality gates (MUST pass before completion):
-```bash
-pnpm typecheck  # 0 errors
-pnpm lint       # 0 errors
-pnpm test       # all pass
-```
-
-## Impact Analysis
-
-MCP tools: `impact_analyze`, `impact_check_gate`, `impact_list`
-
-Risk rules: Core module modification (high), multiple modules affected (medium), breaking API changes (high), database schema changes (high), security-sensitive code (critical).
-
-Gate status: `blocked` (must resolve), `warning` (can proceed), `clear` (safe).
-
-## Knowledge System
-
-Knowledge sources: `.sidstack/knowledge/` (business logic, API docs, patterns)
-
-Document types: `index`, `business-logic`, `api-endpoint`, `design-pattern`, `database-table`, `module`, `governance`
-
-Context formats: `full` (JSON), `compact` (summary), `claude` (raw markdown)
-
-## Ticket Queue
-
-Status flow: `new -> reviewing -> approved -> in_progress -> completed` (or `rejected`)
-
-MCP tools: `ticket_create`, `ticket_list`, `ticket_update`, `ticket_convert_to_task`
+**MCP Tools:** knowledge (5), tasks (5), impact (3), tickets (4), training (2) — 19 core tools.
+**Agents:** Worker (`sidstack-worker`) for implementation, Reviewer (`sidstack-reviewer`) for verification. Skills auto-trigger per role.
+**Knowledge:** `.sidstack/knowledge/` in 9 categories (`00-context` through `08-incidents`).
+**Impact:** `impact_analyze` → `impact_check_gate`. Gates: `blocked`, `warning`, `clear`.
+**Tickets:** `new → reviewing → approved → in_progress → completed` (or `rejected`).
 
 <!-- DOCUMENTATION-DISCIPLINE:START -->
 ## MANDATORY: Documentation Discipline
 
 ### Session Continuity
-- **Read `JOURNAL.md`** at session start when you need context about recent changes
-- **Write to `JOURNAL.md`** when completing significant changes (new features, architecture decisions, non-trivial fixes)
+- **Read `JOURNAL.md`** at session start for recent context
+- **Write to `JOURNAL.md`** after significant changes (features, architecture, non-trivial fixes)
 - Entry format: date, what changed, which files, why, decisions made
 
 ### Changelog
 - **Update `CHANGELOG.md`** when bumping versions
 - Follow [Keep a Changelog](https://keepachangelog.com) format: Added, Changed, Fixed, Removed, Security
-- Every released version must have an entry
 
 ### Commit Messages
 - Use conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`

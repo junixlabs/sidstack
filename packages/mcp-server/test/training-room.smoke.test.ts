@@ -1,10 +1,11 @@
 /**
  * Smoke Tests - Training Room Handlers
  *
- * Validates training room handler functions (incidents, lessons, skills, rules).
+ * Validates training room handler functions (incidents, lessons, skills, rules)
+ * via API client calls.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mockDB } from './setup';
+import { mockApiClient, resetMockApiClient } from './setup';
 import {
   handleTrainingSessionGet,
   handleTrainingSessionList,
@@ -22,9 +23,7 @@ import {
 
 describe('Training Room Handlers (Smoke)', () => {
   beforeEach(() => {
-    Object.values(mockDB).forEach((fn) => {
-      if (typeof fn === 'function' && 'mockClear' in fn) fn.mockClear();
-    });
+    resetMockApiClient();
   });
 
   describe('handleTrainingSessionGet', () => {
@@ -35,6 +34,10 @@ describe('Training Room Handlers (Smoke)', () => {
       });
       expect(result.success).toBe(true);
       expect(result.session).toBeDefined();
+      expect(mockApiClient.training.createSession).toHaveBeenCalledWith(
+        'test-module',
+        expect.objectContaining({ projectPath: '/tmp/test' }),
+      );
     });
   });
 
@@ -43,6 +46,7 @@ describe('Training Room Handlers (Smoke)', () => {
       const result = await handleTrainingSessionList({ projectPath: '/tmp/test' });
       expect(result.success).toBe(true);
       expect(result.sessions).toBeInstanceOf(Array);
+      expect(mockApiClient.training.listSessions).toHaveBeenCalledOnce();
     });
   });
 
@@ -52,13 +56,14 @@ describe('Training Room Handlers (Smoke)', () => {
         projectPath: '/tmp/test',
         moduleId: 'test-module',
         title: 'Test Incident',
-        type: 'bug_fix',
+        type: 'mistake',
         severity: 'medium',
         description: 'Something happened',
       });
       expect(result.success).toBe(true);
       expect(result.incident).toBeDefined();
-      expect(mockDB.createIncident).toHaveBeenCalledOnce();
+      expect(mockApiClient.training.createSession).toHaveBeenCalledOnce();
+      expect(mockApiClient.training.createIncident).toHaveBeenCalledOnce();
     });
   });
 
@@ -67,6 +72,7 @@ describe('Training Room Handlers (Smoke)', () => {
       const result = await handleIncidentList({ projectPath: '/tmp/test' });
       expect(result.success).toBe(true);
       expect(result.incidents).toBeInstanceOf(Array);
+      expect(mockApiClient.training.listIncidents).toHaveBeenCalledOnce();
     });
   });
 
@@ -75,15 +81,15 @@ describe('Training Room Handlers (Smoke)', () => {
       const result = await handleLessonCreate({
         projectPath: '/tmp/test',
         moduleId: 'test-module',
-        incidentId: 'inc-1',
         title: 'Test Lesson',
-        summary: 'We learned something',
+        problem: 'We had a problem',
         rootCause: 'Bad config',
-        fix: 'Fix the config',
-        prevention: 'Add validation',
+        solution: 'Fix the config',
       });
       expect(result.success).toBe(true);
       expect(result.lesson).toBeDefined();
+      expect(mockApiClient.training.createSession).toHaveBeenCalledOnce();
+      expect(mockApiClient.training.createLesson).toHaveBeenCalledOnce();
     });
   });
 
@@ -92,6 +98,7 @@ describe('Training Room Handlers (Smoke)', () => {
       const result = await handleLessonList({ projectPath: '/tmp/test' });
       expect(result.success).toBe(true);
       expect(result.lessons).toBeInstanceOf(Array);
+      expect(mockApiClient.training.listLessons).toHaveBeenCalledOnce();
     });
   });
 
@@ -99,26 +106,13 @@ describe('Training Room Handlers (Smoke)', () => {
     it('creates a skill', async () => {
       const result = await handleSkillCreate({
         projectPath: '/tmp/test',
-        lessonId: 'lesson-1',
         name: 'test-skill',
         type: 'checklist',
         content: 'Step 1: Do this\nStep 2: Do that',
       });
       expect(result.success).toBe(true);
       expect(result.skill).toBeDefined();
-    });
-
-    it('rejects duplicate skill names', async () => {
-      mockDB.getSkillByName.mockReturnValueOnce({ id: 'existing-skill' });
-      const result = await handleSkillCreate({
-        projectPath: '/tmp/test',
-        lessonId: 'lesson-1',
-        name: 'existing-skill',
-        type: 'checklist',
-        content: 'Duplicate',
-      });
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('already exists');
+      expect(mockApiClient.training.createSkill).toHaveBeenCalledOnce();
     });
   });
 
@@ -127,6 +121,7 @@ describe('Training Room Handlers (Smoke)', () => {
       const result = await handleSkillList({ projectPath: '/tmp/test' });
       expect(result.success).toBe(true);
       expect(result.skills).toBeInstanceOf(Array);
+      expect(mockApiClient.training.listSkills).toHaveBeenCalledOnce();
     });
   });
 
@@ -134,28 +129,14 @@ describe('Training Room Handlers (Smoke)', () => {
     it('creates a rule', async () => {
       const result = await handleRuleCreate({
         projectPath: '/tmp/test',
-        lessonId: 'lesson-1',
         name: 'test-rule',
-        description: 'Always do this',
         level: 'should',
         enforcement: 'manual',
+        content: 'Always do this',
       });
       expect(result.success).toBe(true);
       expect(result.rule).toBeDefined();
-    });
-
-    it('rejects duplicate rule names', async () => {
-      mockDB.getRuleByName.mockReturnValueOnce({ id: 'existing-rule' });
-      const result = await handleRuleCreate({
-        projectPath: '/tmp/test',
-        lessonId: 'lesson-1',
-        name: 'existing-rule',
-        description: 'Dupe',
-        level: 'must',
-        enforcement: 'automated',
-      });
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('already exists');
+      expect(mockApiClient.training.createRule).toHaveBeenCalledOnce();
     });
   });
 
@@ -164,6 +145,7 @@ describe('Training Room Handlers (Smoke)', () => {
       const result = await handleRuleList({ projectPath: '/tmp/test' });
       expect(result.success).toBe(true);
       expect(result.rules).toBeInstanceOf(Array);
+      expect(mockApiClient.training.listRules).toHaveBeenCalledOnce();
     });
   });
 
@@ -172,9 +154,12 @@ describe('Training Room Handlers (Smoke)', () => {
       const result = await handleRuleCheck({
         projectPath: '/tmp/test',
         moduleId: 'test-module',
+        role: 'worker',
+        taskType: 'feature',
       });
       expect(result.success).toBe(true);
       expect(result.rules).toBeDefined();
+      expect(mockApiClient.training.checkRules).toHaveBeenCalledOnce();
     });
   });
 
@@ -188,6 +173,14 @@ describe('Training Room Handlers (Smoke)', () => {
       });
       expect(result.success).toBe(true);
       expect(result.context).toBeDefined();
+      expect(mockApiClient.training.getContext).toHaveBeenCalledWith(
+        'test-module',
+        expect.objectContaining({
+          projectPath: '/tmp/test',
+          role: 'worker',
+          taskType: 'feature',
+        }),
+      );
     });
   });
 });

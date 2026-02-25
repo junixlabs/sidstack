@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { Command, Flags } from '@oclif/core';
+import { DOCUMENT_TYPE_CONFIG } from '@sidstack/shared';
 import chalk from 'chalk';
 
 interface KnowledgeDocument {
@@ -18,14 +19,14 @@ export default class KnowledgeList extends Command {
 
   static examples = [
     '<%= config.bin %> knowledge list',
-    '<%= config.bin %> knowledge list --type api-endpoint',
+    '<%= config.bin %> knowledge list --type guide',
     '<%= config.bin %> knowledge list --module orders',
   ];
 
   static flags = {
     type: Flags.string({
       char: 't',
-      description: 'Filter by type (business-logic, api-endpoint, etc.)',
+      description: 'Filter by type (guide, spec, decision, reference, pattern, etc.)',
     }),
     module: Flags.string({
       char: 'm',
@@ -182,27 +183,10 @@ export default class KnowledgeList extends Command {
       byType.set(doc.type, existing);
     }
 
-    const typeIcons: Record<string, string> = {
-      'index': '📋',
-      'business-logic': '💼',
-      'api-endpoint': '🌐',
-      'design-pattern': '🧩',
-      'database-table': '🗄️',
-      'module': '📦',
-    };
-
-    const typeColors: Record<string, (str: string) => string> = {
-      'index': chalk.cyan,
-      'business-logic': chalk.magenta,
-      'api-endpoint': chalk.green,
-      'design-pattern': chalk.blue,
-      'database-table': chalk.yellow,
-      'module': (s) => chalk.hex('#ff8c00')(s),
-    };
-
     for (const [type, docs] of byType) {
-      const icon = typeIcons[type] || '📄';
-      const color = typeColors[type] || chalk.white;
+      const config = DOCUMENT_TYPE_CONFIG[type as keyof typeof DOCUMENT_TYPE_CONFIG];
+      const icon = config?.emoji || '📄';
+      const color = config ? (s: string) => chalk.hex(config.color)(s) : chalk.white;
       this.log(`  ${icon} ${color(type)} (${docs.length})`);
 
       for (const doc of docs) {

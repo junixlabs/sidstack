@@ -8,6 +8,7 @@ interface StatusBadgeProps {
 
 const STATUS_CONFIG: Record<TaskStatus, { bgVar: string; textVar: string; label: string }> = {
   pending:     { bgVar: "var(--surface-2)", textVar: "var(--status-pending)",     label: "Pending" },
+  review:      { bgVar: "var(--surface-3)", textVar: "var(--status-review)",      label: "Review" },
   in_progress: { bgVar: "var(--surface-3)", textVar: "var(--status-in-progress)", label: "In Progress" },
   completed:   { bgVar: "var(--surface-2)", textVar: "var(--status-completed)",   label: "Completed" },
   blocked:     { bgVar: "var(--surface-3)", textVar: "var(--status-blocked)",     label: "Blocked" },

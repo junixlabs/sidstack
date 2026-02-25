@@ -453,6 +453,95 @@ pub async fn run_shell_command(command: String, args: Vec<String>) -> Result<Str
     }
 }
 
+/// Result of workspace root resolution
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WorkspaceRootInfo {
+    /// Path to workspace root (where .sidstack/ lives)
+    pub workspace_root: String,
+    /// Path to the project root (current worktree or main project)
+    pub project_root: String,
+    /// True if this is a workspace structure (has .bare/)
+    pub is_workspace_structure: bool,
+    /// True if cwd is inside a git worktree (not the main repo)
+    pub is_worktree: bool,
+}
+
+/// Resolve the workspace root from a working directory.
+/// Handles both Mode A (.bare/ workspace) and Mode B (normal repo + sibling worktrees).
+///
+/// 1. Check for .sidstack/config.json by traversing up from cwd
+/// 2. If not found, use git fallback: `git rev-parse --git-common-dir`
+///    to find the main project that owns .sidstack/
+#[tauri::command]
+pub async fn resolve_workspace_root(cwd: String) -> Result<Option<WorkspaceRootInfo>, GitError> {
+    let cwd_path = std::path::Path::new(&cwd);
+
+    // Phase 1: Traverse up to find .sidstack/config.json
+    let mut current = cwd_path.to_path_buf();
+    for _ in 0..20 {
+        let config = current.join(".sidstack").join("config.json");
+        if config.exists() {
+            let has_bare = current.join(".bare").exists();
+            let is_worktree = current != cwd_path;
+            return Ok(Some(WorkspaceRootInfo {
+                workspace_root: current.to_string_lossy().to_string(),
+                project_root: cwd.clone(),
+                is_workspace_structure: has_bare,
+                is_worktree,
+            }));
+        }
+        if !current.pop() {
+            break;
+        }
+    }
+
+    // Phase 2: Git fallback for Mode B
+    let git_common_output = Command::new("git")
+        .current_dir(&cwd)
+        .args(["rev-parse", "--git-common-dir"])
+        .output();
+
+    let git_common_dir = match git_common_output {
+        Ok(output) if output.status.success() => {
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        }
+        _ => return Ok(None),
+    };
+
+    // If git-common-dir == ".git", this is the main repo itself (not a worktree)
+    if git_common_dir == ".git" {
+        return Ok(None);
+    }
+
+    // Resolve absolute path
+    let abs_git_dir = if std::path::Path::new(&git_common_dir).is_absolute() {
+        std::path::PathBuf::from(&git_common_dir)
+    } else {
+        cwd_path.join(&git_common_dir).canonicalize().unwrap_or_else(|_| cwd_path.join(&git_common_dir))
+    };
+
+    // Main project root = parent of .git directory
+    let main_project_root = match abs_git_dir.parent() {
+        Some(p) => p,
+        None => return Ok(None),
+    };
+
+    // Check .sidstack/config.json at main project root
+    let config_path = main_project_root.join(".sidstack").join("config.json");
+    if !config_path.exists() {
+        return Ok(None);
+    }
+
+    let has_bare = main_project_root.join(".bare").exists();
+
+    Ok(Some(WorkspaceRootInfo {
+        workspace_root: main_project_root.to_string_lossy().to_string(),
+        project_root: cwd,
+        is_workspace_structure: has_bare,
+        is_worktree: true,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

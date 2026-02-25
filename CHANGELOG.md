@@ -1,5 +1,86 @@
 # Changelog
 
+## [0.5.0] - 2026-02-25
+
+### Added
+- **Server Deployment:** Docker infrastructure for remote API + MCP Server
+  - `docker/api-server/Dockerfile` — API Server container (Express.js + SQLite)
+  - `docker/mcp-server/Dockerfile` — MCP Server container (Streamable HTTP mode)
+  - `docker/web-ui/Dockerfile` — Web UI container (React SPA + Caddy)
+  - `docker/bot-server/Dockerfile` — Bot Server container (SidBot + Gemini)
+  - `docker/docker-compose.yml` — Full stack: API + MCP + Bot + Web UI + mem0 + LiteLLM + Caddy
+  - `docker/caddy/Caddyfile` — Reverse proxy with auto TLS (Let's Encrypt)
+- **Knowledge Sync CLI:** `sidstack knowledge sync` pushes local `.sidstack/knowledge/` files to remote API
+  - Supports `--dry-run`, `--json`, `--api-url`, `--api-key` flags
+  - Reports created/updated/unchanged/errors
+- **Web UI:** Standalone React SPA at `packages/web-ui/` for browser-based access
+  - Knowledge browser (list, tree, detail, create, edit, delete, search)
+  - Task management (list, detail, update)
+  - Ticket management (list, detail, update, convert-to-task)
+  - Responsive layout with mobile support
+- **Desktop Notifications:** SSE-based real-time notifications from API Server
+  - `packages/api-server/src/events.ts` — Server-Sent Events endpoint
+  - Event-driven store sync (`useEventSync` hook with 500ms debounce)
+  - Notification preferences in project settings
+- **Claude Code Launcher:** Launch Claude Code with knowledge context from task detail panel
+- **Rate Limiting:** In-memory rate limiter on API Server (100 writes/15min, 600 reads/15min)
+- **Remote MCP Config:** `.mcp.json` now supports `streamable-http` transport for remote servers
+- **Remote Setup Docs:** QUICK_START.md Option C + CLAUDE_CODE_INTEGRATION.md Option 3
+- **Connection Setup:** Desktop app shows server connection screen on first launch
+  - Enter Server URL + API Key, test connection before saving
+  - Stored in localStorage, injected into all API calls
+- **Multi-Project Web UI:** Project selector page at `/` with search
+  - Switch between projects from sidebar
+- **Bot Server in Docker:** `docker/bot-server/Dockerfile` added to compose stack
+
+### Changed
+- **Architecture:** API Server is now the central gateway — all services (MCP, CLI, Desktop, Web UI) connect via HTTP
+  - MCP Server calls API Server via `SidStackApiClient` (no direct SQLite access)
+  - Updated `technical-design.md` to v3 with remote server topology
+- **MCP Server:** Added API fallback for `projectId` resolution when local filesystem unavailable
+- **Knowledge Routes:** `resolveProjectId()` gracefully falls back to DB lookup when `detectWorkspace()` fails
+- **SSE Auth:** `/api/events/stream` exempted from Bearer token auth (EventSource limitation)
+- **TypeScript:** Added `downlevelIteration` to `tsconfig.base.json` for Docker build compatibility
+- **.env.example:** Added production/remote server configuration section
+- **Desktop App:** No longer auto-starts local API Server — connects to remote server via ConnectionSetup
+- **Auth Headers:** All frontend API calls use `apiFetch()` wrapper with auto-injected Bearer token
+- **Service Health:** Dynamic URL from connection config (was hardcoded localhost)
+- **Hardcoded URLs removed:** All `localhost:19432` references replaced with `getApiBaseUrl()`
+
+### Removed
+- Capability registry (`packages/shared/src/capability-registry.ts`)
+- External session management (`packages/shared/src/external-session.ts`)
+- Session routes from API Server
+- Worktree/session UI components from desktop app
+- Legacy CLI agent templates and knowledge templates
+- Legacy skills (impact-safe, knowledge-first, lesson-detector, training-context)
+
+## [0.4.7] - 2026-02-03
+
+### Fixed
+- **Init Re-init:** Preserve existing projectId when running `sidstack init --force`
+  - Prevents task/ticket data loss when re-initializing a project
+  - Old tasks remain accessible after re-init with different project name
+
+### Changed
+- **MCP Config:** Use `@sidstack/mcp-server@latest` in generated `.mcp.json`
+  - Projects will automatically use the newest MCP server version
+  - No need to manually update version numbers
+
+## [0.4.6] - 2026-02-03
+
+### Fixed
+- **NPM Publish:** Fixed workspace:* protocol not being resolved during npm publish
+  - Used pnpm publish instead of npm publish to correctly resolve workspace dependencies
+  - @sidstack/shared is now correctly referenced as 0.4.6 instead of workspace:*
+
+## [0.4.5] - 2026-02-03
+
+### Fixed
+- **NPM Publish:** Fixed broken npm packages missing compiled JavaScript files
+  - 0.4.4 was published without dist/*.js files due to stale turbo cache
+  - Republished with full build including all .js and .d.ts files
+
 ## [0.4.4] - 2026-02-03
 
 ### Fixed

@@ -1,12 +1,16 @@
-import { Check, CheckCircle2, Circle, ExternalLink, GitBranch, History, User, X } from "lucide-react";
-import { useEffect } from "react";
+import { Check, CheckCircle2, Circle, ExternalLink, GitBranch, History, Play, User, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTask } from "@/hooks/useTasks";
 import { cn } from "@/lib/utils";
+import { showSuccess, showError } from "@/lib/toast";
+import { launchClaudeWithContext } from "@/services/claudeCodeLauncher";
 import type { Task, TaskProgressLog } from "@/stores/taskStore";
+import { useTaskStore } from "@/stores/taskStore";
 import { useUnifiedContextStore } from "@/stores/unifiedContextStore";
 
 import { LinkedKnowledgeSection } from "./LinkedKnowledgeSection";
 import { LinkedSpecsSection } from "./LinkedSpecsSection";
+import { RelatedIncidentsSection } from "./RelatedIncidentsSection";
 
 import { PriorityBadge, StatusBadge, StatusIcon, TaskTypeBadge } from "./badges";
 
@@ -28,8 +32,27 @@ export function TaskDetailPanel({
   onNavigateToProgressTracker,
   onNavigateToSpec,
   onNavigateToKnowledge,
+  workspacePath,
 }: TaskDetailPanelProps) {
+  const [isLaunching, setIsLaunching] = useState(false);
   const { subtasks, parentTask } = useTask(task.id);
+  const detailTask = useTaskStore((s) => s.detailTask);
+  const fetchTaskDetail = useTaskStore((s) => s.fetchTaskDetail);
+
+  // Fetch full detail when task changes
+  useEffect(() => {
+    fetchTaskDetail(task.id);
+  }, [task.id, fetchTaskDetail]);
+
+  // Use detailTask for full fields, fall back to task for basic fields
+  const isDetailLoaded = detailTask?.id === task.id;
+  const governance = isDetailLoaded ? detailTask.governance : task.governance;
+  const acceptanceCriteria = isDetailLoaded ? detailTask.acceptanceCriteria : task.acceptanceCriteria;
+  const validation = isDetailLoaded ? detailTask.validation : task.validation;
+  const solutionPlan = isDetailLoaded ? detailTask.solutionPlan : task.solutionPlan;
+  const planStatus = isDetailLoaded ? detailTask.planStatus : task.planStatus;
+  const planReviewNotes = isDetailLoaded ? detailTask.planReviewNotes : task.planReviewNotes;
+  const implementSummary = isDetailLoaded ? detailTask.implementSummary : task.implementSummary;
 
   // Load linked specs and knowledge from unified context store
   const {
@@ -114,6 +137,30 @@ export function TaskDetailPanel({
               <ExternalLink className="w-3 h-3" />
             </button>
           )}
+          {workspacePath && (
+            <button
+              disabled={isLaunching}
+              onClick={async () => {
+                setIsLaunching(true);
+                try {
+                  await launchClaudeWithContext({
+                    workingDir: workspacePath,
+                    projectId: task.projectId,
+                    taskId: task.id,
+                  });
+                  showSuccess("Claude Code launched with knowledge context");
+                } catch (err) {
+                  showError("Failed to launch Claude Code", err instanceof Error ? err.message : "Unknown error");
+                } finally {
+                  setIsLaunching(false);
+                }
+              }}
+              className="text-xs px-2 py-1 bg-blue-600/20 text-blue-400 rounded hover:bg-blue-600/30 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              <Play className="w-3 h-3" />
+              <span>{isLaunching ? "Launching..." : "Launch Claude Code"}</span>
+            </button>
+          )}
         </div>
 
         {/* Linked Specs Section */}
@@ -125,6 +172,9 @@ export function TaskDetailPanel({
             isLoading={linksLoading}
           />
         )}
+
+        {/* Related Incidents Section */}
+        <RelatedIncidentsSection taskId={task.id} />
 
         {/* Linked Knowledge Section */}
         {onNavigateToKnowledge && (
@@ -185,14 +235,58 @@ export function TaskDetailPanel({
           </div>
         )}
 
+        {/* Solution Plan */}
+        {solutionPlan && (
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs text-[var(--text-muted)]">Solution Plan</span>
+              {planStatus && (
+                <span
+                  className={cn(
+                    "text-[11px] px-1.5 py-0.5 rounded font-medium",
+                    planStatus === 'approved' && "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+                    planStatus === 'draft' && "bg-[var(--status-review)]/15 text-[var(--status-review)]",
+                    planStatus === 'revision_requested' && "bg-[var(--status-blocked)]/15 text-[var(--status-blocked)]",
+                  )}
+                >
+                  {planStatus === 'revision_requested' ? 'Revision Requested' : planStatus}
+                </span>
+              )}
+            </div>
+            <div className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap bg-[var(--surface-0)] rounded p-2 border border-[var(--border-muted)]">
+              {solutionPlan}
+            </div>
+          </div>
+        )}
+
+        {/* Plan Review Notes */}
+        {planReviewNotes && (
+          <div>
+            <div className="text-xs text-[var(--text-muted)] mb-1">Review Feedback</div>
+            <div className="text-sm text-[var(--status-blocked)] bg-[var(--status-blocked)]/10 rounded p-2 border border-[var(--status-blocked)]/20">
+              {planReviewNotes}
+            </div>
+          </div>
+        )}
+
+        {/* Implement Summary */}
+        {implementSummary && (
+          <div>
+            <div className="text-xs text-[var(--text-muted)] mb-1">Implement Summary</div>
+            <div className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap bg-[var(--color-success)]/5 rounded p-2 border border-[var(--color-success)]/20">
+              {implementSummary}
+            </div>
+          </div>
+        )}
+
         {/* Acceptance Criteria */}
-        {task.acceptanceCriteria && task.acceptanceCriteria.length > 0 && (
+        {Array.isArray(acceptanceCriteria) && acceptanceCriteria.length > 0 && (
           <div>
             <div className="text-xs text-[var(--text-muted)] mb-2">
-              Acceptance Criteria ({task.acceptanceCriteria.filter(c => c.completed).length}/{task.acceptanceCriteria.length})
+              Acceptance Criteria ({acceptanceCriteria.filter(c => c.completed).length}/{acceptanceCriteria.length})
             </div>
             <div className="space-y-2">
-              {task.acceptanceCriteria.map((criterion) => (
+              {acceptanceCriteria.map((criterion) => (
                 <div
                   key={criterion.id}
                   className="flex items-start gap-3"
@@ -227,15 +321,15 @@ export function TaskDetailPanel({
         )}
 
         {/* Governance Info */}
-        {task.governance && (
+        {governance && (
           <div>
             <div className="text-xs text-[var(--text-muted)] mb-1">Governance</div>
             <div className="space-y-2 text-xs">
-              {task.governance.qualityGates && task.governance.qualityGates.length > 0 && (
+              {governance.qualityGates && governance.qualityGates.length > 0 && (
                 <div>
                   <div className="text-[var(--text-muted)]">Quality Gates:</div>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {task.governance.qualityGates.map((gate) => (
+                    {governance.qualityGates.map((gate) => (
                       <span
                         key={gate.id}
                         className={cn(
@@ -253,11 +347,11 @@ export function TaskDetailPanel({
                   </div>
                 </div>
               )}
-              {task.governance.principles && task.governance.principles.length > 0 && (
+              {governance.principles && governance.principles.length > 0 && (
                 <div>
                   <div className="text-[var(--text-muted)]">Principles:</div>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {task.governance.principles.map((p) => (
+                    {governance.principles.map((p) => (
                       <span
                         key={p}
                         className="px-1.5 py-0.5 bg-[var(--surface-2)] rounded text-[var(--text-muted)]"
@@ -273,22 +367,22 @@ export function TaskDetailPanel({
         )}
 
         {/* Validation Status */}
-        {task.validation && (
+        {validation && (
           <div>
             <div className="text-xs text-[var(--text-muted)] mb-1">Validation</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="flex items-center gap-1">
-                {task.validation.progressHistoryCount >= 2 ? (
+                {validation.progressHistoryCount >= 2 ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" />
                 ) : (
                   <Circle className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                 )}
                 <span className="text-[var(--text-secondary)]">
-                  Progress: {task.validation.progressHistoryCount}
+                  Progress: {validation.progressHistoryCount}
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                {task.validation.titleFormatValid ? (
+                {validation.titleFormatValid ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" />
                 ) : (
                   <Circle className="w-3.5 h-3.5 text-[var(--text-muted)]" />
@@ -296,7 +390,7 @@ export function TaskDetailPanel({
                 <span className="text-[var(--text-secondary)]">Title format</span>
               </div>
               <div className="flex items-center gap-1">
-                {task.validation.qualityGatesPassed ? (
+                {validation.qualityGatesPassed ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" />
                 ) : (
                   <Circle className="w-3.5 h-3.5 text-[var(--text-muted)]" />
@@ -304,7 +398,7 @@ export function TaskDetailPanel({
                 <span className="text-[var(--text-secondary)]">Quality gates</span>
               </div>
               <div className="flex items-center gap-1">
-                {task.validation.acceptanceCriteriaValid ? (
+                {validation.acceptanceCriteriaValid ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" />
                 ) : (
                   <Circle className="w-3.5 h-3.5 text-[var(--text-muted)]" />

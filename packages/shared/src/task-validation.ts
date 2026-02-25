@@ -13,7 +13,7 @@ import { getMinProgressUpdates, validateTitle, isValidTaskType } from './governa
 // ============================================================================
 
 export interface ValidationBlocker {
-  rule: 'progress-history' | 'title-format' | 'quality-gate' | 'acceptance-criteria' | 'task-type' | 'incomplete-subtasks' | 'cancelled-without-reason';
+  rule: 'progress-history' | 'title-format' | 'quality-gate' | 'acceptance-criteria' | 'task-type' | 'incomplete-subtasks' | 'cancelled-without-reason' | 'review-required';
   message: string;
   details?: unknown;
 }
@@ -85,6 +85,7 @@ export interface TaskForValidation {
   governance?: TaskGovernance;
   acceptanceCriteria?: AcceptanceCriterion[];
   validation?: TaskValidation;
+  notes?: string;
 }
 
 export interface ProgressLogEntry {
@@ -198,6 +199,18 @@ export function validateTaskCompletion(
         details: { incomplete: incomplete.map(ac => ac.description) },
       });
       hints.push(`Mark criteria complete or update acceptance criteria status`);
+    }
+  }
+
+  // Rule 5: Review Required Check (for feature/bugfix/security)
+  if (task.governance?.reviewRequired) {
+    const hasReviewPass = task.notes?.includes('Review PASS') || false;
+    if (!hasReviewPass) {
+      blockers.push({
+        rule: 'review-required',
+        message: `Review PASS required for ${taskType} tasks. Handoff to reviewer first.`,
+      });
+      hints.push('Spawn a sidstack-reviewer agent and wait for "Review PASS" in task notes before completing');
     }
   }
 

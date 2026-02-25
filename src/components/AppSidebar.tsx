@@ -2,29 +2,34 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
-  GitBranch,
+  ClipboardCheck,
   GraduationCap,
   HelpCircle,
   Inbox,
   Layers,
   ListTodo,
+  Monitor,
   Settings2,
 } from "lucide-react";
-import { memo, useCallback, useState, useMemo, useRef } from "react";
+import { memo, useCallback, useState, useRef } from "react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useAppStore } from "@/stores/appStore";
 import { useOnboardingStore } from "@/stores/onboardingStore";
-import { useProjectStore } from "@/stores/projectStore";
 import type { BlockViewType } from "@/types/block";
 
 import { OnboardingProgress } from "./onboarding/OnboardingProgress";
-import { WorktreesList } from "./sidebar/WorktreesList";
 
 // =============================================================================
 // Types
@@ -43,7 +48,7 @@ export interface SidebarItem {
 interface AppSidebarProps {
   activeItem?: string;
   onItemClick: (item: SidebarItem) => void;
-  onWorktreeClick?: (worktreePath: string, branch: string) => void;
+  onShowDocs?: (section?: string) => void;
   className?: string;
   expanded?: boolean;
   onToggleExpand?: () => void;
@@ -93,6 +98,22 @@ export const sidebarItems: SidebarItem[] = [
     shortcut: "⌘5",
     blockType: "training-room",
     description: "Capture learnings from incidents and bugs",
+  },
+  {
+    id: "agent-desks",
+    icon: <Monitor className="w-5 h-5" />,
+    label: "Agent Desks",
+    shortcut: "⌘6",
+    blockType: "agent-desk",
+    description: "Manage parallel development workspaces",
+  },
+  {
+    id: "traceability",
+    icon: <ClipboardCheck className="w-5 h-5" />,
+    label: "Traceability",
+    shortcut: "⌘7",
+    blockType: "traceability",
+    description: "Spec-to-task-to-test coverage matrix",
   },
 ];
 
@@ -226,7 +247,7 @@ const SidebarItemButton = memo(function SidebarItemButton({
 export const AppSidebar = memo(function AppSidebar({
   activeItem = "project-hub",
   onItemClick,
-  onWorktreeClick,
+  onShowDocs,
   className,
   expanded: controlledExpanded,
   onToggleExpand,
@@ -237,17 +258,7 @@ export const AppSidebar = memo(function AppSidebar({
     return saved !== null ? saved === 'true' : true;
   });
   const expanded = controlledExpanded ?? internalExpanded;
-  const { projects } = useProjectStore();
-  const { projectPath } = useAppStore();
   const { setShowGettingStarted } = useOnboardingStore();
-
-  // Find project based on current projectPath
-  const activeProject = useMemo(() => {
-    if (!projectPath) return null;
-    return projects.find((p) =>
-      p.worktrees.some((w) => w.path === projectPath)
-    ) || null;
-  }, [projects, projectPath]);
 
   const handleItemClick = useCallback(
     (item: SidebarItem) => {
@@ -337,56 +348,6 @@ export const AppSidebar = memo(function AppSidebar({
         ))}
       </div>
 
-      {/* Worktrees section */}
-      {activeProject && activeProject.worktrees.length > 0 && (
-        <div className="border-t border-[var(--border-muted)] pt-2 px-1">
-          {expanded ? (
-            <WorktreesList
-              onWorktreeClick={onWorktreeClick}
-              activeViewId={activeItem}
-            />
-          ) : (
-            /* Collapsed: show branch icon with tooltip listing worktrees */
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex flex-col items-center gap-1 py-1">
-                  <div className="w-10 h-8 mx-auto flex items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-1)] transition-colors duration-150">
-                    <GitBranch className="w-4 h-4" />
-                  </div>
-                  <div className="flex gap-0.5 justify-center">
-                    {activeProject.worktrees.map((wt) => (
-                      <span
-                        key={wt.id}
-                        className={cn(
-                          "w-1.5 h-1.5 rounded-full",
-                          wt.path === projectPath
-                            ? "bg-[var(--accent-primary)]"
-                            : "bg-[var(--text-muted)]"
-                        )}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-[200px]">
-                <div className="space-y-1">
-                  <span className="font-medium text-xs">Worktrees</span>
-                  {activeProject.worktrees.map((wt) => (
-                    <div key={wt.id} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-                      <span className={cn(
-                        "w-1.5 h-1.5 rounded-full shrink-0",
-                        wt.path === projectPath ? "bg-[var(--accent-primary)]" : "bg-[var(--text-muted)]"
-                      )} />
-                      <span className="truncate">{wt.id}</span>
-                    </div>
-                  ))}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-      )}
-
       {/* Spacer */}
       <div className="flex-1" />
 
@@ -408,29 +369,50 @@ export const AppSidebar = memo(function AppSidebar({
         </div>
       )}
 
-      {/* Help button - reopen onboarding */}
+      {/* Help flyout menu */}
       <div className="px-1 pb-1">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => setShowGettingStarted(true)}
-              aria-label="Show getting started guide"
-              className={cn(
-                "flex items-center justify-center rounded",
-                "text-[var(--text-muted)] hover:text-[var(--text-secondary)]",
-                "hover:bg-[var(--surface-1)] transition-colors duration-150",
-                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)]",
-                expanded ? "w-full gap-2 px-3 py-1.5 text-xs" : "w-10 h-8 mx-auto"
-              )}
-            >
-              <HelpCircle className="w-4 h-4 shrink-0" />
-              {expanded && <span>Getting Started</span>}
-            </button>
-          </TooltipTrigger>
-          {!expanded && (
-            <TooltipContent side="right">Getting Started</TooltipContent>
-          )}
-        </Tooltip>
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <button
+                  aria-label="Help"
+                  className={cn(
+                    "flex items-center justify-center rounded",
+                    "text-[var(--text-muted)] hover:text-[var(--text-secondary)]",
+                    "hover:bg-[var(--surface-1)] transition-colors duration-150",
+                    "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)]",
+                    expanded ? "w-full gap-2 px-3 py-1.5 text-xs" : "w-10 h-8 mx-auto"
+                  )}
+                >
+                  <HelpCircle className="w-4 h-4 shrink-0" />
+                  {expanded && <span>Help</span>}
+                </button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            {!expanded && (
+              <TooltipContent side="right">Help</TooltipContent>
+            )}
+          </Tooltip>
+          <DropdownMenuContent side="right" align="end" className="w-48">
+            <DropdownMenuItem onClick={() => setShowGettingStarted(true)}>
+              Getting Started
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onShowDocs?.("about")}>
+              About
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onShowDocs?.("user-guide")}>
+              User Guide
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onShowDocs?.("roadmap")}>
+              Roadmap
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onShowDocs?.("changelog")}>
+              Changelog
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Toggle button */}

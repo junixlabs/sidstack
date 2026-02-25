@@ -1,6 +1,6 @@
 import { BookOpen, FileText, Map, Clock, X } from "lucide-react";
 import pkg from "../../package.json";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import {
   Dialog,
@@ -17,6 +17,7 @@ import { MarkdownPreview } from "./MarkdownPreview";
 interface DocsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialSection?: string;
 }
 
 interface DocSection {
@@ -53,8 +54,14 @@ const docSections: DocSection[] = [
   },
 ];
 
-export function DocsDialog({ open, onOpenChange }: DocsDialogProps) {
+export function DocsDialog({ open, onOpenChange, initialSection }: DocsDialogProps) {
   const [activeSection, setActiveSection] = useState("about");
+
+  useEffect(() => {
+    if (open && initialSection) {
+      setActiveSection(initialSection);
+    }
+  }, [open, initialSection]);
 
   const currentDoc = docSections.find((s) => s.id === activeSection);
 

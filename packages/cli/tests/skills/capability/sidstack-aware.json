@@ -1,0 +1,90 @@
+{
+  "skill": "sidstack-aware",
+  "tests": [
+    {
+      "id": "aware-task-check-before-edit",
+      "type": "capability",
+      "description": "Should check for task before file edit",
+      "input": {
+        "prompt": "add a new function to utils.ts",
+        "context": {
+          "about_to_edit": "src/utils.ts"
+        }
+      },
+      "expected": {
+        "activation": true,
+        "announces": "Applying SidStack task governance",
+        "tools_called": ["mcp__sidstack__task_list"],
+        "output_contains": ["Task"]
+      },
+      "tags": ["governance", "core"]
+    },
+    {
+      "id": "aware-create-task-if-none",
+      "type": "capability",
+      "description": "Should create task if none exists",
+      "input": {
+        "prompt": "implement user profile page",
+        "context": {
+          "active_tasks": []
+        }
+      },
+      "expected": {
+        "activation": true,
+        "tools_called": ["mcp__sidstack__task_list", "mcp__sidstack__task_create"],
+        "task_created": true,
+        "output_contains": ["Task created"]
+      },
+      "tags": ["governance", "task-creation"]
+    },
+    {
+      "id": "aware-progress-tracking",
+      "type": "capability",
+      "description": "Should update progress during implementation",
+      "input": {
+        "prompt": "continue working on the feature",
+        "context": {
+          "active_task": "task-123",
+          "milestone": "core_done"
+        }
+      },
+      "expected": {
+        "activation": true,
+        "tools_called": ["mcp__sidstack__task_update"],
+        "output_contains": ["Progress:"]
+      },
+      "tags": ["governance", "progress"]
+    },
+    {
+      "id": "aware-list-tasks",
+      "type": "capability",
+      "description": "Should list tasks when asked",
+      "input": {
+        "prompt": "what tasks do I have?"
+      },
+      "expected": {
+        "activation": true,
+        "tools_called": ["mcp__sidstack__task_list"],
+        "output_format": "task_list"
+      },
+      "tags": ["task-query"]
+    },
+    {
+      "id": "aware-mcp-unavailable",
+      "type": "capability",
+      "description": "Should warn but continue if MCP unavailable",
+      "input": {
+        "prompt": "fix the bug",
+        "context": {
+          "mcp_available": false
+        }
+      },
+      "expected": {
+        "activation": true,
+        "output_contains": ["warn", "without task tracking"],
+        "continues": true
+      },
+      "tags": ["error-handling"]
+    }
+  ]
+}

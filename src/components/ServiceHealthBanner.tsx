@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useVisibilityPolling } from "@/hooks/useVisibility";
 import { ipcClient } from "@/lib/ipcClient";
 import { cn } from "@/lib/utils";
+import { getApiBaseUrl, getAuthHeaders } from "@/lib/api-config";
 
 interface ServiceStatus {
   name: string;
@@ -20,28 +21,31 @@ interface ServiceStatus {
   icon: typeof Server;
 }
 
-const SERVICES: Omit<ServiceStatus, "healthy">[] = [
-  {
-    name: "API Server",
-    url: "http://localhost:19432/health",
-    type: "http",
-    description: "Task management, orchestrator APIs",
-    icon: Server,
-  },
-  {
-    name: "IPC Server",
-    url: "ws://localhost:17432",
-    type: "ws",
-    description: "Terminal spawning, agent coordination",
-    icon: Wifi,
-  },
-];
+function getServices(): Omit<ServiceStatus, "healthy">[] {
+  return [
+    {
+      name: "API Server",
+      url: `${getApiBaseUrl()}/health`,
+      type: "http",
+      description: "Task management, orchestrator APIs",
+      icon: Server,
+    },
+    {
+      name: "IPC Server",
+      url: "ws://localhost:17432",
+      type: "ws",
+      description: "Terminal spawning, agent coordination",
+      icon: Wifi,
+    },
+  ];
+}
 
 async function checkHttpHealth(url: string): Promise<boolean> {
   try {
     const response = await fetch(url, {
       method: "GET",
-      signal: AbortSignal.timeout(3000),
+      headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(5000),
     });
     return response.ok;
   } catch {
@@ -69,7 +73,7 @@ export function ServiceHealthBanner({ className }: ServiceHealthBannerProps) {
     setChecking(true);
 
     const results: ServiceStatus[] = await Promise.all(
-      SERVICES.map(async (service) => {
+      getServices().map(async (service) => {
         const healthy = service.type === "http"
           ? await checkHttpHealth(service.url)
           : checkWsHealth(service.url); // Sync function, no await needed

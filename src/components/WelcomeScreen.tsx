@@ -10,7 +10,7 @@ import { Logo } from "./Logo";
 
 interface WelcomeScreenProps {
   onOpenProject: () => void;
-  onShowDocs: () => void;
+  onShowDocs: (section?: string) => void;
 }
 
 // Parse changelog to extract the latest version info
@@ -152,7 +152,7 @@ export function WelcomeScreen({ onOpenProject, onShowDocs }: WelcomeScreenProps)
           <Button
             variant="outline"
             size="lg"
-            onClick={onShowDocs}
+            onClick={() => onShowDocs("about")}
             className="gap-2"
           >
             <BookOpen className="w-4 h-4" />
@@ -180,7 +180,7 @@ export function WelcomeScreen({ onOpenProject, onShowDocs }: WelcomeScreenProps)
             ))}
           </ul>
           <button
-            onClick={onShowDocs}
+            onClick={() => onShowDocs("changelog")}
             className="mt-4 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors flex items-center gap-1"
           >
             <Map className="w-3 h-3" />

@@ -7,35 +7,30 @@ created: {{date}}
 
 # Project Knowledge Base
 
-Welcome to your project's knowledge documentation. This knowledge base helps both humans and AI agents understand your project's architecture, business rules, and technical decisions.
+Structured documentation for humans and AI agents.
 
 ## Categories
 
-| Category | Description |
-|----------|-------------|
-| [Business Logic](./business-logic/_index.md) | Business rules, workflows, state machines |
-| [API](./api/_index.md) | API endpoints, request/response schemas |
-| [Patterns](./patterns/_index.md) | Design patterns used in the project |
-| [Database](./database/_index.md) | Schema, tables, relationships |
-| [Modules](./modules/_index.md) | Module documentation |
-
-## Quick Start
-
-1. Navigate to a category above
-2. Create new documents using the provided templates
-3. Link related documents using the `related` field in frontmatter
+| Category | Description | Type |
+|----------|-------------|------|
+| [00-context](./00-context/) | Vision, glossary, onboarding | Living |
+| [01-architecture](./01-architecture/) | System design, modules, patterns | Living |
+| [02-decisions](./02-decisions/) | ADRs, technical decisions | Event |
+| [03-standards](./03-standards/) | Coding conventions, naming, testing | Living |
+| [04-data](./04-data/) | Database schema, ownership, retention | Living |
+| [05-api](./05-api/) | API contracts, schemas, versioning | Living |
+| [06-operations](./06-operations/) | Deployment, monitoring, rollback | Living |
+| [07-projects](./07-projects/) | Project-specific documentation | Event |
+| [08-incidents](./08-incidents/) | Incident reports, root cause analysis | Event |
 
 ## Document Format
-
-All documents use YAML frontmatter:
 
 ```yaml
 ---
 id: unique-identifier
-type: business-logic | api-endpoint | design-pattern | database-table
+type: guide | spec | decision | reference | pattern | rule
 module: module-name
-status: draft | implemented | deprecated
-related: [other-doc-ids]
+status: draft | active | review | archived
 tags: [tag1, tag2]
 ---
 
@@ -44,9 +39,7 @@ tags: [tag1, tag2]
 Content here...
 ```
 
-## For AI Agents
+## Naming Conventions
 
-When working on this project:
-1. Read relevant knowledge docs before making changes
-2. Follow documented patterns
-3. Update docs after significant changes
+- **Living docs (00-06)**: descriptive filenames (`auth-flow.md`, `naming-conventions.md`)
+- **Event docs (02, 07, 08)**: date-prefixed (`2026-01-15-adopt-rest.md`, `2026-02-crash-fix.md`)

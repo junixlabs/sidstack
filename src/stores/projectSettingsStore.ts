@@ -6,6 +6,7 @@
  */
 
 import { create } from 'zustand';
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
 
 import type {
   ProjectSettings,
@@ -13,9 +14,10 @@ import type {
   SyncSettings,
   AgentSettings,
   TicketSettings,
+  NotificationSettings,
 } from '@sidstack/shared';
 
-const API_BASE = 'http://localhost:19432/api/projects';
+const API_BASE = `${getApiBaseUrl()}/api/projects`;
 
 // Default settings (duplicated here to avoid import issues)
 const DEFAULT_SETTINGS: ProjectSettings = {
@@ -31,6 +33,13 @@ const DEFAULT_SETTINGS: ProjectSettings = {
     syncOnWindowFocus: true,
     autoRefreshEnabled: true,
     autoRefreshIntervalSeconds: 15,
+    notifications: {
+      enabled: true,
+      desktopEnabled: true,
+      taskUpdates: true,
+      ticketUpdates: true,
+      knowledgeChanges: true,
+    },
   },
   agent: {
     defaultRole: 'dev',
@@ -65,6 +74,7 @@ interface ProjectSettingsStore {
   updateSyncSettings: (updates: Partial<SyncSettings>) => void;
   updateAgentSettings: (updates: Partial<AgentSettings>) => void;
   updateTicketSettings: (updates: Partial<TicketSettings>) => void;
+  updateNotificationSettings: (updates: Partial<NotificationSettings>) => void;
   resetToDefaults: () => Promise<void>;
   clearError: () => void;
 
@@ -93,7 +103,7 @@ export const useProjectSettingsStore = create<ProjectSettingsStore>((set, get) =
     set({ isLoading: true, error: null, currentProjectPath: projectPath });
 
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}/settings?path=${encodeURIComponent(projectPath)}`
       );
       const data = await res.json();
@@ -121,7 +131,7 @@ export const useProjectSettingsStore = create<ProjectSettingsStore>((set, get) =
     set({ isLoading: true, error: null });
 
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}/settings?path=${encodeURIComponent(currentProjectPath)}`,
         {
           method: 'PUT',
@@ -189,6 +199,20 @@ export const useProjectSettingsStore = create<ProjectSettingsStore>((set, get) =
     }));
   },
 
+  // Update notification settings (local, mark dirty)
+  updateNotificationSettings: (updates: Partial<NotificationSettings>) => {
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        sync: {
+          ...state.settings.sync,
+          notifications: { ...state.settings.sync.notifications!, ...updates },
+        },
+      },
+      isDirty: true,
+    }));
+  },
+
   // Reset to defaults
   resetToDefaults: async () => {
     const { currentProjectPath } = get();
@@ -201,7 +225,7 @@ export const useProjectSettingsStore = create<ProjectSettingsStore>((set, get) =
     set({ isLoading: true, error: null });
 
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}/settings?path=${encodeURIComponent(currentProjectPath)}`,
         { method: 'DELETE' }
       );
@@ -238,4 +262,5 @@ export type {
   SyncSettings,
   AgentSettings,
   TicketSettings,
+  NotificationSettings,
 };

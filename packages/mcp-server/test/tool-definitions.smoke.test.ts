@@ -8,14 +8,16 @@ import { ticketTools } from '../src/tools/handlers/tickets';
 import { trainingRoomTools } from '../src/tools/handlers/training-room';
 import { entityReferenceTools } from '../src/tools/handlers/entity-references';
 import { contextBuilderTools } from '../src/tools/handlers/context-builder';
-import { capabilityTools } from '../src/tools/handlers/capabilities';
+import { testResultTools } from '../src/tools/handlers/test-results';
+import { memoryTools } from '../src/tools/handlers/memory';
 
 const allToolGroups = [
   { name: 'ticketTools', tools: ticketTools },
   { name: 'trainingRoomTools', tools: trainingRoomTools },
   { name: 'entityReferenceTools', tools: entityReferenceTools },
   { name: 'contextBuilderTools', tools: contextBuilderTools },
-  { name: 'capabilityTools', tools: capabilityTools },
+  { name: 'testResultTools', tools: testResultTools },
+  { name: 'memoryTools', tools: memoryTools },
 ];
 
 describe('Tool Definitions (Smoke)', () => {

@@ -6,6 +6,7 @@
  */
 
 import { create } from "zustand";
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
 import type {
   IncidentType,
   IncidentSeverity,
@@ -301,7 +302,7 @@ interface TrainingRoomState {
 // Implementation
 // ============================================================================
 
-const API_BASE = "http://localhost:19432";
+const API_BASE = getApiBaseUrl();
 
 const initialFilters: TrainingFilters = {
   projectPath: "",
@@ -340,7 +341,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
     try {
       const params = new URLSearchParams();
       if (pp) params.append("projectPath", pp);
-      const response = await fetch(`${API_BASE}/api/training/sessions/${moduleId}?${params}`);
+      const response = await apiFetch(`${API_BASE}/api/training/sessions/${moduleId}?${params}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -370,7 +371,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
     try {
       const params = new URLSearchParams();
       if (pp) params.append("projectPath", pp);
-      const response = await fetch(`${API_BASE}/api/training/sessions/${moduleId}?${params}`, {
+      const response = await apiFetch(`${API_BASE}/api/training/sessions/${moduleId}?${params}`, {
         method: "POST",
       });
       const data = await response.json();
@@ -401,7 +402,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
     try {
       const params = new URLSearchParams();
       if (pp) params.append("projectPath", pp);
-      const response = await fetch(`${API_BASE}/api/training/sessions?${params}`);
+      const response = await apiFetch(`${API_BASE}/api/training/sessions?${params}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -422,19 +423,18 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
   // ==========================================================================
 
   fetchIncidents: async (sessionId) => {
-    const { currentSession, filters } = get();
-    const sid = sessionId || currentSession?.id;
+    const { filters } = get();
 
     set({ isLoading: true, error: null });
     try {
       const params = new URLSearchParams();
       if (filters.projectPath) params.append("projectPath", filters.projectPath);
-      if (sid) params.append("sessionId", sid);
+      if (sessionId) params.append("sessionId", sessionId);
       if (filters.moduleId) params.append("moduleId", filters.moduleId);
       if (filters.incidentStatus) params.append("status", filters.incidentStatus);
       if (filters.incidentSeverity) params.append("severity", filters.incidentSeverity);
 
-      const response = await fetch(`${API_BASE}/api/training/incidents?${params}`);
+      const response = await apiFetch(`${API_BASE}/api/training/incidents?${params}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -458,7 +458,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/training/incidents`, {
+      const response = await apiFetch(`${API_BASE}/api/training/incidents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, sessionId: currentSession.id }),
@@ -482,7 +482,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
 
   updateIncident: async (id, data) => {
     try {
-      const response = await fetch(`${API_BASE}/api/training/incidents/${id}`, {
+      const response = await apiFetch(`${API_BASE}/api/training/incidents/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -508,7 +508,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
 
   deleteIncident: async (id) => {
     try {
-      const response = await fetch(`${API_BASE}/api/training/incidents/${id}`, {
+      const response = await apiFetch(`${API_BASE}/api/training/incidents/${id}`, {
         method: "DELETE",
       });
 
@@ -536,18 +536,17 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
   // ==========================================================================
 
   fetchLessons: async (sessionId) => {
-    const { currentSession, filters } = get();
-    const sid = sessionId || currentSession?.id;
+    const { filters } = get();
 
     set({ isLoading: true, error: null });
     try {
       const params = new URLSearchParams();
       if (filters.projectPath) params.append("projectPath", filters.projectPath);
-      if (sid) params.append("sessionId", sid);
+      if (sessionId) params.append("sessionId", sessionId);
       if (filters.moduleId) params.append("moduleId", filters.moduleId);
       if (filters.lessonStatus) params.append("status", filters.lessonStatus);
 
-      const response = await fetch(`${API_BASE}/api/training/lessons?${params}`);
+      const response = await apiFetch(`${API_BASE}/api/training/lessons?${params}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -571,7 +570,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/training/lessons`, {
+      const response = await apiFetch(`${API_BASE}/api/training/lessons`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, sessionId: currentSession.id }),
@@ -595,7 +594,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
 
   updateLesson: async (id, data) => {
     try {
-      const response = await fetch(`${API_BASE}/api/training/lessons/${id}`, {
+      const response = await apiFetch(`${API_BASE}/api/training/lessons/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -619,7 +618,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
 
   approveLesson: async (id, approver = "user") => {
     try {
-      const response = await fetch(`${API_BASE}/api/training/lessons/${id}/approve`, {
+      const response = await apiFetch(`${API_BASE}/api/training/lessons/${id}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ approver }),
@@ -659,7 +658,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
       if (mid) params.append("module", mid);
       if (filters.skillStatus) params.append("status", filters.skillStatus);
 
-      const response = await fetch(`${API_BASE}/api/training/skills?${params}`);
+      const response = await apiFetch(`${API_BASE}/api/training/skills?${params}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -678,7 +677,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
   createSkill: async (data) => {
     const { filters } = get();
     try {
-      const response = await fetch(`${API_BASE}/api/training/skills`, {
+      const response = await apiFetch(`${API_BASE}/api/training/skills`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, projectPath: filters.projectPath }),
@@ -702,7 +701,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
 
   updateSkill: async (id, data) => {
     try {
-      const response = await fetch(`${API_BASE}/api/training/skills/${id}`, {
+      const response = await apiFetch(`${API_BASE}/api/training/skills/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -726,7 +725,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
 
   activateSkill: async (id) => {
     try {
-      const response = await fetch(`${API_BASE}/api/training/skills/${id}/activate`, {
+      const response = await apiFetch(`${API_BASE}/api/training/skills/${id}/activate`, {
         method: "POST",
       });
       const result = await response.json();
@@ -748,7 +747,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
 
   deprecateSkill: async (id) => {
     try {
-      const response = await fetch(`${API_BASE}/api/training/skills/${id}/deprecate`, {
+      const response = await apiFetch(`${API_BASE}/api/training/skills/${id}/deprecate`, {
         method: "POST",
       });
       const result = await response.json();
@@ -786,7 +785,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
       if (mid) params.append("module", mid);
       if (filters.ruleStatus) params.append("status", filters.ruleStatus);
 
-      const response = await fetch(`${API_BASE}/api/training/rules?${params}`);
+      const response = await apiFetch(`${API_BASE}/api/training/rules?${params}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -805,7 +804,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
   createRule: async (data) => {
     const { filters } = get();
     try {
-      const response = await fetch(`${API_BASE}/api/training/rules`, {
+      const response = await apiFetch(`${API_BASE}/api/training/rules`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, projectPath: filters.projectPath }),
@@ -829,7 +828,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
 
   updateRule: async (id, data) => {
     try {
-      const response = await fetch(`${API_BASE}/api/training/rules/${id}`, {
+      const response = await apiFetch(`${API_BASE}/api/training/rules/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -853,7 +852,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
 
   deprecateRule: async (id) => {
     try {
-      const response = await fetch(`${API_BASE}/api/training/rules/${id}/deprecate`, {
+      const response = await apiFetch(`${API_BASE}/api/training/rules/${id}/deprecate`, {
         method: "POST",
       });
       const result = await response.json();
@@ -885,7 +884,11 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
     try {
       const params = new URLSearchParams();
       if (pp) params.append("projectPath", pp);
-      const response = await fetch(`${API_BASE}/api/training/stats/${moduleId}?${params}`);
+      // Use aggregate endpoint for "default" module to show project-wide stats
+      const url = moduleId === "default"
+        ? `${API_BASE}/api/training/stats?${params}`
+        : `${API_BASE}/api/training/stats/${moduleId}?${params}`;
+      const response = await apiFetch(url);
       const data = await response.json();
 
       if (!response.ok) {
@@ -910,7 +913,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
       if (role) params.append("role", role);
       if (taskType) params.append("taskType", taskType);
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_BASE}/api/training/context/${moduleId}?${params}`
       );
       const data = await response.json();
@@ -931,7 +934,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
   buildContextPrompt: async (moduleId, projectPath, role, taskType) => {
     const pp = projectPath ?? get().filters.projectPath;
     try {
-      const response = await fetch(`${API_BASE}/api/training/context/build`, {
+      const response = await apiFetch(`${API_BASE}/api/training/context/build`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectPath: pp, moduleId, role, taskType }),
@@ -956,7 +959,7 @@ export const useTrainingRoomStore = create<TrainingRoomState>((set, get) => ({
 
   submitFeedback: async (data) => {
     try {
-      const response = await fetch(`${API_BASE}/api/training/feedback`, {
+      const response = await apiFetch(`${API_BASE}/api/training/feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

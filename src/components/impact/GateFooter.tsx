@@ -22,6 +22,7 @@ import {
 import { memo, useState, useCallback } from "react";
 
 import { cn } from "@/lib/utils";
+import { getApiBaseUrl } from "@/lib/api-config";
 import type { ImplementationGate, GateBlocker, GateWarning, GateApproval } from "@sidstack/shared";
 
 // =============================================================================
@@ -148,7 +149,7 @@ const ApprovalInfo = memo(function ApprovalInfo({
 export const GateFooter = memo(function GateFooter({
   gate,
   analysisId,
-  apiBaseUrl = "http://localhost:19432",
+  apiBaseUrl = getApiBaseUrl(),
   onApprove,
   onRefresh,
   className,

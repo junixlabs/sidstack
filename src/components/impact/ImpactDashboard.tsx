@@ -21,6 +21,7 @@ import {
 import { memo, useCallback, useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { getApiBaseUrl } from "@/lib/api-config";
 import type {
   ImpactAnalysis,
   GateStatus,
@@ -115,7 +116,7 @@ function getSeverityStats(analysis: ImpactAnalysis) {
 export const ImpactDashboard = memo(function ImpactDashboard({
   analysisId,
   analysis: initialAnalysis,
-  apiBaseUrl = "http://localhost:19432",
+  apiBaseUrl = getApiBaseUrl(),
   onRefresh,
   onGateApprove,
   compact = false,

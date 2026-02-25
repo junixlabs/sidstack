@@ -10,6 +10,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { validateProjectPath } from './validate-path';
 
 // =============================================================================
 // Types
@@ -142,6 +143,7 @@ export async function handleOkrList(args: {
   projectPath: string;
   quarter?: string;
 }): Promise<Record<string, unknown>> {
+  validateProjectPath(args.projectPath);
   const data = await readOkrs(args.projectPath);
 
   if (!data) {
@@ -203,6 +205,7 @@ export async function handleOkrUpdate(args: {
   updates: Array<{ krId: string; progress: number }>;
   reason?: string;
 }): Promise<Record<string, unknown>> {
+  validateProjectPath(args.projectPath);
   const data = await readOkrs(args.projectPath);
 
   if (!data) {

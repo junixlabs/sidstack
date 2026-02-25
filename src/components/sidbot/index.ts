@@ -1,0 +1,1 @@
+export { SidBotPanel } from "./SidBotPanel";

@@ -131,21 +131,36 @@ function LinkedKnowledgeItem({ link, onNavigate, onUnlink }: LinkedKnowledgeItem
   const fileName = link.knowledgePath.split("/").pop() || link.knowledgePath;
 
   // Determine category from path for color coding
-  const category = link.knowledgePath.includes("/business-logic/")
-    ? "business"
-    : link.knowledgePath.includes("/api/")
+  const category = link.knowledgePath.includes("/00-context/")
+    ? "context"
+    : link.knowledgePath.includes("/01-architecture/")
+    ? "architecture"
+    : link.knowledgePath.includes("/02-decisions/")
+    ? "decisions"
+    : link.knowledgePath.includes("/03-standards/")
+    ? "standards"
+    : link.knowledgePath.includes("/04-data/")
+    ? "data"
+    : link.knowledgePath.includes("/05-api/")
     ? "api"
-    : link.knowledgePath.includes("/patterns/")
-    ? "pattern"
-    : link.knowledgePath.includes("/database/")
-    ? "database"
+    : link.knowledgePath.includes("/06-operations/")
+    ? "operations"
+    : link.knowledgePath.includes("/07-projects/")
+    ? "projects"
+    : link.knowledgePath.includes("/08-incidents/")
+    ? "incidents"
     : "other";
 
   const categoryColor = {
-    business: "bg-purple-400",
-    api: "bg-blue-400",
-    pattern: "bg-green-400",
-    database: "bg-orange-400",
+    context: "bg-purple-400",
+    architecture: "bg-blue-400",
+    decisions: "bg-amber-400",
+    standards: "bg-green-400",
+    data: "bg-orange-400",
+    api: "bg-cyan-400",
+    operations: "bg-red-400",
+    projects: "bg-indigo-400",
+    incidents: "bg-rose-400",
     other: "bg-gray-400",
   }[category];
 

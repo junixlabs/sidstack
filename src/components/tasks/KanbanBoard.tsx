@@ -5,7 +5,7 @@
  * Optimized for PM workflow visibility.
  */
 
-import { Clock, GitBranch, User } from "lucide-react";
+import { Clock, Eye, GitBranch, Inbox, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { Task, TaskStatus } from "@/stores/taskStore";
@@ -35,6 +35,14 @@ const COLUMN_CONFIG: Array<{
     textVar: "var(--kanban-pending-text)",
     borderVar: "var(--kanban-pending-border)",
     emptyMessage: "No pending tasks",
+  },
+  {
+    status: "review",
+    label: "Review",
+    bgVar: "var(--kanban-review)",
+    textVar: "var(--kanban-review-text)",
+    borderVar: "var(--kanban-review-border)",
+    emptyMessage: "No tasks in review",
   },
   {
     status: "in_progress",
@@ -80,7 +88,7 @@ export function KanbanBoard({
   return (
     <div className="flex flex-col h-full">
       {/* Main board */}
-      <div className="flex-1 flex gap-3 overflow-x-auto pb-2">
+      <div className="flex-1 flex gap-4 pb-2">
         {COLUMN_CONFIG.map((column) => (
           <KanbanColumn
             key={column.status}
@@ -137,7 +145,7 @@ function KanbanColumn({
   onContextMenu,
 }: KanbanColumnProps) {
   return (
-    <div className="flex-shrink-0 w-72 flex flex-col bg-[var(--surface-0)] rounded-lg border border-[var(--border-muted)]">
+    <div className="flex-1 min-w-[220px] flex flex-col bg-[var(--surface-0)] rounded-lg border border-[var(--border-muted)]">
       {/* Column header */}
       <div
         className="px-3 py-2 rounded-t-lg border-b flex items-center justify-between"
@@ -147,15 +155,16 @@ function KanbanColumn({
           borderColor: borderVar,
         }}
       >
-        <span className="text-sm font-medium">{label}</span>
-        <span className="text-xs opacity-70">{tasks.length}</span>
+        <span className="text-sm font-semibold">{label}</span>
+        <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-black/15">{tasks.length}</span>
       </div>
 
       {/* Cards container */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[200px]">
+      <div className={cn("flex-1 overflow-y-auto p-2 space-y-2", tasks.length === 0 ? "min-h-[120px]" : "min-h-[200px]")}>
         {tasks.length === 0 ? (
-          <div className="text-xs text-[var(--text-muted)] text-center py-8">
-            {emptyMessage}
+          <div className="flex flex-col items-center justify-center gap-1.5 py-6 text-[var(--text-secondary)]">
+            <Inbox className="w-5 h-5 opacity-40" />
+            <span className="text-xs">{emptyMessage}</span>
           </div>
         ) : (
           tasks.map((task) => (
@@ -198,7 +207,7 @@ function KanbanCard({ task, isSelected, onSelect, onContextMenu }: KanbanCardPro
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
       onContextMenu={handleContextMenu}
       className={cn(
-        "p-2.5 rounded-md cursor-pointer transition-all border",
+        "group p-2.5 rounded-md cursor-pointer transition-all border",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]",
         isSelected
           ? "bg-[var(--surface-3)] border-[var(--border-emphasis)] ring-1 ring-[var(--border-emphasis)]"
@@ -218,8 +227,23 @@ function KanbanCard({ task, isSelected, onSelect, onContextMenu }: KanbanCardPro
         {task.title}
       </div>
 
-      {/* Progress bar (if any) */}
-      {task.progress > 0 && (
+      {/* Plan status indicator for review tasks */}
+      {task.status === "review" && task.planStatus && (
+        <div className="flex items-center gap-1 mb-2">
+          <Eye className="w-3 h-3 text-[var(--status-review)]" />
+          <span className={cn(
+            "text-[11px] font-medium",
+            task.planStatus === 'approved' && "text-[var(--status-completed)]",
+            task.planStatus === 'draft' && "text-[var(--status-review)]",
+            task.planStatus === 'revision_requested' && "text-[var(--status-blocked)]",
+          )}>
+            {task.planStatus === 'revision_requested' ? 'Needs Revision' : task.planStatus === 'approved' ? 'Approved' : 'Awaiting Review'}
+          </span>
+        </div>
+      )}
+
+      {/* Progress bar (skip for completed — already in done column) */}
+      {task.progress > 0 && task.status !== "completed" && (
         <div className="mb-2">
           <div
             className="h-1 bg-[var(--surface-3)] rounded-full overflow-hidden"
@@ -234,9 +258,7 @@ function KanbanCard({ task, isSelected, onSelect, onContextMenu }: KanbanCardPro
               style={{
                 width: `${task.progress}%`,
                 backgroundColor:
-                  task.status === "completed"
-                    ? "var(--status-completed)"
-                    : task.status === "in_progress"
+                  task.status === "in_progress"
                     ? "var(--status-in-progress)"
                     : "var(--text-muted)",
               }}
@@ -257,7 +279,7 @@ function KanbanCard({ task, isSelected, onSelect, onContextMenu }: KanbanCardPro
           </span>
         )}
         {task.branch && (
-          <span className="text-[11px] px-1.5 py-0.5 bg-purple-500/15 text-purple-400 rounded border border-purple-500/25 flex items-center gap-0.5" title={`Branch: ${task.branch}`}>
+          <span className="text-[11px] px-1.5 py-0.5 bg-purple-500/15 text-purple-400 rounded border border-purple-500/25 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" title={`Branch: ${task.branch}`}>
             <GitBranch className="w-2.5 h-2.5" />
             {task.branch.length > 12 ? `${task.branch.substring(0, 12)}...` : task.branch}
           </span>

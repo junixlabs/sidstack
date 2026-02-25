@@ -46,6 +46,46 @@ import {
   handleOkrUpdate,
 } from './handlers/okr.js';
 
+import {
+  testResultTools,
+  handleTestResultTool,
+} from './handlers/test-results.js';
+
+import {
+  agentDeskTools,
+  handleDeskList,
+  handleDeskStatus,
+  handleDeskAcquire,
+  handleDeskRelease,
+  handleDeskPoolInit,
+} from './handlers/agent-desk.js';
+
+import {
+  memoryTools,
+  handleMemoryAdd,
+  handleMemorySearch,
+  handleMemoryList,
+  handleMemoryDelete,
+  handleMemoryIndexKnowledge,
+  handleMemoryCleanup,
+} from './handlers/memory.js';
+
+import {
+  traceabilityTools,
+  handleTraceabilityMatrix,
+} from './handlers/traceability.js';
+
+import {
+  entityReferenceTools,
+  handleEntityLink,
+  handleEntityReferences,
+} from './handlers/entity-references.js';
+
+import {
+  contextBuilderTools,
+  handleEntityContext,
+} from './handlers/context-builder.js';
+
 // ============================================================
 // MVP Tool Whitelist
 // ============================================================
@@ -90,12 +130,37 @@ const MVP_TOOLS = new Set([
   'skill_list',
   'training_context_get',
 
-  // Sessions (role-based launch)
-  'session_launch',
-
   // OKRs (project goals)
   'okr_list',
   'okr_update',
+
+  // Test Results (E2E persistence)
+  'test_result_create',
+  'test_result_list',
+  'test_result_get',
+
+  // Agent Desk (workspace isolation)
+  'desk_list',
+  'desk_status',
+  'desk_acquire',
+  'desk_release',
+  'desk_pool_init',
+
+  // Memory (semantic search via mem0)
+  'memory_add',
+  'memory_search',
+  'memory_list',
+  'memory_delete',
+  'memory_index_knowledge',
+  'memory_cleanup',
+
+  // Traceability (spec → task → test coverage)
+  'traceability_matrix',
+
+  // Entity References (cross-entity linking)
+  'entity_link',
+  'entity_references',
+  'entity_context',
 ]);
 
 // ============================================================
@@ -120,6 +185,24 @@ const allTools: Tool[] = [
 
   // OKR Tools
   ...(okrTools as unknown as Tool[]),
+
+  // Test Result Tools
+  ...(testResultTools as unknown as Tool[]),
+
+  // Agent Desk Tools
+  ...(agentDeskTools as unknown as Tool[]),
+
+  // Memory Tools (mem0 semantic search)
+  ...(memoryTools as unknown as Tool[]),
+
+  // Traceability Tools
+  ...(traceabilityTools as unknown as Tool[]),
+
+  // Entity Reference Tools
+  ...(entityReferenceTools as unknown as Tool[]),
+
+  // Context Builder Tools
+  ...(contextBuilderTools as unknown as Tool[]),
 ];
 
 // Export only MVP tools
@@ -197,8 +280,54 @@ export async function handleToolCall(
       case 'okr_update':
         return wrapResult(handleOkrUpdate(args as any));
 
+      // Test Result tools
+      case 'test_result_create':
+      case 'test_result_list':
+      case 'test_result_get':
+        return wrapResult(handleTestResultTool(name, args as any));
+
+      // Agent Desk tools
+      case 'desk_list':
+        return wrapResult(handleDeskList(args as any));
+      case 'desk_status':
+        return wrapResult(handleDeskStatus(args as any));
+      case 'desk_acquire':
+        return wrapResult(handleDeskAcquire(args as any));
+      case 'desk_release':
+        return wrapResult(handleDeskRelease(args as any));
+      case 'desk_pool_init':
+        return wrapResult(handleDeskPoolInit(args as any));
+
+      // Memory tools (mem0 semantic search)
+      case 'memory_add':
+        return wrapResult(handleMemoryAdd(args as any));
+      case 'memory_search':
+        return wrapResult(handleMemorySearch(args as any));
+      case 'memory_list':
+        return wrapResult(handleMemoryList(args as any));
+      case 'memory_delete':
+        return wrapResult(handleMemoryDelete(args as any));
+      case 'memory_index_knowledge':
+        return wrapResult(handleMemoryIndexKnowledge(args as any));
+      case 'memory_cleanup':
+        return wrapResult(handleMemoryCleanup(args as any));
+
+      // Traceability tools
+      case 'traceability_matrix':
+        return wrapResult(handleTraceabilityMatrix(args as any));
+
+      // Entity Reference tools
+      case 'entity_link':
+        return wrapResult(handleEntityLink(args as any));
+      case 'entity_references':
+        return wrapResult(handleEntityReferences(args as any));
+
+      // Context Builder tools
+      case 'entity_context':
+        return wrapResult(handleEntityContext(args as any));
+
       default:
-        // Try SQLite-based tools (task_*, session_launch)
+        // Try SQLite-based tools (task_*, work_*, project_*)
         const sqliteToolNames = sqliteTools.map((t: { name: string }) => t.name);
         if (sqliteToolNames.includes(name)) {
           result = await handleSqliteTool(name, args);
@@ -227,7 +356,7 @@ async function wrapResult(
   return {
     content: [{
       type: 'text',
-      text: JSON.stringify(result, null, 2),
+      text: JSON.stringify(result),
     }],
   };
 }

@@ -26,7 +26,7 @@ import type {
   HealthCheckResult,
   HealthIssue,
 } from './types';
-import { DOCUMENT_TYPE_CONFIG } from './types';
+import { DOCUMENT_TYPE_CONFIG, FOLDER_CONFIG } from './types';
 import { AdapterRegistry, defaultAdapterRegistry } from './adapters';
 import {
   serializeFrontmatter,
@@ -418,6 +418,7 @@ export class KnowledgeService {
       owner: input.owner,
       related: input.related,
       dependsOn: input.dependsOn,
+      covers: input.covers,
     });
 
     // Serialize and write
@@ -456,6 +457,7 @@ export class KnowledgeService {
     if (updates.owner !== undefined) frontmatter.owner = updates.owner;
     if (updates.related !== undefined) frontmatter.related = updates.related;
     if (updates.dependsOn !== undefined) frontmatter.dependsOn = updates.dependsOn;
+    if (updates.covers !== undefined) frontmatter.covers = updates.covers;
 
     // Update timestamp
     frontmatter.updatedAt = new Date().toISOString();
@@ -602,6 +604,43 @@ export class KnowledgeService {
   }
 
   // ===========================================================================
+  // Doc Sync
+  // ===========================================================================
+
+  /**
+   * Check which knowledge docs may be stale based on changed files.
+   * Compares the `covers` field of each doc against the provided changed files list.
+   */
+  async checkDocSyncByChangedFiles(
+    changedFiles: string[]
+  ): Promise<Array<{ docId: string; title: string; coveredFile: string }>> {
+    if (changedFiles.length === 0) return [];
+
+    const documents = await this.loadDocuments();
+    const stale: Array<{ docId: string; title: string; coveredFile: string }> = [];
+
+    for (const doc of documents) {
+      if (!doc.covers || doc.covers.length === 0) continue;
+
+      for (const pattern of doc.covers) {
+        const matchedFile = changedFiles.find(f =>
+          f === pattern || f.endsWith(pattern) || f.includes(pattern)
+        );
+        if (matchedFile) {
+          stale.push({
+            docId: doc.id,
+            title: doc.title,
+            coveredFile: matchedFile,
+          });
+          break; // One match is enough per doc
+        }
+      }
+    }
+
+    return stale;
+  }
+
+  // ===========================================================================
   // Cache Management
   // ===========================================================================
 
@@ -697,10 +736,13 @@ export class KnowledgeService {
   }
 
   private sortTree(nodes: KnowledgeTreeNode[]): void {
-    // Sort folders first, then documents
+    // Sort folders first (by path to respect numeric prefixes), then documents alphabetically
     nodes.sort((a, b) => {
       if (a.type === 'folder' && b.type !== 'folder') return -1;
       if (a.type !== 'folder' && b.type === 'folder') return 1;
+      if (a.type === 'folder' && b.type === 'folder') {
+        return a.path.localeCompare(b.path);
+      }
       return a.name.localeCompare(b.name);
     });
 
@@ -713,11 +755,10 @@ export class KnowledgeService {
   }
 
   private formatFolderName(name: string): string {
-    // Check if it's a known type folder
-    for (const [, config] of Object.entries(DOCUMENT_TYPE_CONFIG)) {
-      if (config.folder === name) {
-        return config.label + 's'; // Pluralize
-      }
+    // Check if it's a known knowledge folder from FOLDER_CONFIG
+    const folderConfig = FOLDER_CONFIG.find(f => f.name === name);
+    if (folderConfig) {
+      return folderConfig.title;
     }
 
     // Default formatting

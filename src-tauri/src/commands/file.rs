@@ -776,20 +776,27 @@ fn collect_files_with_extension(dir: &Path, extension: &str, files: &mut Vec<Str
 pub async fn init_knowledge_folder(project_path: String) -> Result<(), FileError> {
     let knowledge_path = Path::new(&project_path).join(".sidstack").join("knowledge");
 
-    // Create main directories
-    let dirs = ["business-logic", "api", "patterns", "database", "modules"];
+    // Create 9-folder knowledge structure
+    let dirs = [
+        "00-context", "01-architecture", "02-decisions", "03-standards",
+        "04-data", "05-api", "06-operations", "07-projects", "08-incidents",
+    ];
     for dir in &dirs {
         fs::create_dir_all(knowledge_path.join(dir))?;
     }
 
-    // Create index files with templates
+    // Create index and README files with templates
     let templates = [
         ("_index.md", include_str!("../../../packages/shared/templates/knowledge/_index.md")),
-        ("business-logic/_index.md", include_str!("../../../packages/shared/templates/knowledge/business-logic/_index.md")),
-        ("api/_index.md", include_str!("../../../packages/shared/templates/knowledge/api/_index.md")),
-        ("patterns/_index.md", include_str!("../../../packages/shared/templates/knowledge/patterns/_index.md")),
-        ("database/_index.md", include_str!("../../../packages/shared/templates/knowledge/database/_index.md")),
-        ("modules/_index.md", include_str!("../../../packages/shared/templates/knowledge/modules/_index.md")),
+        ("00-context/_README.md", include_str!("../../../packages/shared/templates/knowledge/00-context/_README.md")),
+        ("01-architecture/_README.md", include_str!("../../../packages/shared/templates/knowledge/01-architecture/_README.md")),
+        ("02-decisions/_README.md", include_str!("../../../packages/shared/templates/knowledge/02-decisions/_README.md")),
+        ("03-standards/_README.md", include_str!("../../../packages/shared/templates/knowledge/03-standards/_README.md")),
+        ("04-data/_README.md", include_str!("../../../packages/shared/templates/knowledge/04-data/_README.md")),
+        ("05-api/_README.md", include_str!("../../../packages/shared/templates/knowledge/05-api/_README.md")),
+        ("06-operations/_README.md", include_str!("../../../packages/shared/templates/knowledge/06-operations/_README.md")),
+        ("07-projects/_README.md", include_str!("../../../packages/shared/templates/knowledge/07-projects/_README.md")),
+        ("08-incidents/_README.md", include_str!("../../../packages/shared/templates/knowledge/08-incidents/_README.md")),
     ];
 
     for (rel_path, content) in &templates {

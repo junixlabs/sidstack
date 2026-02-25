@@ -1,0 +1,31 @@
+# Ingress - expose mem0 API externally
+# Adjust for your ingress controller (traefik is default on k3s)
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mem0-ingress
+  namespace: sidstack
+  annotations:
+    # Uncomment for Traefik (k3s default)
+    # traefik.ingress.kubernetes.io/router.tls: "true"
+
+    # Uncomment for cert-manager auto TLS
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  rules:
+    - host: mem0.your-domain.com        # CHANGE THIS
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mem0
+                port:
+                  number: 8000
+  # Uncomment for TLS
+  # tls:
+  #   - hosts:
+  #       - mem0.your-domain.com
+  #     secretName: mem0-tls

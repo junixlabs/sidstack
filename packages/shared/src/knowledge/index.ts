@@ -26,7 +26,6 @@ export {
 export {
   type KnowledgeAdapter,
   SidStackAdapter,
-  MarkdownAdapter,
   AdapterRegistry,
   defaultAdapterRegistry,
 } from './adapters';

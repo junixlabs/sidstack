@@ -12,21 +12,28 @@ import {
   type TaskForValidation,
   type ProgressLogEntry,
 } from '@sidstack/shared';
+import { emitSseEvent } from '../events';
 
 export const tasksRouter: Router = Router();
 
-// List tasks
+// List tasks — unified endpoint with fields param
 tasksRouter.get('/', async (req, res) => {
   try {
-    // getDB() now auto-reloads if file changed externally (e.g., by MCP server)
     const db = await getDB();
     const projectId = (req.query.projectId as string) || 'default';
-    const status = req.query.status as string | undefined;
-    console.log('[tasks] Listing tasks for projectId:', projectId);
-
-    const tasks = db.listTasks(projectId, { status });
-    console.log('[tasks] Found', tasks.length, 'tasks');
-    res.json({ tasks });
+    const result = db.listTasks(projectId, {
+      preset: req.query.preset as any,
+      status: req.query.status ? (req.query.status as string).split(',') : undefined,
+      taskType: req.query.taskType ? (req.query.taskType as string).split(',') : undefined,
+      priority: req.query.priority as string | undefined,
+      parentOnly: req.query.parentOnly === 'true',
+      search: req.query.search as string | undefined,
+      assignedAgent: req.query.assignedAgent as string | undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+      offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
+      fields: (req.query.fields as any) || 'standard',
+    });
+    res.json(result);
   } catch (error) {
     console.error('[tasks] Error listing tasks:', error);
     res.status(500).json({ error: 'Failed to list tasks' });
@@ -145,6 +152,15 @@ tasksRouter.post('/', async (req, res) => {
       }),
     });
 
+    emitSseEvent({
+      type: 'task_created',
+      projectId,
+      entityId: task.id,
+      title: task.title,
+      summary: `New ${taskType} task created`,
+      timestamp: Date.now(),
+    });
+
     res.status(201).json({
       task,
       governance: {
@@ -168,8 +184,45 @@ tasksRouter.post('/', async (req, res) => {
 tasksRouter.patch('/:id', async (req, res) => {
   try {
     const db = await getDB();
-    const { status, progress, notes, moduleId, assignedAgent, branch } = req.body;
+    const { status, progress, notes, moduleId, assignedAgent, branch, solutionPlan, planStatus, planReviewNotes, implementSummary } = req.body;
     const taskId = req.params.id;
+
+    const currentTask = db.getTask(taskId);
+    if (!currentTask) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    // Status transition: → review requires solutionPlan
+    if (status === 'review') {
+      const plan = solutionPlan || currentTask.solutionPlan;
+      if (!plan || String(plan).trim().length < 20) {
+        return res.status(400).json({
+          error: 'Moving to review requires a solutionPlan (min 20 chars)',
+          hint: 'Provide solutionPlan with: root cause, approach, and logic changes.',
+        });
+      }
+    }
+
+    // Status transition: review → in_progress requires planStatus=approved
+    if (status === 'in_progress' && currentTask.status === 'review') {
+      if (currentTask.planStatus !== 'approved' && planStatus !== 'approved') {
+        return res.status(400).json({
+          error: 'Cannot start work on a task in review without an approved plan',
+          hint: 'Set planStatus to "approved" first.',
+        });
+      }
+    }
+
+    // Status transition: → completed requires implementSummary
+    if (status === 'completed') {
+      const summary = implementSummary || currentTask.implementSummary;
+      if (!summary || String(summary).trim().length < 10) {
+        return res.status(400).json({
+          error: 'Completing a task requires an implementSummary (min 10 chars)',
+          hint: 'Provide implementSummary with: what changed and how it was verified.',
+        });
+      }
+    }
 
     // Validate subtasks when completing a task
     if (status === 'completed') {
@@ -203,10 +256,36 @@ tasksRouter.patch('/:id', async (req, res) => {
       }
     }
 
-    const task = db.updateTask(taskId, { status, progress, notes, moduleId, assignedAgent, branch });
+    // Build update — auto-set planStatus=draft when solutionPlan submitted with review
+    const updates: Record<string, unknown> = {};
+    if (status !== undefined) updates.status = status;
+    if (progress !== undefined) updates.progress = progress;
+    if (notes !== undefined) updates.notes = notes;
+    if (moduleId !== undefined) updates.moduleId = moduleId;
+    if (assignedAgent !== undefined) updates.assignedAgent = assignedAgent;
+    if (branch !== undefined) updates.branch = branch;
+    if (solutionPlan !== undefined) updates.solutionPlan = solutionPlan;
+    if (implementSummary !== undefined) updates.implementSummary = implementSummary;
 
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
+    // planStatus logic
+    if (planStatus !== undefined) {
+      updates.planStatus = planStatus;
+    } else if (status === 'review' && solutionPlan) {
+      updates.planStatus = 'draft';
+    }
+    if (planReviewNotes !== undefined) updates.planReviewNotes = planReviewNotes;
+
+    const task = db.updateTask(taskId, updates as any);
+
+    if (task) {
+      emitSseEvent({
+        type: 'task_updated',
+        projectId: currentTask.projectId,
+        entityId: taskId,
+        title: task.title,
+        summary: status ? `Task status → ${status}` : 'Task updated',
+        timestamp: Date.now(),
+      });
     }
 
     res.json({ task });
@@ -437,6 +516,15 @@ tasksRouter.post('/:id/complete', async (req, res) => {
     } catch {
       // Non-blocking: ticket completion failure should not affect task completion
     }
+
+    emitSseEvent({
+      type: 'task_completed',
+      projectId: task.projectId,
+      entityId: taskId,
+      title: task.title,
+      summary: 'Task completed',
+      timestamp: Date.now(),
+    });
 
     res.json({
       task: updatedTask,

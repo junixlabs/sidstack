@@ -35,7 +35,10 @@ const VIEW_CONFIGS: ViewConfig[] = [
   { id: "ticket-queue", blockType: "ticket-queue", title: "Ticket Queue" },
   { id: "specs", blockType: "specs-browser", title: "Specs" },
   { id: "training-room", blockType: "training-room", title: "Training Room" },
+  { id: "agent-desks", blockType: "agent-desk", title: "Agent Desks" },
+  { id: "traceability", blockType: "traceability", title: "Traceability" },
   { id: "settings", blockType: "settings", title: "Project Settings" },
+  { id: "docs", blockType: "docs", title: "Documentation" },
 ];
 
 interface WorkspaceViewSwitcherProps {

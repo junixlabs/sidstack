@@ -2,9 +2,11 @@
 
 Get from zero to productive in minutes.
 
-SidStack has two interfaces - use either or both:
+SidStack has multiple interfaces - use any combination:
 - **MCP Server** - Use from Claude Code with 32 MCP tools
 - **Desktop App** - Visual project management (macOS)
+- **Web UI** - Browser-based access (remote/team)
+- **Docker** - Deploy full stack on a server
 
 ---
 
@@ -123,6 +125,166 @@ Or configure MCP manually (without CLI init):
   }
 }
 ```
+
+---
+
+## Option C: Docker Server (Full Stack)
+
+Deploy all SidStack services on a server with Docker Compose.
+
+### Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| **api-server** | 19432 | REST API — central data gateway (SQLite) |
+| **mcp-server** | 19433 | MCP tools — Streamable HTTP for Claude Code |
+| **bot-server** | 3222 | SidBot — Gemini intent router + chat |
+| **web-ui** | 5174 | React SPA — browser-based project management |
+| **caddy** | 80/443 | Reverse proxy — auto TLS (Let's Encrypt) |
+| **mem0** | 4321 | Semantic memory (optional) |
+| **litellm** | 4000 | LLM gateway for mem0 (optional) |
+
+### 1. Configure Environment
+
+```bash
+cd docker
+cp .env.example .env
+```
+
+Edit `.env` with your values:
+
+```env
+# Required
+SIDSTACK_API_KEY=sk-your-secure-key
+
+# Domain names (must point to your server IP)
+API_DOMAIN=api.yourdomain.com
+MCP_DOMAIN=mcp.yourdomain.com
+APP_DOMAIN=app.yourdomain.com
+
+# Optional: CORS for Web UI
+SIDSTACK_CORS_ORIGINS=https://app.yourdomain.com
+```
+
+### 2. Start All Services
+
+```bash
+# Full stack (all services)
+docker compose up -d
+
+# Core only (no semantic memory)
+docker compose up -d api-server mcp-server bot-server web-ui caddy
+
+# Minimal (API + MCP only, no proxy)
+docker compose up -d api-server mcp-server
+```
+
+### 3. Verify
+
+```bash
+# Check all services are running
+docker compose ps
+
+# Health checks
+curl https://api.yourdomain.com/health
+curl https://mcp.yourdomain.com/health
+
+# Open Web UI
+open https://app.yourdomain.com
+```
+
+### 4. Connect Claude Code
+
+Add to your project's `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "sidstack": {
+      "type": "streamable-http",
+      "url": "https://mcp.yourdomain.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+### 5. Sync Knowledge to Server
+
+Push local `.sidstack/knowledge/` files to the remote API:
+
+```bash
+npx @sidstack/cli knowledge sync \
+  --api-url https://api.yourdomain.com \
+  --api-key sk-your-key
+
+# Preview without changes
+npx @sidstack/cli knowledge sync --dry-run
+```
+
+### Architecture
+
+```
+Internet
+  │
+  ├── app.yourdomain.com  → Caddy → web-ui (:5174)
+  ├── api.yourdomain.com  → Caddy → api-server (:19432) → SQLite
+  ├── mcp.yourdomain.com  → Caddy → mcp-server (:19433) → api-server
+  └── bot.yourdomain.com  → Caddy → bot-server (:3222)  → api-server + Gemini
+
+  Web UI: /api/* proxied internally to api-server
+  MCP Server: calls API Server via HTTP (no direct DB access)
+  Bot Server: Gemini intent routing, calls API Server for tasks/tickets
+```
+
+---
+
+## Option D: Connect to Remote Server
+
+Connect Claude Code to an existing SidStack server (deployed by your team).
+
+### 1. Get Your Credentials
+
+Your admin provides:
+- API URL (e.g. `https://api.yourdomain.com`)
+- MCP URL (e.g. `https://mcp.yourdomain.com`)
+- API Key (e.g. `sk-...`)
+
+### 2. Configure `.mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "sidstack": {
+      "type": "streamable-http",
+      "url": "https://mcp.yourdomain.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+### 3. Set Environment (Optional)
+
+For CLI commands that call the REST API directly:
+
+```bash
+export SIDSTACK_API_URL=https://api.yourdomain.com
+export SIDSTACK_API_KEY=sk-your-key
+```
+
+### 4. Verify Connection
+
+In Claude Code, ask:
+```
+List my SidStack tasks
+```
+
+Claude should use the `task_list` MCP tool and connect to the remote server.
 
 ---
 

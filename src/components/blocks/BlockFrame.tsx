@@ -15,7 +15,6 @@ import {
   BookOpen,
   ListTodo,
   GraduationCap,
-  GitBranch,
   Ticket,
 } from "lucide-react";
 import { memo, useCallback, type ReactNode } from "react";
@@ -101,8 +100,6 @@ function getViewIcon(viewType: BlockViewType) {
       return <ListTodo className="w-3.5 h-3.5" />;
     case "training-room":
       return <GraduationCap className="w-3.5 h-3.5" />;
-    case "worktree-status":
-      return <GitBranch className="w-3.5 h-3.5" />;
     case "ticket-queue":
       return <Ticket className="w-3.5 h-3.5" />;
     default:
@@ -132,8 +129,6 @@ function getViewName(viewType: BlockViewType): string {
       return "Tasks";
     case "training-room":
       return "Training";
-    case "worktree-status":
-      return "Worktree";
     case "ticket-queue":
       return "Tickets";
     default:

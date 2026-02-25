@@ -1,6 +1,6 @@
 {
   "name": "@sidstack/mcp-server",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "description": "MCP Server for SidStack - task management, knowledge, and impact analysis for Claude Code",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -28,6 +28,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/server.js",
+    "start:http": "node dist/server.js --http",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",

@@ -1,0 +1,23 @@
+---
+id: {{title}}
+type: guide
+title: {{title}}
+module: {{module}}
+status: draft
+created: {{date}}
+tags: [guide, {{module}}]
+---
+
+# {{title}}
+
+## Overview
+
+Brief description of this guide's purpose.
+
+## Details
+
+Content here...
+
+## Related
+
+- Link to related documents

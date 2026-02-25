@@ -11,6 +11,12 @@ import type { Task, Ticket, TrainingContext } from './database';
 // Types
 // ============================================================================
 
+export interface SemanticMemory {
+  memory: string;
+  score?: number;
+  metadata?: Record<string, unknown>;
+}
+
 export interface ContextBuilderOptions {
   workspacePath: string;
 
@@ -26,6 +32,8 @@ export interface ContextBuilderOptions {
   getModuleKnowledge?: (moduleId: string, workspacePath: string) => Promise<ModuleKnowledge | null>;
   getSpecContent?: (specId: string, workspacePath: string) => Promise<SpecContent | null>;
   getTrainingContext?: (moduleId: string, role?: string, taskType?: string) => Promise<TrainingContext | null>;
+  getSemanticMemories?: (query: string) => Promise<SemanticMemory[]>;
+  getValidationFailures?: (query: string) => Promise<SemanticMemory[]>;
 
   // Options
   includeGovernance?: boolean;  // Include governance rules in context
@@ -48,7 +56,7 @@ export interface ModuleDoc {
   title: string;
   path: string;
   content: string;
-  type: 'business-logic' | 'api' | 'pattern' | 'database' | 'general';
+  type: 'guide' | 'reference' | 'pattern' | 'spec' | 'decision' | 'rule' | 'general';
 }
 
 export interface SpecContent {
@@ -339,6 +347,48 @@ function formatSpecContext(spec: SpecContent): string {
 }
 
 /**
+ * Format semantic memories from mem0 for Claude context injection
+ */
+function formatSemanticMemories(memories: SemanticMemory[]): string {
+  const sections: string[] = [];
+
+  sections.push('## Relevant Memories');
+  sections.push('_Semantically related memories from past interactions:_\n');
+
+  for (const mem of memories.slice(0, 10)) {
+    const score = mem.score != null ? ` (relevance: ${(mem.score * 100).toFixed(0)}%)` : '';
+    sections.push(`- ${mem.memory}${score}`);
+  }
+
+  if (memories.length > 10) {
+    sections.push(`\n_...and ${memories.length - 10} more memories_`);
+  }
+
+  return sections.join('\n');
+}
+
+/**
+ * Format validation failure memories as "Known Pitfalls" for Claude context injection
+ */
+function formatKnownPitfalls(failures: SemanticMemory[]): string {
+  const sections: string[] = [];
+
+  sections.push('## Known Pitfalls');
+  sections.push('_Past validation failures in this area. Avoid repeating these mistakes:_\n');
+
+  for (const mem of failures.slice(0, 5)) {
+    const score = mem.score != null ? ` (relevance: ${(mem.score * 100).toFixed(0)}%)` : '';
+    sections.push(`- ${mem.memory}${score}`);
+  }
+
+  if (failures.length > 5) {
+    sections.push(`\n_...and ${failures.length - 5} more failures_`);
+  }
+
+  return sections.join('\n');
+}
+
+/**
  * Format auto-learning instructions for Claude session injection.
  * Tells the agent when and how to capture incidents, lessons, and skills.
  */
@@ -516,6 +566,47 @@ export async function buildSessionContext(
     }
   }
 
+  // Load and format Semantic Memories (from mem0)
+  if (options.getSemanticMemories) {
+    // Build a search query from task title or moduleId
+    const searchQuery = options.taskId
+      ? (await options.getTask?.(options.taskId))?.title
+      : options.moduleId || options.specId;
+
+    if (searchQuery) {
+      try {
+        const memories = await options.getSemanticMemories(searchQuery);
+        if (memories.length > 0) {
+          contextParts.push('\n---\n');
+          contextParts.push(formatSemanticMemories(memories));
+          entities.push('semantic-memories');
+        }
+      } catch {
+        // Non-blocking: skip if mem0 unavailable
+      }
+    }
+  }
+
+  // Load and format Known Pitfalls (validation failures from mem0)
+  if (options.getValidationFailures) {
+    const searchQuery = options.taskId
+      ? (await options.getTask?.(options.taskId))?.title
+      : options.moduleId || options.specId;
+
+    if (searchQuery) {
+      try {
+        const failures = await options.getValidationFailures(searchQuery);
+        if (failures.length > 0) {
+          contextParts.push('\n---\n');
+          contextParts.push(formatKnownPitfalls(failures));
+          entities.push('known-pitfalls');
+        }
+      } catch {
+        // Non-blocking: skip if mem0 unavailable
+      }
+    }
+  }
+
   // Auto-learning instructions (when training tools are available)
   if (options.includeTraining && options.moduleId) {
     contextParts.push('\n---\n');
@@ -579,6 +670,8 @@ export function createSessionContextOptions(params: {
   agentRole?: string;
   taskType?: string;
   maxContextLength?: number;
+  getSemanticMemories?: (query: string) => Promise<SemanticMemory[]>;
+  getValidationFailures?: (query: string) => Promise<SemanticMemory[]>;
 }): ContextBuilderOptions {
   const { db, knowledgeService, workspacePath } = params;
 
@@ -592,6 +685,8 @@ export function createSessionContextOptions(params: {
     agentRole: params.agentRole,
     taskType: params.taskType,
     maxContextLength: params.maxContextLength ?? 8000,
+    getSemanticMemories: params.getSemanticMemories,
+    getValidationFailures: params.getValidationFailures,
 
     // Data loaders
     getTask: db ? async (id: string) => db.getTask(id) : undefined,
@@ -611,12 +706,12 @@ export function createSessionContextOptions(params: {
               name: modId,
               docs: response.documents.map((d: any) => {
                 const t = d.type as string;
-                const mappedType = t === 'reference' ? 'api' : t === 'pattern' ? 'pattern' : 'general';
+                const mappedType = ['guide', 'reference', 'pattern', 'spec', 'decision', 'rule'].includes(t) ? t : 'general';
                 return {
                   title: d.title,
                   path: d.sourcePath,
                   content: d.content || d.summary || '',
-                  type: mappedType as 'business-logic' | 'api' | 'pattern' | 'database' | 'general',
+                  type: mappedType as 'guide' | 'reference' | 'pattern' | 'spec' | 'decision' | 'rule' | 'general',
                 };
               }),
             };

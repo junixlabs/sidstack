@@ -22,6 +22,87 @@ This creates the `.sidstack/` directory with governance rules, knowledge templat
 
 ---
 
+## Agent Desk
+
+Agent Desk gives each AI agent its own isolated workspace using git worktrees. All desks share one `.sidstack/` knowledge base, but each has independent code, branches, and local state.
+
+### Key Concepts
+
+| Term | Meaning |
+|------|---------|
+| **Agent Desk** | A git worktree assigned to an AI agent (Worker or Reviewer) |
+| **`.sidstack/`** | Shared project knowledge, governance, and skills (1 per project) |
+| **`.sidstack-local/`** | Per-desk state: role, status, current task, ports |
+
+### Workspace Modes
+
+**Mode A: `.bare/` Workspace** (recommended for new projects)
+
+```
+my-project-workspace/
+├── .bare/                ← Git bare repository
+├── .sidstack/            ← Shared knowledge & governance
+├── main/                 ← Reference worktree (main branch)
+├── worker-1/             ← Agent Desk (Worker)
+└── reviewer-1/           ← Agent Desk (Reviewer)
+```
+
+Setup via CLI:
+```bash
+sidstack new my-project                              # Creates workspace
+sidstack desk add worker-1 -b agent/worker-1 --role worker
+sidstack desk add reviewer-1 -b agent/reviewer-1 --role reviewer
+```
+
+**Mode B: Normal Repo + Sibling Worktrees** (for existing repos)
+
+```
+/projects/
+├── my-project/              ← Normal git repo (has .sidstack/)
+├── worker-1/                ← Sibling worktree
+└── reviewer-1/              ← Sibling worktree
+```
+
+Setup:
+```bash
+cd my-project
+sidstack init                                         # Creates .sidstack/
+git worktree add ../worker-1 -b agent/worker-1
+```
+
+### Creating an Agent Desk (Desktop App)
+
+1. Click **+** in the sidebar Agent Desk section
+2. Choose role: **Worker** or **Reviewer**
+3. Enter agent name (e.g., "Worker 1")
+4. Select or create a branch
+5. Click **Create Agent Desk**
+
+The app creates the worktree, writes `.sidstack-local/session.json`, and adds the desk to the sidebar.
+
+### Managing Desks
+
+```bash
+sidstack desk list                    # List all agent desks
+sidstack desk list --verbose          # Include git status
+sidstack desk add <name> [flags]      # Add a new desk
+sidstack desk remove <name>           # Remove a desk
+```
+
+### MCP Integration
+
+From any agent desk directory, MCP tools automatically resolve the shared `.sidstack/`:
+
+```bash
+# From worker-1/ directory:
+knowledge_context({ projectPath: "/path/to/worker-1" })
+# → Resolves to shared .sidstack/ automatically
+```
+
+No configuration needed — workspace detection handles both modes transparently.
+
+---
+
 ## Navigation
 
 Use the **Activity Bar** on the left to switch between views:
@@ -53,14 +134,17 @@ Browse your project's structured documentation stored in `.sidstack/knowledge/`.
 
 ### Document Types
 
-| Type | Purpose |
-|------|---------|
-| `business-logic` | Business rules and domain workflows |
-| `api-endpoint` | API contracts, endpoints, and schemas |
-| `design-pattern` | Architecture patterns and conventions |
-| `database-table` | Database schema and relationships |
-| `module` | Module boundaries and responsibilities |
-| `index` | Module index and overview |
+| Category | Purpose |
+|----------|---------|
+| `00-context` | Vision, glossary, onboarding, team structure |
+| `01-architecture` | System design, module boundaries, patterns |
+| `02-decisions` | ADRs, technical decisions (date-prefixed) |
+| `03-standards` | Coding conventions, naming, testing rules |
+| `04-data` | Database schema, ownership, retention |
+| `05-api` | API contracts, schemas, versioning |
+| `06-operations` | Deployment, monitoring, rollback strategy |
+| `07-projects` | Project-specific docs (date-prefixed) |
+| `08-incidents` | Incident reports, root cause analysis (date-prefixed) |
 
 ### Features
 
@@ -91,11 +175,17 @@ Track AI agent work with governance quality gates.
 - **Kanban** — Board view grouped by status columns
 - **Timeline** — Gantt-style view for scheduling
 
-### Quality Gates
+### Task Completion
 
-Before a task can be marked complete, SidStack checks:
-- Acceptance criteria are defined (for feature/bugfix/security tasks)
-- Governance rules are satisfied
+When a task is completed via `task_complete`, SidStack automatically:
+
+1. **Runs quality gates** — Executes typecheck, lint, and test commands
+2. **Creates follow-up tasks:**
+   - `[infra] Deploy` — assigned to human
+   - `[test] Verify on production` — assigned to human
+   - `[docs] Update docs` — assigned to reviewer (includes changed files context)
+3. **Detects stale docs** — Warns if knowledge docs cover files that changed
+4. **Validates governance** — Checks acceptance criteria, progress history, and title format
 - Required fields are filled
 
 ---
@@ -153,7 +243,6 @@ SidStack connects to Claude Code via a **Model Context Protocol (MCP) server** t
 | Impact | `impact_analyze`, `impact_check_gate`, `impact_list` | Assess change risk |
 | Tickets | `ticket_create`, `ticket_list`, `ticket_update`, `ticket_convert_to_task` | Manage intake |
 | Training | `incident_create`, `lesson_create`, `skill_create`, `rule_check` | Learn from mistakes |
-| Sessions | `session_launch` | Launch governed Claude sessions |
 
 ---
 
@@ -181,6 +270,13 @@ sidstack skill list              # List available skills
 sidstack skill show <name>       # Show skill details
 sidstack skill add <name>        # Add a skill to project
 sidstack skill create            # Create a custom skill
+
+# Agent Desk
+sidstack desk list               # List all agent desks
+sidstack desk list --verbose     # Include git status per desk
+sidstack desk add <name>         # Add a new agent desk
+sidstack desk remove <name>      # Remove an agent desk
+sidstack new <name>              # Create a new workspace with .bare/
 ```
 
 ---
@@ -219,3 +315,18 @@ sidstack skill create            # Create a custom skill
 ### Tasks Not Updating
 - Check that the project ID matches between desktop app and MCP tools
 - Verify the SQLite database isn't locked by another process
+
+### Agent Desk Not Detected
+- Run `sidstack init` in the main project to create `.sidstack/config.json`
+- For Mode A: ensure `.sidstack/config.json` is at workspace root (next to `.bare/`)
+- For Mode B: run `git rev-parse --git-common-dir` from the desk directory — it should point to the main project's `.git`
+
+### Agent Desk Can't Find Shared Knowledge
+- Verify `.sidstack/` exists in the main project
+- If `.sidstack/` is gitignored: it won't appear in worktrees (expected — git fallback resolves it)
+- If `.sidstack/` is tracked in git: it appears in every worktree via git checkout
+
+### Port Conflicts Between Desks
+- Each desk gets unique ports auto-allocated by the Desktop App
+- Check `.sidstack-local/session.json` for assigned ports
+- Default ranges: dev 3000-3099, api 19432-19531, preview 4000-4099

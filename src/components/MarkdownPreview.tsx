@@ -13,6 +13,8 @@ interface MarkdownPreviewProps {
   basePath?: string;
   /** Callback when a local file link is clicked */
   onLinkClick?: (path: string) => void;
+  /** Compact mode - removes max-w-none and padding, suitable for constrained containers */
+  compact?: boolean;
 }
 
 /**
@@ -24,7 +26,7 @@ interface MarkdownPreviewProps {
  * - HUD-style dark theme
  */
 // Memoized to prevent re-parsing markdown on parent re-renders
-export const MarkdownPreview = memo(function MarkdownPreview({ content, className = "", basePath, onLinkClick }: MarkdownPreviewProps) {
+export const MarkdownPreview = memo(function MarkdownPreview({ content, className = "", basePath, onLinkClick, compact = false }: MarkdownPreviewProps) {
 
   // Check if a href is a local file link (relative path or file://)
   const isLocalLink = (href: string): boolean => {
@@ -68,7 +70,9 @@ export const MarkdownPreview = memo(function MarkdownPreview({ content, classNam
     <div
       className={clsx(
         // Base prose styles with HUD theme
-        "prose prose-invert prose-sm max-w-none",
+        "prose prose-invert prose-sm",
+        // Width constraint - compact mode uses max-w-full instead of max-w-none
+        compact ? "max-w-full overflow-hidden" : "max-w-none",
         // Headings - Clear hierarchy
         "prose-headings:text-[var(--text-primary)] prose-headings:font-semibold prose-headings:border-b prose-headings:border-[var(--border-muted)] prose-headings:pb-2 prose-headings:mb-4",
         "prose-h1:text-xl prose-h1:border-[var(--border-default)]",
@@ -76,19 +80,24 @@ export const MarkdownPreview = memo(function MarkdownPreview({ content, classNam
         "prose-h3:text-base prose-h3:text-[var(--text-secondary)] prose-h3:border-none prose-h3:pb-0",
         "prose-h4:text-sm prose-h4:text-[var(--text-secondary)] prose-h4:border-none prose-h4:pb-0 prose-h4:uppercase prose-h4:tracking-wide",
         // Paragraphs
-        "prose-p:text-[var(--text-secondary)] prose-p:leading-relaxed prose-p:mb-4",
+        "prose-p:text-[var(--text-secondary)] prose-p:leading-relaxed",
+        compact ? "prose-p:mb-2" : "prose-p:mb-4",
         // Links
         "prose-a:text-[var(--text-secondary)] prose-a:no-underline hover:prose-a:text-[var(--text-primary)] hover:prose-a:underline",
         // Strong/Bold
         "prose-strong:text-[var(--text-primary)] prose-strong:font-semibold",
         // Inline code
-        "prose-code:text-[var(--text-secondary)] prose-code:bg-[var(--surface-2)] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-code:before:content-none prose-code:after:content-none",
+        compact
+          ? "prose-code:text-[var(--text-secondary)] prose-code:bg-[var(--surface-2)] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono prose-code:before:content-none prose-code:after:content-none prose-code:break-all"
+          : "prose-code:text-[var(--text-secondary)] prose-code:bg-[var(--surface-2)] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-code:before:content-none prose-code:after:content-none",
         // Pre/Code blocks - handled by custom component
         "prose-pre:bg-transparent prose-pre:p-0 prose-pre:border-none",
+        compact && "prose-pre:overflow-x-auto prose-pre:max-w-full",
         // Blockquotes
         "prose-blockquote:border-l-[var(--border-default)] prose-blockquote:border-l-2 prose-blockquote:bg-[var(--surface-2)] prose-blockquote:rounded-r-lg prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:text-[var(--text-secondary)] prose-blockquote:italic",
         // Lists
         "prose-ul:text-[var(--text-secondary)] prose-ol:text-[var(--text-secondary)]",
+        compact && "prose-ul:pl-4 prose-ol:pl-4",
         "prose-li:marker:text-[var(--text-muted)] prose-li:mb-1",
         // Horizontal rule
         "prose-hr:border-[var(--border-muted)] prose-hr:my-8",
@@ -96,10 +105,11 @@ export const MarkdownPreview = memo(function MarkdownPreview({ content, classNam
         "prose-table:text-[var(--text-secondary)]",
         "prose-th:text-[var(--text-primary)] prose-th:border-[var(--border-muted)] prose-th:bg-[var(--surface-2)] prose-th:px-3 prose-th:py-2",
         "prose-td:border-[var(--border-muted)] prose-td:px-3 prose-td:py-2",
-        // Container padding
-        "p-6 overflow-auto",
+        // Container padding - compact mode has no padding
+        compact ? "p-0" : "p-6 overflow-auto",
         className
       )}
+      style={compact ? { overflowWrap: "break-word", wordBreak: "break-word" } : undefined}
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}

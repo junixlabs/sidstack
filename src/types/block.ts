@@ -1,7 +1,7 @@
 // Block System Types for SidStack
 // Inspired by WaveTerm's block architecture
 
-export type BlockViewType = "preview" | "webview" | "settings" | "specs-browser" | "knowledge-browser" | "training-room" | "task-manager" | "worktree-status" | "worktree-overview" | "ticket-queue" | "project-hub";
+export type BlockViewType = "preview" | "webview" | "settings" | "specs-browser" | "knowledge-browser" | "training-room" | "task-manager" | "ticket-queue" | "project-hub" | "agent-desk" | "docs" | "traceability";
 
 /**
  * Block data stored per block instance
@@ -32,8 +32,9 @@ export interface BlockData {
   trainingSessionId?: string; // ID of the training session
   trainingModuleId?: string; // Module ID for the training session
 
-  // Worktree Status-specific
-  worktreePath?: string; // Path to the worktree
+  // Agent Desk-specific
+  agentDeskId?: string; // Worktree ID of the agent desk
+  projectId?: string; // Project ID for scoped worktree lookup
 
   // Cross-feature navigation - used when navigating from other views
   selectedTaskId?: string; // Pre-select this task in Task Manager

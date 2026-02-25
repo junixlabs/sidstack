@@ -228,7 +228,7 @@ contextRouter.get('/task/:taskId/start-context', async (req, res) => {
       entityType: 'task',
       entityId: taskId,
       format: format as ContextFormat,
-      sections: ['capability', 'knowledge', 'impact', 'governance', 'history', 'references'],
+      sections: ['knowledge', 'impact', 'governance', 'history', 'references'],
       maxTokens,
       depth: 1,
     });

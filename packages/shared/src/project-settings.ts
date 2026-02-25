@@ -5,10 +5,25 @@
  * Stored in <project>/.sidstack/project-settings.json
  */
 
-import type { TerminalApp, LaunchMode, WindowMode } from './external-session';
+// Terminal types (previously from external-session.ts, now inlined)
+export type TerminalApp =
+  | 'iTerm'
+  | 'Terminal'
+  | 'Warp'
+  | 'Alacritty'
+  | 'kitty'
+  | 'ghostty'
+  | 'Hyper';
 
-// Re-export for convenience
-export type { TerminalApp, LaunchMode, WindowMode };
+export type LaunchMode =
+  | 'normal'
+  | 'skip-permissions'
+  | 'continue'
+  | 'resume'
+  | 'print'
+  | 'verbose';
+
+export type WindowMode = 'always-new' | 'per-project-tabs' | 'per-project-splits';
 
 // ============================================================================
 // Settings Schema
@@ -45,6 +60,8 @@ export interface SyncSettings {
   autoRefreshEnabled: boolean;
   /** Auto-refresh interval in seconds (5-60) */
   autoRefreshIntervalSeconds: number;
+  /** Notification preferences */
+  notifications?: NotificationSettings;
 }
 
 /**
@@ -57,6 +74,22 @@ export interface AgentSettings {
   maxConcurrentAgents: number;
   /** Enable automatic agent recovery */
   autoRecoveryEnabled: boolean;
+}
+
+/**
+ * Notification preference settings
+ */
+export interface NotificationSettings {
+  /** Master toggle for all notifications */
+  enabled: boolean;
+  /** Enable OS-level desktop notifications */
+  desktopEnabled: boolean;
+  /** Notify on task status changes */
+  taskUpdates: boolean;
+  /** Notify on ticket pipeline changes */
+  ticketUpdates: boolean;
+  /** Notify on knowledge document changes */
+  knowledgeChanges: boolean;
 }
 
 /**
@@ -126,12 +159,21 @@ export const DEFAULT_SESSION_SETTINGS: SessionSettings = {
   defaultMode: 'normal',
 };
 
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  enabled: true,
+  desktopEnabled: true,
+  taskUpdates: true,
+  ticketUpdates: true,
+  knowledgeChanges: true,
+};
+
 export const DEFAULT_SYNC_SETTINGS: SyncSettings = {
   autoSyncEnabled: true,
   syncIntervalSeconds: 30,
   syncOnWindowFocus: true,
   autoRefreshEnabled: true,
   autoRefreshIntervalSeconds: 15,
+  notifications: DEFAULT_NOTIFICATION_SETTINGS,
 };
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {

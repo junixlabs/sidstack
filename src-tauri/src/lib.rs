@@ -15,7 +15,7 @@ mod session_tracker;
 mod sdk_sidecar;
 pub mod utils;
 
-use commands::git::{get_diff, get_file_diff, list_branches, get_commit_log, get_repo_status, run_git_command, run_shell_command};
+use commands::git::{get_diff, get_file_diff, list_branches, get_commit_log, get_repo_status, run_git_command, run_shell_command, resolve_workspace_root};
 use commands::workspace::{list_workspaces, create_workspace, delete_workspace, get_workspace_status, sync_shared_symlinks};
 use commands::file::{get_file_content, get_file_tree, search_files, delete_file, rename_file, create_file, create_folder, get_image_base64, path_exists, read_file, list_markdown_files, init_knowledge_folder, validate_knowledge_files, fix_knowledge_file, list_files_with_extension};
 use commands::agent::{
@@ -165,13 +165,8 @@ pub fn run() {
             // Setup system tray
             let _ = setup_tray(app.handle());
 
-            // Start API server
-            let api_state = app.state::<api_server::SharedApiServerState>().inner().clone();
-            tauri::async_runtime::spawn(async move {
-                if let Err(e) = start_api_server(api_state).await {
-                    eprintln!("[Agent Manager] Failed to start API server: {}", e);
-                }
-            });
+            // API server is now remote — no local startup needed.
+            // Connection configured via UI (ConnectionSetup component).
 
             // Start IPC server for MCP communication
             let ipc_state = app.state::<ipc_server::SharedIpcServerState>().inner().clone();
@@ -212,6 +207,7 @@ pub fn run() {
             get_repo_status,
             run_git_command,
             run_shell_command,
+            resolve_workspace_root,
             // Workspace commands
             list_workspaces,
             create_workspace,

@@ -1,13 +1,10 @@
 import {
-  RotateCw,
   ChevronsDown,
   ChevronsUp,
   CheckSquare,
   Inbox,
-  Sparkles,
-  RefreshCw,
 } from "lucide-react";
-import { memo, useEffect, useCallback, useState } from "react";
+import { memo, useEffect, useCallback, useState, useRef } from "react";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import {
@@ -20,93 +17,16 @@ import {
   useContextMenu,
   ViewSwitcher,
 } from "@/components/tasks";
-import { useOptionalWorkspaceContext } from "@/contexts/WorkspaceContext";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { useBlockNavigation } from "@/hooks/useBlockNavigation";
 import { useTasks } from "@/hooks/useTasks";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/appStore";
-import { useClaudeSessionStore } from "@/stores/claudeSessionStore";
-import { useOnboardingStore } from "@/stores/onboardingStore";
+import { useWorkspaceContext } from "@/contexts/WorkspaceContext";
 import type { StatusFilter, ViewMode } from "@/stores/taskStore";
 import type { BlockViewProps } from "@/types/block";
 
 import { registerBlockView } from "../BlockRegistry";
-
-// Analysis prompt for task suggestions
-const TASK_ANALYSIS_PROMPT = `# Analyze Codebase for Task Suggestions
-
-Your goal: Scan this codebase and suggest actionable tasks that would improve code quality, maintainability, and completeness.
-
-## What to Look For
-
-### 1. Code Markers
-Search for explicit markers in the code:
-\`\`\`bash
-# Find TODOs, FIXMEs, HACKs, XXX
-grep -rn "TODO\\|FIXME\\|HACK\\|XXX" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.py" --include="*.go" --include="*.rs" . 2>/dev/null | head -30
-\`\`\`
-
-### 2. Test Coverage Gaps
-Look for files/functions without tests:
-- Check if test files exist for main modules
-- Look for complex functions without test coverage
-- Identify untested edge cases
-
-### 3. Documentation Gaps
-- Missing or outdated README sections
-- Functions without JSDoc/docstrings
-- Missing API documentation
-- Undocumented configuration options
-
-### 4. Code Quality Issues
-- Large files that should be split (>500 lines)
-- Complex functions (high cyclomatic complexity)
-- Duplicated code patterns
-- Inconsistent error handling
-- Missing type annotations
-
-### 5. Security & Performance
-- Hardcoded secrets or credentials
-- N+1 query patterns
-- Missing input validation
-- Unhandled promise rejections
-
-## Output Format
-
-For each finding, suggest a task:
-
-| Priority | Task | Module | Type | Effort |
-|----------|------|--------|------|--------|
-| High | Fix security issue in auth.ts:45 | auth | bugfix | 1h |
-| Medium | Add tests for payment service | payments | test | 2h |
-| Low | Document API endpoints | api | docs | 1h |
-
-## Create Tasks
-
-Ask user: "I found X potential tasks. Would you like me to create them in SidStack?"
-
-If yes, use MCP tool \`task_create\` for each task:
-\`\`\`
-task_create({
-  title: "Task title",
-  description: "Detailed description with file:line references",
-  taskType: "bugfix|feature|test|docs|refactor",
-  priority: "high|medium|low",
-  moduleId: "module-id"  // if modules exist
-})
-\`\`\`
-
-## Quality Guidelines
-
-- **Be specific**: Include file paths and line numbers
-- **Be actionable**: Each task should be completable in one session
-- **Prioritize**: Focus on high-impact, low-effort tasks first
-- **Group related**: Suggest if tasks should be grouped as subtasks
-
----
-
-Begin by scanning for code markers.`;
 
 /**
  * Task Manager Block View
@@ -120,45 +40,12 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
   // Get cross-feature navigation params from block data
   const { selectedTaskId: navTaskId, filterByModule } = props.block;
 
-  // Get projectId from current workspace
+  // Get projectId from current workspace (prefer config.json value, wait for init)
   const { projectPath } = useAppStore();
-  const projectId = projectPath?.split("/").pop() || "default";
+  const { isActive, isWorkspaceReady, sidstackProjectId } = useWorkspaceContext();
+  const fallbackId = projectPath?.split("/").pop() || "default";
+  const projectId = isWorkspaceReady ? (sidstackProjectId || fallbackId) : fallbackId;
 
-  // Workspace context for session launching
-  const workspaceContext = useOptionalWorkspaceContext();
-  const workspacePath = workspaceContext?.workspacePath || projectPath || null;
-
-  // Session launching state
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const launchSession = useClaudeSessionStore((s) => s.launchSession);
-  const completeMilestone = useOnboardingStore((s) => s.completeMilestone);
-
-  // Handle analyze with Claude
-  const handleAnalyzeWithClaude = useCallback(async () => {
-    if (!workspacePath || isAnalyzing) return;
-
-    setIsAnalyzing(true);
-    setAnalyzeError(null);
-
-    try {
-      const result = await launchSession({
-        projectDir: workspacePath,
-        prompt: TASK_ANALYSIS_PROMPT,
-      });
-
-      if (result.success) {
-        completeMilestone("sessionLaunched");
-      } else {
-        setAnalyzeError(result.error || "Failed to launch analysis session");
-      }
-    } catch (err) {
-      console.error("Failed to launch analysis session:", err);
-      setAnalyzeError("Failed to connect to API server");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [workspacePath, isAnalyzing, launchSession, completeMilestone]);
 
   const {
     filteredTasks,
@@ -183,10 +70,8 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
     collapseAll,
   } = useTasks({ projectId, autoFetch: true });
 
-  // Auto-refresh based on settings
-  const { isActive: autoRefreshActive } = useAutoRefresh({
-    onRefresh: refresh,
-  });
+  // Auto-refresh based on project settings (pauses when workspace is inactive)
+  useAutoRefresh({ onRefresh: refresh, enabled: isActive });
 
   // Apply cross-feature navigation params when they change
   useEffect(() => {
@@ -238,12 +123,6 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
         return;
       }
 
-      // R - refresh
-      if (e.key === "r" && !e.ctrlKey && !e.metaKey) {
-        refresh();
-        return;
-      }
-
       // 1-4 - view mode shortcuts
       const viewModeMap: Record<string, ViewMode> = {
         "1": "list",
@@ -287,6 +166,39 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectTask, refresh, setViewMode, viewMode, setStatusFilter, expandAll, collapseAll]);
+
+  // Resizable detail panel
+  const [panelWidth, setPanelWidth] = useState(380);
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(0);
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = panelWidth;
+
+    const handleDragMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = dragStartX.current - ev.clientX;
+      const newWidth = Math.min(Math.max(dragStartWidth.current + delta, 300), 700);
+      setPanelWidth(newWidth);
+    };
+
+    const handleDragEnd = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", handleDragMove);
+      document.removeEventListener("mouseup", handleDragEnd);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", handleDragMove);
+    document.addEventListener("mouseup", handleDragEnd);
+  }, [panelWidth]);
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -374,25 +286,13 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
             currentView={viewMode}
             onViewChange={setViewMode}
           />
-
-          <button
-            onClick={refresh}
-            className="px-2 py-1 text-xs bg-[var(--surface-2)] text-[var(--text-secondary)] rounded hover:bg-[var(--surface-3)] flex items-center gap-1"
-            title={autoRefreshActive ? "Auto-refresh enabled" : "Refresh (R)"}
-          >
-            <RotateCw className={cn("w-3 h-3", autoRefreshActive && "animate-spin")} />
-            <span>{autoRefreshActive ? "Auto" : "Refresh"}</span>
-          </button>
         </div>
       </div>
 
       {/* Main content */}
       <div className="flex-1 overflow-hidden flex">
         {/* Task view area */}
-        <div className={cn(
-          "flex-1 overflow-auto p-3",
-          viewMode === "kanban" && "overflow-x-auto"
-        )}>
+        <div className="flex-1 min-w-0 overflow-auto p-3">
           {isLoading ? (
             <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
               Loading tasks...
@@ -402,38 +302,24 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
               Error: {error}
             </div>
           ) : filteredTasks.length === 0 ? (
-            <div className="flex flex-col items-center">
-              <EmptyState
-                icon={<CheckSquare className="w-full h-full" />}
-                title="No tasks yet"
-                description="Let Claude analyze your codebase to suggest tasks based on TODOs, code quality issues, missing tests, and more."
-                actions={[
-                  {
-                    label: isAnalyzing ? "Analyzing..." : "Analyze with Claude",
-                    onClick: handleAnalyzeWithClaude,
-                    icon: isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />,
-                    disabled: isAnalyzing || !workspacePath,
+            <EmptyState
+              icon={<CheckSquare className="w-full h-full" />}
+              title="No tasks yet"
+              description="Create tasks to track your work, or import from the Ticket Queue."
+              actions={[
+                {
+                  label: "Import from Tickets",
+                  onClick: () => {
+                    navigateToBlockView("ticket-queue");
                   },
-                  {
-                    label: "Import from Tickets",
-                    onClick: () => {
-                      navigateToBlockView("ticket-queue");
-                    },
-                    icon: <Inbox className="w-4 h-4" />,
-                    variant: "outline",
-                  },
-                ]}
-                tips={analyzeError ? [] : [
-                  "Claude will scan for TODOs, FIXMEs, and code quality issues",
-                  "Tasks can be linked to modules for better organization",
-                ]}
-              />
-              {analyzeError && (
-                <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-center max-w-md">
-                  <p className="text-xs text-red-400">{analyzeError}</p>
-                </div>
-              )}
-            </div>
+                  icon: <Inbox className="w-4 h-4" />,
+                },
+              ]}
+              tips={[
+                "Use Claude Code teammates for parallel task execution",
+                "Tasks can be linked to modules for better organization",
+              ]}
+            />
           ) : viewMode === "list" ? (
             <TaskListView
               tasks={filteredTasks}
@@ -467,17 +353,25 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
           ) : null}
         </div>
 
-        {/* Task detail panel */}
+        {/* Task detail panel — pushes content, resizable via drag */}
         {selectedTask && (
-          <div className="w-80 shrink-0 border-l border-[var(--border-muted)] overflow-y-auto bg-[var(--surface-1)]">
-            <TaskDetailPanel
-              task={selectedTask}
-              progressHistory={selectedTaskProgress}
-              onClose={() => selectTask(null)}
-              onNavigateToProgressTracker={handleViewProgressHistory}
-              onNavigateToSpec={handleViewSpec}
-              onNavigateToKnowledge={handleViewKnowledge}
+          <div className="shrink-0 flex" style={{ width: panelWidth }}>
+            {/* Drag handle */}
+            <div
+              className="w-1 cursor-col-resize hover:bg-[var(--accent-primary)]/40 active:bg-[var(--accent-primary)]/60 transition-colors"
+              onMouseDown={handleDragStart}
+              title="Drag to resize"
             />
+            <div className="flex-1 min-w-0 overflow-y-auto bg-[var(--surface-1)] border-l border-[var(--border-muted)]">
+              <TaskDetailPanel
+                task={selectedTask}
+                progressHistory={selectedTaskProgress}
+                onClose={() => selectTask(null)}
+                onNavigateToProgressTracker={handleViewProgressHistory}
+                onNavigateToSpec={handleViewSpec}
+                onNavigateToKnowledge={handleViewKnowledge}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -494,7 +388,7 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <span>R: refresh | 1-4: view | Alt+1-5: filter | Esc: close</span>
+          <span>⌘R: refresh | 1-4: view | Alt+1-5: filter | Esc: close</span>
           <ViewOnlyBadge />
         </div>
       </div>

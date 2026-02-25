@@ -7,6 +7,7 @@ import {
   KnowledgeStatus,
   extractCodeRefs,
 } from "@/types/knowledge";
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
 
 /**
  * Knowledge Browser Store
@@ -15,7 +16,7 @@ import {
  * Uses REST API (api-server) instead of Tauri IPC for data loading.
  */
 
-const API_BASE = "http://localhost:19432/api/knowledge";
+const API_BASE = `${getApiBaseUrl()}/api/knowledge`;
 
 // ============================================================================
 // Types
@@ -238,7 +239,7 @@ export const useKnowledgeStore = create<KnowledgeStore>()((set, get) => ({
   isLoading: false,
   isInitialized: false,
   error: null,
-  expandedFolders: new Set(["business-logic", "api", "patterns", "database", "modules"]),
+  expandedFolders: new Set(["00-context", "01-architecture", "02-decisions", "03-standards", "04-data", "05-api", "06-operations", "07-projects", "08-incidents"]),
 
   // ==========================================================================
   // Initialization
@@ -249,7 +250,7 @@ export const useKnowledgeStore = create<KnowledgeStore>()((set, get) => ({
 
     try {
       // Check if knowledge documents exist via REST API
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}?projectPath=${encodeURIComponent(projectPath)}&limit=1`
       );
 
@@ -308,7 +309,7 @@ export const useKnowledgeStore = create<KnowledgeStore>()((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}?projectPath=${encodeURIComponent(projectPath)}&limit=500`
       );
 
@@ -363,7 +364,7 @@ export const useKnowledgeStore = create<KnowledgeStore>()((set, get) => ({
       // Extract doc ID from path
       const docId = path.replace(/\.md$/, "").replace(/\//g, "-");
 
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}/doc/${encodeURIComponent(docId)}?projectPath=${encodeURIComponent(projectPath)}`
       );
 

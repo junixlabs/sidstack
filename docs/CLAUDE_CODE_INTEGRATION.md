@@ -17,7 +17,7 @@ This automatically:
 - Sets up governance (principles, skills)
 - Generates knowledge docs from your codebase
 
-### Option 2: Manual MCP Config
+### Option 2: Manual MCP Config (Local)
 
 Add to `.mcp.json` or Claude Code MCP settings:
 
@@ -31,6 +31,26 @@ Add to `.mcp.json` or Claude Code MCP settings:
   }
 }
 ```
+
+### Option 3: Remote Server (Streamable HTTP)
+
+Connect to a remote SidStack server using streamable-http transport:
+
+```json
+{
+  "mcpServers": {
+    "sidstack": {
+      "type": "streamable-http",
+      "url": "https://mcp.your-server.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+Set `SIDSTACK_API_URL` and `SIDSTACK_API_KEY` in `.env` if your project also calls the REST API directly. See [Quick Start - Option C](QUICK_START.md#option-c-remote-server-shared--team) for full setup.
 
 ### Verify Connection
 

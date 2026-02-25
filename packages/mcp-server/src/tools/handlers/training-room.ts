@@ -11,7 +11,8 @@
  * - training_feedback_submit: Track effectiveness
  */
 
-import { SidStackDB, getDB } from '@sidstack/shared';
+import { createApiClient, detectWorkspace } from '@sidstack/shared';
+import { validateProjectPath } from './validate-path';
 import type {
   IncidentType,
   IncidentSeverity,
@@ -28,14 +29,18 @@ import type {
   TriggerConfig,
 } from '@sidstack/shared';
 
-// Database instance
-let db: SidStackDB | null = null;
+const apiClient = createApiClient();
 
-async function getDatabase(): Promise<SidStackDB> {
-  if (!db) {
-    db = await getDB();
+/**
+ * Resolve workspace path from projectPath (handles worktrees)
+ * Returns the actual workspace root where .sidstack/ lives
+ */
+function resolveWorkspacePath(projectPath: string): string {
+  const workspace = detectWorkspace(projectPath);
+  if (workspace) {
+    return workspace.workspaceRoot;
   }
-  return db;
+  return projectPath; // Fallback to provided path
 }
 
 // =============================================================================
@@ -163,6 +168,10 @@ export const trainingRoomTools = [
             commands: { type: 'array', items: { type: 'string' } },
             errorMessage: { type: 'string' },
           },
+        },
+        checkSimilar: {
+          type: 'boolean',
+          description: 'If true, check for similar open incidents and suggest lesson creation. Defaults to false.',
         },
       },
       required: ['projectPath', 'moduleId', 'type', 'severity', 'title'],
@@ -627,23 +636,28 @@ export const trainingRoomTools = [
 // --- Training Session Handlers ---
 
 export async function handleTrainingSessionGet(args: { projectPath: string; moduleId: string }) {
-  const database = await getDatabase();
-  const session = database.getOrCreateTrainingSession(args.moduleId, args.projectPath);
+  validateProjectPath(args.projectPath);
+  const projectPath = resolveWorkspacePath(args.projectPath);
+
+  // POST creates-or-gets a session for the module
+  const result = await apiClient.training.createSession(args.moduleId, { projectPath });
 
   return {
     success: true,
-    session,
+    session: result.session,
   };
 }
 
 export async function handleTrainingSessionList(args: { projectPath?: string; status?: 'active' | 'archived' }) {
-  const database = await getDatabase();
-  const sessions = database.listTrainingSessions(args.projectPath, args.status);
+  if (args.projectPath) validateProjectPath(args.projectPath);
+  const projectPath = args.projectPath ? resolveWorkspacePath(args.projectPath) : undefined;
+
+  const result = await apiClient.training.listSessions({ projectPath, status: args.status });
 
   return {
     success: true,
-    sessions,
-    total: sessions.length,
+    sessions: result.sessions,
+    total: result.total,
   };
 }
 
@@ -657,13 +671,17 @@ export async function handleIncidentCreate(args: {
   title: string;
   description?: string;
   context?: IncidentContext;
+  checkSimilar?: boolean;
 }) {
-  const database = await getDatabase();
+  validateProjectPath(args.projectPath);
+  const projectPath = resolveWorkspacePath(args.projectPath);
 
-  // Get or create session for module (scoped to project)
-  const session = database.getOrCreateTrainingSession(args.moduleId, args.projectPath);
+  // Get or create session for module via API
+  const sessionResult = await apiClient.training.createSession(args.moduleId, { projectPath });
+  const session = sessionResult.session;
 
-  const incident = database.createIncident({
+  // Create the incident via API
+  const incidentResult = await apiClient.training.createIncident({
     sessionId: session.id,
     type: args.type,
     severity: args.severity,
@@ -671,29 +689,92 @@ export async function handleIncidentCreate(args: {
     description: args.description,
     context: args.context,
   });
+  const incident = incidentResult.incident;
 
-  // Check for similar incidents to suggest lesson creation
+  // Check for similar incidents to suggest lesson creation (opt-in)
   let suggestion: { action: string; reason: string; similarIncidentIds: string[] } | undefined;
+  if (args.checkSimilar) {
+    try {
+      // Try semantic search via mem0 first, fall back to keyword matching
+      let similarIncidentIds: string[] = [];
+      let usedSemantic = false;
+
+      try {
+        const { getMem0ClientIfAvailable } = await import('./memory.js');
+        const mem0 = await getMem0ClientIfAvailable();
+        if (mem0) {
+          const searchQuery = `${args.type} ${args.severity}: ${args.title} ${args.description || ''}`;
+          const projectId = projectPath.split('/').pop() || args.moduleId;
+          const results = await mem0.search(searchQuery, projectId, 10);
+
+          // Filter for incident memories with score >= 0.7
+          const similarMemories = results.filter(
+            m => m.score !== undefined
+              && m.score >= 0.7
+              && m.metadata?.sourceType === 'incident'
+              && m.metadata?.incidentId !== incident.id
+          );
+
+          if (similarMemories.length > 0) {
+            similarIncidentIds = similarMemories
+              .map(m => m.metadata?.incidentId as string)
+              .filter(Boolean);
+            usedSemantic = true;
+          }
+        }
+      } catch {
+        // mem0 unavailable -- fall through to keyword fallback
+      }
+
+      // Keyword fallback when mem0 not available or returned no results
+      if (!usedSemantic) {
+        const listResult = await apiClient.training.listIncidents({
+          sessionId: session.id,
+          status: 'open',
+        });
+
+        const existingIncidents = listResult.incidents || [];
+        const incidentText = `${incident.title} ${args.description || ''}`;
+        const similarIncidents = existingIncidents.filter((i: any) =>
+          i.id !== incident.id && hasSimilarKeywords(`${i.title} ${i.description || ''}`, incidentText)
+        );
+        similarIncidentIds = similarIncidents.map((i: any) => i.id);
+      }
+
+      if (similarIncidentIds.length >= 2) {
+        suggestion = {
+          action: 'create_lesson',
+          reason: `Found ${similarIncidentIds.length} similar incidents for module "${args.moduleId}". Consider creating a lesson to capture the pattern.`,
+          similarIncidentIds,
+        };
+      }
+    } catch {
+      // Non-critical - skip suggestion on error
+    }
+  }
+
+  // Auto-extract memory to mem0 (fire-and-forget)
   try {
-    const existingIncidents = database.listIncidents({
-      sessionId: session.id,
-      status: 'open' as IncidentStatus,
-    });
+    const { getMem0ClientIfAvailable } = await import('./memory.js');
+    const mem0 = await getMem0ClientIfAvailable();
+    if (mem0) {
+      const memContent = [
+        `Incident [${args.severity}/${args.type}]: ${args.title}`,
+        args.description || '',
+        args.context?.errorMessage ? `Error: ${args.context.errorMessage}` : '',
+      ].filter(Boolean).join('\n');
 
-    const incidentText = `${incident.title} ${args.description || ''}`;
-    const similarIncidents = existingIncidents.filter(i =>
-      i.id !== incident.id && hasSimilarKeywords(`${i.title} ${i.description || ''}`, incidentText)
-    );
-
-    if (similarIncidents.length >= 2) {
-      suggestion = {
-        action: 'create_lesson',
-        reason: `Found ${similarIncidents.length} similar incidents for module "${args.moduleId}". Consider creating a lesson to capture the pattern.`,
-        similarIncidentIds: similarIncidents.map(i => i.id),
-      };
+      // Derive projectId from workspace path
+      const projectId = projectPath.split('/').pop() || args.moduleId;
+      mem0.addSmart(memContent, projectId, {
+        sourceType: 'incident',
+        incidentId: incident.id,
+        moduleId: args.moduleId,
+        severity: args.severity,
+      }).catch(() => {});
     }
   } catch {
-    // Non-critical - skip suggestion on error
+    // Non-blocking
   }
 
   return {
@@ -710,22 +791,15 @@ export async function handleIncidentUpdate(args: {
   resolution?: string;
   severity?: IncidentSeverity;
 }) {
-  const database = await getDatabase();
-
-  const incident = database.updateIncident({
-    id: args.incidentId,
+  const result = await apiClient.training.updateIncident(args.incidentId, {
     status: args.status,
     resolution: args.resolution,
     severity: args.severity,
   });
 
-  if (!incident) {
-    return { success: false, error: 'Incident not found' };
-  }
-
   return {
     success: true,
-    incident,
+    incident: result.incident,
   };
 }
 
@@ -736,26 +810,21 @@ export async function handleIncidentList(args: {
   type?: IncidentType;
   severity?: IncidentSeverity;
 }) {
-  const database = await getDatabase();
-  const projectPath = args.projectPath || '';
+  if (args.projectPath) validateProjectPath(args.projectPath);
+  const projectPath = args.projectPath ? resolveWorkspacePath(args.projectPath) : undefined;
 
-  let sessionId: string | undefined;
-  if (args.moduleId) {
-    const session = database.getTrainingSessionByModule(args.moduleId, projectPath);
-    sessionId = session?.id;
-  }
-
-  const incidents = database.listIncidents({
-    sessionId,
-    status: args.status,
+  // The API server handles sessionId lookup and projectPath scoping
+  const result = await apiClient.training.listIncidents({
+    projectPath,
     type: args.type,
     severity: args.severity,
+    status: args.status,
   });
 
   return {
     success: true,
-    incidents,
-    total: incidents.length,
+    incidents: result.incidents,
+    total: result.total,
   };
 }
 
@@ -771,12 +840,14 @@ export async function handleLessonCreate(args: {
   solution: string;
   applicability?: Applicability;
 }) {
-  const database = await getDatabase();
+  validateProjectPath(args.projectPath);
+  const projectPath = resolveWorkspacePath(args.projectPath);
 
-  // Get or create session for module (scoped to project)
-  const session = database.getOrCreateTrainingSession(args.moduleId, args.projectPath);
+  // Get or create session for module via API
+  const sessionResult = await apiClient.training.createSession(args.moduleId, { projectPath });
+  const session = sessionResult.session;
 
-  const lesson = database.createLesson({
+  const result = await apiClient.training.createLesson({
     sessionId: session.id,
     incidentIds: args.incidentIds,
     title: args.title,
@@ -785,6 +856,30 @@ export async function handleLessonCreate(args: {
     solution: args.solution,
     applicability: args.applicability,
   });
+  const lesson = result.lesson;
+
+  // Auto-capture lesson to mem0 (fire-and-forget)
+  try {
+    const { getMem0ClientIfAvailable } = await import('./memory.js');
+    const mem0 = await getMem0ClientIfAvailable();
+    if (mem0) {
+      const memContent = [
+        `Lesson: ${args.title}`,
+        `Problem: ${args.problem}`,
+        `Root Cause: ${args.rootCause}`,
+        `Solution: ${args.solution}`,
+      ].join('\n');
+
+      const projectId = projectPath.split('/').pop() || args.moduleId;
+      mem0.addSmart(memContent, projectId, {
+        sourceType: 'lesson',
+        lessonId: lesson.id,
+        moduleId: args.moduleId,
+      }).catch(() => {});
+    }
+  } catch {
+    // Non-blocking
+  }
 
   return {
     success: true,
@@ -794,9 +889,8 @@ export async function handleLessonCreate(args: {
 }
 
 export async function handleLessonApprove(args: { lessonId: string; approver: string }) {
-  const database = await getDatabase();
-
-  const lesson = database.approveLesson(args.lessonId, args.approver);
+  const result = await apiClient.training.approveLesson(args.lessonId, { approver: args.approver });
+  const lesson = result.lesson;
 
   if (!lesson) {
     return { success: false, error: 'Lesson not found' };
@@ -819,24 +913,19 @@ export async function handleLessonApprove(args: { lessonId: string; approver: st
 }
 
 export async function handleLessonList(args: { projectPath?: string; moduleId?: string; status?: LessonStatus }) {
-  const database = await getDatabase();
-  const projectPath = args.projectPath || '';
+  if (args.projectPath) validateProjectPath(args.projectPath);
+  const projectPath = args.projectPath ? resolveWorkspacePath(args.projectPath) : undefined;
 
-  let sessionId: string | undefined;
-  if (args.moduleId) {
-    const session = database.getTrainingSessionByModule(args.moduleId, projectPath);
-    sessionId = session?.id;
-  }
-
-  const lessons = database.listLessons({
-    sessionId,
+  // The API server handles sessionId lookup and projectPath scoping
+  const result = await apiClient.training.listLessons({
+    projectPath,
     status: args.status,
   });
 
   return {
     success: true,
-    lessons,
-    total: lessons.length,
+    lessons: result.lessons,
+    total: result.total,
   };
 }
 
@@ -852,16 +941,12 @@ export async function handleSkillCreate(args: {
   trigger?: TriggerConfig;
   applicability?: Applicability;
 }) {
-  const database = await getDatabase();
+  validateProjectPath(args.projectPath);
+  const projectPath = resolveWorkspacePath(args.projectPath);
 
-  // Check for duplicate name within project
-  const existing = database.getSkillByName(args.name, args.projectPath);
-  if (existing) {
-    return { success: false, error: `Skill with name "${args.name}" already exists in this project` };
-  }
-
-  const skill = database.createSkill({
-    projectPath: args.projectPath,
+  // The API server handles duplicate checking
+  const result = await apiClient.training.createSkill({
+    projectPath,
     name: args.name,
     description: args.description,
     lessonIds: args.lessonIds,
@@ -873,8 +958,8 @@ export async function handleSkillCreate(args: {
 
   return {
     success: true,
-    skill,
-    message: `Skill created: ${skill.name}`,
+    skill: result.skill,
+    message: `Skill created: ${result.skill.name}`,
   };
 }
 
@@ -887,10 +972,7 @@ export async function handleSkillUpdate(args: {
   trigger?: TriggerConfig;
   applicability?: Applicability;
 }) {
-  const database = await getDatabase();
-
-  const skill = database.updateSkill({
-    id: args.skillId,
+  const result = await apiClient.training.updateSkill(args.skillId, {
     name: args.name,
     description: args.description,
     content: args.content,
@@ -899,29 +981,26 @@ export async function handleSkillUpdate(args: {
     applicability: args.applicability,
   });
 
-  if (!skill) {
-    return { success: false, error: 'Skill not found' };
-  }
-
   return {
     success: true,
-    skill,
+    skill: result.skill,
   };
 }
 
 export async function handleSkillList(args: { projectPath?: string; status?: SkillStatus; type?: SkillType }) {
-  const database = await getDatabase();
+  if (args.projectPath) validateProjectPath(args.projectPath);
+  const projectPath = args.projectPath ? resolveWorkspacePath(args.projectPath) : undefined;
 
-  const skills = database.listSkills({
-    projectPath: args.projectPath,
+  const result = await apiClient.training.listSkills({
+    projectPath,
     status: args.status,
     type: args.type,
   });
 
   return {
     success: true,
-    skills,
-    total: skills.length,
+    skills: result.skills,
+    total: result.total,
   };
 }
 
@@ -937,16 +1016,12 @@ export async function handleRuleCreate(args: {
   content: string;
   applicability?: Applicability;
 }) {
-  const database = await getDatabase();
+  validateProjectPath(args.projectPath);
+  const projectPath = resolveWorkspacePath(args.projectPath);
 
-  // Check for duplicate name within project
-  const existing = database.getRuleByName(args.name, args.projectPath);
-  if (existing) {
-    return { success: false, error: `Rule with name "${args.name}" already exists in this project` };
-  }
-
-  const rule = database.createRule({
-    projectPath: args.projectPath,
+  // The API server handles duplicate checking
+  const result = await apiClient.training.createRule({
+    projectPath,
     name: args.name,
     description: args.description,
     skillIds: args.skillIds,
@@ -958,8 +1033,8 @@ export async function handleRuleCreate(args: {
 
   return {
     success: true,
-    rule,
-    message: `Rule created: ${rule.name}`,
+    rule: result.rule,
+    message: `Rule created: ${result.rule.name}`,
   };
 }
 
@@ -973,10 +1048,7 @@ export async function handleRuleUpdate(args: {
   status?: RuleStatus;
   applicability?: Applicability;
 }) {
-  const database = await getDatabase();
-
-  const rule = database.updateRule({
-    id: args.ruleId,
+  const result = await apiClient.training.updateRule(args.ruleId, {
     name: args.name,
     description: args.description,
     content: args.content,
@@ -986,13 +1058,9 @@ export async function handleRuleUpdate(args: {
     applicability: args.applicability,
   });
 
-  if (!rule) {
-    return { success: false, error: 'Rule not found' };
-  }
-
   return {
     success: true,
-    rule,
+    rule: result.rule,
   };
 }
 
@@ -1002,10 +1070,11 @@ export async function handleRuleList(args: {
   level?: RuleLevel;
   enforcement?: RuleEnforcement;
 }) {
-  const database = await getDatabase();
+  if (args.projectPath) validateProjectPath(args.projectPath);
+  const projectPath = args.projectPath ? resolveWorkspacePath(args.projectPath) : undefined;
 
-  const rules = database.listRules({
-    projectPath: args.projectPath,
+  const result = await apiClient.training.listRules({
+    projectPath,
     status: args.status,
     level: args.level,
     enforcement: args.enforcement,
@@ -1013,8 +1082,8 @@ export async function handleRuleList(args: {
 
   return {
     success: true,
-    rules,
-    total: rules.length,
+    rules: result.rules,
+    total: result.total,
   };
 }
 
@@ -1024,17 +1093,20 @@ export async function handleRuleCheck(args: {
   role: string;
   taskType: string;
 }) {
-  const database = await getDatabase();
+  validateProjectPath(args.projectPath);
 
-  // Get training context which includes applicable rules (scoped to project)
-  const context = database.getTrainingContext(args.moduleId, args.projectPath, args.role, args.taskType);
+  const result = await apiClient.training.checkRules({
+    module: args.moduleId,
+    role: args.role,
+    taskType: args.taskType,
+  });
 
   return {
     success: true,
-    rules: context.rules,
-    total: context.rules.length,
-    message: context.rules.length > 0
-      ? `Found ${context.rules.length} applicable rules`
+    rules: result.rules,
+    total: result.total,
+    message: result.total > 0
+      ? `Found ${result.total} applicable rules`
       : 'No applicable rules found',
   };
 }
@@ -1047,9 +1119,16 @@ export async function handleTrainingContextGet(args: {
   role: string;
   taskType: string;
 }) {
-  const database = await getDatabase();
+  validateProjectPath(args.projectPath);
+  const projectPath = resolveWorkspacePath(args.projectPath);
 
-  const context = database.getTrainingContext(args.moduleId, args.projectPath, args.role, args.taskType);
+  const result = await apiClient.training.getContext(args.moduleId, {
+    projectPath,
+    role: args.role,
+    taskType: args.taskType,
+  });
+
+  const context = result.context;
 
   // Build context prompt for injection
   const contextPrompt = buildTrainingContextPrompt(context);
@@ -1059,9 +1138,9 @@ export async function handleTrainingContextGet(args: {
     context,
     contextPrompt,
     summary: {
-      skills: context.skills.length,
-      rules: context.rules.length,
-      lessons: context.recentLessons.length,
+      skills: context.skills?.length ?? 0,
+      rules: context.rules?.length ?? 0,
+      lessons: context.recentLessons?.length ?? 0,
     },
   };
 }
@@ -1075,24 +1154,26 @@ export async function handleTrainingFeedbackSubmit(args: {
   outcome: FeedbackOutcome;
   notes?: string;
 }) {
-  const database = await getDatabase();
-
-  // Increment usage if it's a skill
+  // Record skill usage if applicable
   if (args.entityType === 'skill') {
-    database.incrementSkillUsage(args.entityId);
+    try {
+      await apiClient.training.recordSkillUsage(args.entityId, {});
+    } catch {
+      // Non-critical - skill usage tracking failure shouldn't block feedback
+    }
   }
 
-  const feedback = database.createTrainingFeedback({
+  const result = await apiClient.training.createFeedback({
     entityType: args.entityType,
     entityId: args.entityId,
     taskId: args.taskId,
     outcome: args.outcome,
-    notes: args.notes,
+    comment: args.notes,
   });
 
   return {
     success: true,
-    feedback,
+    feedback: result.feedback,
     message: `Feedback recorded: ${args.outcome} for ${args.entityType} ${args.entityId}`,
   };
 }

@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { Command, Flags } from '@oclif/core';
+import { ALL_DOCUMENT_TYPES, FOLDER_TO_DEFAULT_TYPE } from '@sidstack/shared';
 import chalk from 'chalk';
 
 interface KnowledgeFileIssue {
@@ -18,8 +19,8 @@ interface ValidationResult {
   issues: KnowledgeFileIssue[];
 }
 
-const VALID_TYPES = ['index', 'business-logic', 'api-endpoint', 'design-pattern', 'database-table', 'module'];
-const VALID_STATUSES = ['draft', 'implemented', 'deprecated', 'planned'];
+const VALID_TYPES: string[] = ALL_DOCUMENT_TYPES;
+const VALID_STATUSES = ['draft', 'active', 'review', 'archived'];
 
 export default class KnowledgeValidate extends Command {
   static description = 'Validate knowledge documentation files';
@@ -271,16 +272,7 @@ export default class KnowledgeValidate extends Command {
   private inferType(filePath: string): string {
     const dir = path.dirname(filePath);
     const dirName = path.basename(dir);
-
-    const typeMap: Record<string, string> = {
-      'api': 'api-endpoint',
-      'business-logic': 'business-logic',
-      'patterns': 'design-pattern',
-      'database': 'database-table',
-      'modules': 'module',
-    };
-
-    return typeMap[dirName] || 'index';
+    return FOLDER_TO_DEFAULT_TYPE[dirName] || 'index';
   }
 
   private printResults(result: ValidationResult, wasFixed: boolean): void {

@@ -1,0 +1,180 @@
+# SidStack Server Stack
+# API Server + MCP Server + mem0 + Caddy reverse proxy
+#
+# Usage:
+#   cp .env.example .env   # Edit with your values
+#   docker compose up -d
+#
+# Services:
+#   api-server  :19432  — REST API (central data gateway)
+#   mcp-server  :19433  — MCP tools (Streamable HTTP for Claude Code)
+#   bot-server  :3222   — SidBot (Gemini intent router + chat)
+#   web-ui      :5174   — React SPA (browser access)
+#   mem0        :4321   — Semantic memory (optional)
+#   litellm     :4000   — LLM gateway for mem0 (optional)
+#   caddy       :80/443 — Reverse proxy with auto TLS
+
+services:
+  # ===========================================================================
+  # Core Services
+  # ===========================================================================
+
+  api-server:
+    build:
+      context: ../
+      dockerfile: docker/api-server/Dockerfile
+    ports:
+      - "${API_PORT:-19432}:19432"
+    volumes:
+      - sidstack-data:/data
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/data/sidstack.db
+      - API_PORT=19432
+      - SIDSTACK_API_KEY=${SIDSTACK_API_KEY}
+      - SIDSTACK_CORS_ORIGINS=${SIDSTACK_CORS_ORIGINS:-}
+      - MEM0_API_URL=http://mem0:8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:19432/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  mcp-server:
+    build:
+      context: ../
+      dockerfile: docker/mcp-server/Dockerfile
+    ports:
+      - "${MCP_PORT:-19433}:19433"
+    depends_on:
+      api-server:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - MCP_PORT=19433
+      - SIDSTACK_API_URL=http://api-server:19432
+      - SIDSTACK_MCP_KEY=${SIDSTACK_MCP_KEY:-}
+      - MEM0_API_URL=http://mem0:8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:19433/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  bot-server:
+    build:
+      context: ../
+      dockerfile: docker/bot-server/Dockerfile
+    ports:
+      - "${BOT_PORT:-3222}:3222"
+    depends_on:
+      api-server:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=3222
+      - SIDSTACK_API_URL=http://api-server:19432
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:3222/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ===========================================================================
+  # Semantic Memory (optional — comment out if not needed)
+  # ===========================================================================
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    volumes:
+      - ./mem0/litellm-config.yaml:/app/config.yaml
+    ports:
+      - "4000:4000"
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-sidstack-dev}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/readiness')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  mem0:
+    build: ./mem0
+    ports:
+      - "4321:8000"
+    depends_on:
+      litellm:
+        condition: service_healthy
+    environment:
+      - MEM0_API_KEY=${MEM0_API_KEY:-}
+      - QDRANT_HOST=${QDRANT_HOST}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-sidstack_mem0}
+      - LITELLM_BASE_URL=http://litellm:4000/v1
+      - LITELLM_API_BASE=http://litellm:4000/v1
+      - OPENAI_BASE_URL=http://litellm:4000/v1
+      - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-sidstack-dev}
+      - LLM_MODEL=${LLM_MODEL:-gemini-flash}
+      - EMBED_MODEL=${EMBED_MODEL:-gemini-embedding}
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Web UI (React SPA served by Caddy)
+  # ===========================================================================
+
+  web-ui:
+    build:
+      context: ../
+      dockerfile: docker/web-ui/Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-}
+    ports:
+      - "${WEB_UI_PORT:-5174}:5174"
+    depends_on:
+      api-server:
+        condition: service_healthy
+    environment:
+      - API_UPSTREAM=api-server:19432
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Reverse Proxy (auto TLS)
+  # ===========================================================================
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api-server
+      - mcp-server
+      - bot-server
+      - web-ui
+    environment:
+      - API_DOMAIN=${API_DOMAIN:-api.sidstack.dev}
+      - MCP_DOMAIN=${MCP_DOMAIN:-mcp.sidstack.dev}
+      - BOT_DOMAIN=${BOT_DOMAIN:-bot.sidstack.dev}
+      - APP_DOMAIN=${APP_DOMAIN:-app.sidstack.dev}
+    restart: unless-stopped
+
+volumes:
+  sidstack-data:
+  caddy-data:
+  caddy-config:

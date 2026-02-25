@@ -1,52 +1,76 @@
 /**
  * Knowledge MCP Tool Handlers
  *
- * Tools for accessing unified knowledge directly from the filesystem:
+ * Tools for accessing unified knowledge via the SidStack API server:
  * - knowledge_list: List all knowledge documents
  * - knowledge_get: Get single document with content
  * - knowledge_search: Search across knowledge base
  * - knowledge_context: Build session context for Claude
  * - knowledge_modules: List modules with knowledge stats
  *
- * Uses KnowledgeService from @sidstack/shared for direct filesystem access.
- * No api-server dependency required.
+ * Uses createApiClient from @sidstack/shared for HTTP access via api-server.
  */
 
 import {
-  createKnowledgeService,
+  createApiClient,
+  ALL_DOCUMENT_TYPES,
   type DocumentType,
-  type DocumentStatus,
-  type CreateDocumentInput,
-  type UpdateDocumentInput,
+  type Mem0Memory,
+  // Workspace detection
+  detectWorkspace,
 } from '@sidstack/shared';
-import { buildSessionContext, createSessionContextOptions } from '@sidstack/shared';
-import { SidStackDB, getDB } from '@sidstack/shared';
+import { validateProjectPath } from './validate-path.js';
+import { getMem0ClientIfAvailable } from './memory.js';
+import * as path from 'path';
 
 // =============================================================================
-// Service Cache (per project path)
+// API Client (singleton)
 // =============================================================================
 
-const serviceCache = new Map<string, ReturnType<typeof createKnowledgeService>>();
+const apiClient = createApiClient();
 
-function getService(projectPath: string): ReturnType<typeof createKnowledgeService> {
-  if (!serviceCache.has(projectPath)) {
-    serviceCache.set(projectPath, createKnowledgeService(projectPath));
+// =============================================================================
+// Rate Limiter for knowledge_search (30 calls/min per projectPath)
+// =============================================================================
+
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const searchCallTimestamps = new Map<string, number[]>();
+
+function checkSearchRateLimit(projectPath: string): { allowed: boolean; retryAfterSeconds?: number } {
+  const now = Date.now();
+  const timestamps = searchCallTimestamps.get(projectPath) || [];
+
+  // Prune entries outside the window
+  const recent = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+
+  if (recent.length >= RATE_LIMIT_MAX) {
+    const oldestInWindow = recent[0];
+    const retryAfterSeconds = Math.ceil((oldestInWindow + RATE_LIMIT_WINDOW_MS - now) / 1000);
+    searchCallTimestamps.set(projectPath, recent);
+    return { allowed: false, retryAfterSeconds };
   }
-  return serviceCache.get(projectPath)!;
+
+  recent.push(now);
+  searchCallTimestamps.set(projectPath, recent);
+  return { allowed: true };
 }
 
-// Database instance
-let db: SidStackDB | null = null;
-
-async function getDatabase(): Promise<SidStackDB | null> {
+/**
+ * Resolve workspace path from projectPath (handles worktrees)
+ * Returns the actual workspace root where .sidstack/ lives.
+ * Falls back to projectPath as-is when workspace detection fails (remote mode).
+ */
+function resolveWorkspacePath(projectPath: string): string {
   try {
-    if (!db) {
-      db = await getDB();
+    const workspace = detectWorkspace(projectPath);
+    if (workspace) {
+      return workspace.workspaceRoot;
     }
-    return db;
   } catch {
-    return null;
+    // Workspace detection can fail in remote mode — fall through
   }
+  return projectPath;
 }
 
 // =============================================================================
@@ -68,7 +92,7 @@ export const knowledgeTools = [
           type: 'array',
           items: {
             type: 'string',
-            enum: ['index', 'business-logic', 'api-endpoint', 'design-pattern', 'database-table', 'module', 'governance', 'spec', 'decision', 'proposal', 'guide', 'skill', 'principle', 'rule', 'reference', 'template', 'checklist', 'pattern'],
+            enum: ALL_DOCUMENT_TYPES as unknown as string[],
           },
           description: 'Filter by document type(s)',
         },
@@ -86,8 +110,8 @@ export const knowledgeTools = [
         },
         limit: {
           type: 'number',
-          description: 'Max documents to return (default: 50)',
-          default: 50,
+          description: 'Max documents to return (default: 20)',
+          default: 20,
         },
       },
       required: ['projectPath'],
@@ -129,7 +153,7 @@ export const knowledgeTools = [
           type: 'array',
           items: {
             type: 'string',
-            enum: ['index', 'business-logic', 'api-endpoint', 'design-pattern', 'database-table', 'module', 'governance', 'spec', 'decision', 'proposal', 'guide', 'skill', 'principle', 'rule', 'reference', 'template', 'checklist', 'pattern'],
+            enum: ALL_DOCUMENT_TYPES as unknown as string[],
           },
           description: 'Filter by document type(s)',
         },
@@ -207,7 +231,7 @@ export const knowledgeTools = [
         },
         type: {
           type: 'string',
-          enum: ['spec', 'decision', 'proposal', 'guide', 'reference', 'template', 'checklist', 'pattern', 'skill', 'principle', 'rule', 'module', 'index'],
+          enum: ALL_DOCUMENT_TYPES as unknown as string[],
           description: 'Document type',
         },
         content: {
@@ -245,6 +269,11 @@ export const knowledgeTools = [
           type: 'array',
           items: { type: 'string' },
           description: 'Dependency document IDs',
+        },
+        covers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Source files this doc covers (for stale detection)',
         },
       },
       required: ['projectPath', 'title', 'type', 'content'],
@@ -300,6 +329,11 @@ export const knowledgeTools = [
           items: { type: 'string' },
           description: 'New dependency document IDs',
         },
+        covers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Updated source files this doc covers',
+        },
       },
       required: ['projectPath', 'docId'],
     },
@@ -352,7 +386,7 @@ export const knowledgeTools = [
 ];
 
 // =============================================================================
-// Tool Handlers - Direct Filesystem Access
+// Tool Handlers - API Client Access
 // =============================================================================
 
 export async function handleKnowledgeList(args: {
@@ -364,30 +398,36 @@ export async function handleKnowledgeList(args: {
   limit?: number;
 }) {
   try {
-    const service = getService(args.projectPath);
-    const response = await service.listDocuments({
-      type: args.type,
+    validateProjectPath(args.projectPath);
+
+    const response = await apiClient.knowledge.list({
+      projectPath: args.projectPath,
+      type: args.type?.join(','),
       module: args.module,
-      status: args.status as any,
+      status: args.status,
       search: args.search,
-      limit: args.limit || 50,
+      limit: String(args.limit || 20),
     });
 
+    const documents = response.documents || [];
+
     const summary = {
-      total: response.total,
-      returned: response.documents.length,
+      total: response.total ?? documents.length,
+      returned: documents.length,
       byType: {} as Record<string, number>,
       bySource: {} as Record<string, number>,
     };
 
-    for (const doc of response.documents) {
+    for (const doc of documents) {
       summary.byType[doc.type] = (summary.byType[doc.type] || 0) + 1;
-      summary.bySource[doc.source] = (summary.bySource[doc.source] || 0) + 1;
+      if (doc.source) {
+        summary.bySource[doc.source] = (summary.bySource[doc.source] || 0) + 1;
+      }
     }
 
     return {
       success: true,
-      documents: response.documents.map(d => ({
+      documents: documents.map((d: any) => ({
         id: d.id,
         type: d.type,
         title: d.title,
@@ -395,7 +435,7 @@ export async function handleKnowledgeList(args: {
         module: d.module,
         status: d.status,
         source: d.source,
-        summary: d.summary,
+        summary: d.summary ? d.summary.slice(0, 200) + (d.summary.length > 200 ? '...' : '') : undefined,
       })),
       summary,
     };
@@ -414,8 +454,11 @@ export async function handleKnowledgeGet(args: {
   docId: string;
 }) {
   try {
-    const service = getService(args.projectPath);
-    const doc = await service.getDocument(args.docId);
+    validateProjectPath(args.projectPath);
+
+    const doc = await apiClient.knowledge.get(args.docId, {
+      projectPath: args.projectPath,
+    });
 
     if (!doc) {
       return {
@@ -440,6 +483,7 @@ export async function handleKnowledgeGet(args: {
         summary: doc.summary,
         related: doc.related,
         dependsOn: doc.dependsOn,
+        covers: doc.covers,
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
       },
@@ -459,19 +503,63 @@ export async function handleKnowledgeSearch(args: {
   limit?: number;
 }) {
   try {
-    const service = getService(args.projectPath);
-    const results = await service.searchDocuments(args.query, args.limit || 20);
+    validateProjectPath(args.projectPath);
+
+    // Rate limit check
+    const rateCheck = checkSearchRateLimit(args.projectPath);
+    if (!rateCheck.allowed) {
+      return {
+        success: false,
+        error: `Rate limit exceeded for knowledge_search (${RATE_LIMIT_MAX}/min). Retry after ${rateCheck.retryAfterSeconds} seconds.`,
+        query: args.query,
+        total: 0,
+        documents: [],
+      };
+    }
+
+    const response = await apiClient.knowledge.search({
+      projectPath: args.projectPath,
+      q: args.query,
+      limit: String(args.limit || 20),
+    });
+
+    let results = response.results || [];
 
     // Apply type filter if provided
-    const filtered = args.type
-      ? results.filter(d => args.type!.includes(d.type))
-      : results;
+    if (args.type) {
+      results = results.filter((d: any) => args.type!.includes(d.type));
+    }
+
+    // Semantic search via mem0 (non-blocking, graceful degradation)
+    let semanticMatches: Array<{ memory: string; score?: number; metadata?: Record<string, unknown> }> = [];
+    try {
+      const mem0Client = await getMem0ClientIfAvailable();
+      if (mem0Client) {
+        // Derive projectId from workspace path
+        const workspacePath = resolveWorkspacePath(args.projectPath);
+        const projectId = path.basename(workspacePath);
+        const memories = await mem0Client.search(args.query, projectId, args.limit || 10);
+        semanticMatches = memories.map(m => ({
+          memory: m.memory,
+          score: m.score,
+          metadata: m.metadata,
+        }));
+      }
+    } catch {
+      // Non-blocking: keyword results still returned
+    }
+
+    // Deduplicate: remove semantic matches already in keyword results
+    const docIds = new Set(results.map((d: any) => d.id));
+    const uniqueSemanticMatches = semanticMatches.filter(
+      m => !m.metadata?.docId || !docIds.has(m.metadata.docId as string)
+    );
 
     return {
       success: true,
       query: args.query,
-      total: filtered.length,
-      documents: filtered.map(d => ({
+      total: results.length,
+      documents: results.map((d: any) => ({
         id: d.id,
         type: d.type,
         title: d.title,
@@ -479,9 +567,10 @@ export async function handleKnowledgeSearch(args: {
         module: d.module,
         status: d.status,
         source: d.source,
-        summary: d.summary,
+        summary: d.summary ? d.summary.slice(0, 200) + (d.summary.length > 200 ? '...' : '') : undefined,
         score: d._score,
       })),
+      ...(uniqueSemanticMatches.length > 0 ? { semanticMatches: uniqueSemanticMatches } : {}),
     };
   } catch (error) {
     return {
@@ -502,30 +591,71 @@ export async function handleKnowledgeContext(args: {
   ticketId?: string;
   maxLength?: number;
 }) {
-  const database = await getDatabase();
-  const service = getService(args.projectPath);
-
-  const options = createSessionContextOptions({
-    db: database,
-    knowledgeService: service,
-    workspacePath: args.projectPath,
-    taskId: args.taskId,
-    moduleId: args.moduleId,
-    specId: args.specId,
-    ticketId: args.ticketId,
-    maxContextLength: args.maxLength || 8000,
-  });
+  validateProjectPath(args.projectPath);
 
   try {
-    const context = await buildSessionContext(options);
+    // Build query params for the API call
+    const query: Record<string, string | undefined> = {
+      projectPath: args.projectPath,
+      taskId: args.taskId,
+      moduleId: args.moduleId,
+      maxLength: args.maxLength ? String(args.maxLength) : undefined,
+    };
+
+    const contextResult = await apiClient.knowledge.context(query);
+
+    // Semantic memory overlay via mem0 (non-blocking, graceful degradation)
+    let semanticSection = '';
+    try {
+      const mem0Client = await getMem0ClientIfAvailable();
+      if (mem0Client) {
+        const projectId = path.basename(resolveWorkspacePath(args.projectPath));
+
+        // Build semantic query from context result, not just IDs
+        const ctxText = typeof contextResult === 'string'
+          ? contextResult
+          : (contextResult.context || contextResult.prompt || '');
+        const searchQuery = ctxText
+          ? ctxText.substring(0, 200)
+          : (args.taskId || args.moduleId || args.specId || 'project context');
+
+        // Single search, partition client-side
+        const allMemories = await mem0Client.search(searchQuery, projectId, 10).catch(() => [] as Mem0Memory[]);
+        const memories = allMemories.filter(m => m.metadata?.sourceType !== 'validation_failure').slice(0, 5);
+        const failures = allMemories.filter(m => m.metadata?.sourceType === 'validation_failure').slice(0, 5);
+
+        if (memories.length > 0) {
+          semanticSection += '\n\n## Semantic Memories\n';
+          for (const m of memories) {
+            semanticSection += `- ${m.memory}\n`;
+          }
+        }
+        if (failures.length > 0) {
+          semanticSection += '\n\n## Past Validation Failures\n';
+          for (const f of failures) {
+            semanticSection += `- ${f.memory}\n`;
+          }
+        }
+      }
+    } catch {
+      // Non-blocking
+    }
+
+    // The context API returns the knowledge context object directly
+    // Adapt to the expected MCP response format
+    const contextText = typeof contextResult === 'string'
+      ? contextResult
+      : (contextResult.context || contextResult.prompt || JSON.stringify(contextResult));
+    const fullContext = contextText + semanticSection;
+
     return {
       success: true,
-      context: context.prompt,
-      entities: context.metadata.entities,
+      context: fullContext,
+      entities: contextResult.entities || contextResult.metadata?.entities || [],
       metadata: {
-        totalLength: context.prompt.length,
+        totalLength: fullContext.length,
         maxLength: args.maxLength || 8000,
-        truncated: context.prompt.length >= (args.maxLength || 8000),
+        truncated: fullContext.length >= (args.maxLength || 8000),
       },
     };
   } catch (error) {
@@ -540,19 +670,23 @@ export async function handleKnowledgeModules(args: {
   projectPath: string;
 }) {
   try {
-    const service = getService(args.projectPath);
-    const stats = await service.getStats();
+    validateProjectPath(args.projectPath);
 
-    const modules = Object.entries(stats.byModule || {}).map(([name, count]) => ({
-      name,
-      documentCount: count,
-    }));
+    const modules = await apiClient.knowledge.modules({
+      projectPath: args.projectPath,
+    });
+
+    // The API returns an array of { id, documentCount }
+    const moduleList = Array.isArray(modules) ? modules : [];
 
     return {
       success: true,
-      modules,
-      totalModules: modules.length,
-      totalDocuments: stats.totalDocuments,
+      modules: moduleList.map((m: any) => ({
+        name: m.id || m.name,
+        documentCount: m.documentCount || 0,
+      })),
+      totalModules: moduleList.length,
+      totalDocuments: moduleList.reduce((sum: number, m: any) => sum + (m.documentCount || 0), 0),
     };
   } catch (error) {
     return {
@@ -577,23 +711,49 @@ export async function handleKnowledgeCreate(args: {
   category?: string;
   related?: string[];
   dependsOn?: string[];
+  covers?: string[];
 }) {
   try {
-    const service = getService(args.projectPath);
-    const input: CreateDocumentInput = {
+    validateProjectPath(args.projectPath);
+
+    const doc = await apiClient.knowledge.create({
+      projectPath: args.projectPath,
       title: args.title,
-      type: args.type as CreateDocumentInput['type'],
+      type: args.type,
       content: args.content,
       module: args.module,
       tags: args.tags,
-      status: args.status as DocumentStatus | undefined,
+      status: args.status,
       owner: args.owner,
       category: args.category,
       related: args.related,
       dependsOn: args.dependsOn,
-    };
+      covers: args.covers,
+    });
 
-    const doc = await service.createDocument(input);
+    // Write-through: index new doc to mem0 (non-blocking)
+    try {
+      const mem0Client = await getMem0ClientIfAvailable();
+      if (mem0Client) {
+        const projectId = path.basename(resolveWorkspacePath(args.projectPath));
+        const memContent = [
+          `Title: ${args.title}`,
+          `Type: ${args.type}`,
+          args.module ? `Module: ${args.module}` : '',
+          args.tags?.length ? `Tags: ${args.tags.join(', ')}` : '',
+          '',
+          args.content,
+        ].filter(Boolean).join('\n');
+        await mem0Client.addSmart(memContent, projectId, {
+          sourceType: 'knowledge_doc',
+          docId: doc.id,
+          docType: args.type,
+          module: args.module,
+        });
+      }
+    } catch {
+      // Non-blocking: doc created successfully
+    }
 
     return {
       success: true,
@@ -624,21 +784,59 @@ export async function handleKnowledgeUpdate(args: {
   owner?: string;
   related?: string[];
   dependsOn?: string[];
+  covers?: string[];
 }) {
   try {
-    const service = getService(args.projectPath);
-    const updates: UpdateDocumentInput = {};
+    validateProjectPath(args.projectPath);
 
-    if (args.title !== undefined) updates.title = args.title;
-    if (args.content !== undefined) updates.content = args.content;
-    if (args.status !== undefined) updates.status = args.status as DocumentStatus;
-    if (args.tags !== undefined) updates.tags = args.tags;
-    if (args.module !== undefined) updates.module = args.module;
-    if (args.owner !== undefined) updates.owner = args.owner;
-    if (args.related !== undefined) updates.related = args.related;
-    if (args.dependsOn !== undefined) updates.dependsOn = args.dependsOn;
+    const body: Record<string, unknown> = {};
+    if (args.title !== undefined) body.title = args.title;
+    if (args.content !== undefined) body.content = args.content;
+    if (args.status !== undefined) body.status = args.status;
+    if (args.tags !== undefined) body.tags = args.tags;
+    if (args.module !== undefined) body.module = args.module;
+    if (args.owner !== undefined) body.owner = args.owner;
+    if (args.related !== undefined) body.related = args.related;
+    if (args.dependsOn !== undefined) body.dependsOn = args.dependsOn;
+    if (args.covers !== undefined) body.covers = args.covers;
 
-    const doc = await service.updateDocument(args.docId, updates);
+    const doc = await apiClient.knowledge.update(args.docId, body, {
+      projectPath: args.projectPath,
+    });
+
+    // Write-through: re-index to mem0 if content or title changed (non-blocking)
+    if (args.content || args.title) {
+      try {
+        const mem0Client = await getMem0ClientIfAvailable();
+        if (mem0Client) {
+          const projectId = path.basename(resolveWorkspacePath(args.projectPath));
+          // Remove old memories for this doc
+          const existing = await mem0Client.search(args.docId, projectId, 10, { docId: args.docId }).catch(() => [] as Mem0Memory[]);
+          for (const mem of existing) {
+            await mem0Client.delete(mem.id, projectId).catch(() => {});
+          }
+          // Re-index with updated content
+          if (args.content) {
+            const memContent = [
+              `Title: ${args.title || doc.title}`,
+              `Type: ${doc.type}`,
+              args.module ? `Module: ${args.module}` : '',
+              args.tags?.length ? `Tags: ${args.tags.join(', ')}` : '',
+              '',
+              args.content,
+            ].filter(Boolean).join('\n');
+            await mem0Client.addSmart(memContent, projectId, {
+              sourceType: 'knowledge_doc',
+              docId: args.docId,
+              docType: doc.type,
+              module: args.module,
+            });
+          }
+        }
+      } catch {
+        // Non-blocking: doc updated successfully
+      }
+    }
 
     return {
       success: true,
@@ -665,14 +863,32 @@ export async function handleKnowledgeDelete(args: {
   archive?: boolean;
 }) {
   try {
-    const service = getService(args.projectPath);
+    validateProjectPath(args.projectPath);
+
     const archive = args.archive !== false; // default true
-    await service.deleteDocument(args.docId, archive);
+    const result = await apiClient.knowledge.delete(args.docId, {
+      projectPath: args.projectPath,
+      archive: String(archive),
+    });
+
+    // Write-through: remove from mem0 (non-blocking)
+    try {
+      const mem0Client = await getMem0ClientIfAvailable();
+      if (mem0Client) {
+        const projectId = path.basename(resolveWorkspacePath(args.projectPath));
+        const existing = await mem0Client.search(args.docId, projectId, 10, { docId: args.docId }).catch(() => [] as Mem0Memory[]);
+        for (const mem of existing) {
+          await mem0Client.delete(mem.id, projectId).catch(() => {});
+        }
+      }
+    } catch {
+      // Non-blocking: doc deleted/archived successfully
+    }
 
     return {
       success: true,
       docId: args.docId,
-      action: archive ? 'archived' : 'deleted',
+      action: result?.action || (archive ? 'archived' : 'deleted'),
     };
   } catch (error) {
     return {
@@ -687,8 +903,12 @@ export async function handleKnowledgeHealth(args: {
   checks?: string[];
 }) {
   try {
-    const service = getService(args.projectPath);
-    const result = await service.healthCheck(args.checks);
+    validateProjectPath(args.projectPath);
+
+    const result = await apiClient.knowledge.health({
+      projectPath: args.projectPath,
+      checks: args.checks?.join(','),
+    });
 
     return {
       success: true,

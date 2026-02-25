@@ -3,25 +3,18 @@
  *
  * Types for project knowledge documentation system.
  * Used by both frontend (React) and templates.
+ *
+ * KnowledgeDocumentType and KnowledgeStatus are derived from @sidstack/shared
+ * to stay in sync with the canonical schema.
  */
 
-export type KnowledgeDocumentType =
-  | "index"
-  | "business-logic"
-  | "api-endpoint"
-  | "design-pattern"
-  | "database-table"
-  | "module";
+import type { DocumentType, DocumentStatus } from '@sidstack/shared';
 
-export type KnowledgeStatus = "draft" | "implemented" | "deprecated";
+/** Re-export DocumentType as KnowledgeDocumentType for frontend use */
+export type KnowledgeDocumentType = DocumentType;
 
-export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-
-export type PatternCategory =
-  | "creational"
-  | "structural"
-  | "behavioral"
-  | "architectural";
+/** Re-export DocumentStatus as KnowledgeStatus for frontend use */
+export type KnowledgeStatus = DocumentStatus;
 
 /**
  * Code reference - links to source code
@@ -45,24 +38,6 @@ export interface KnowledgeFrontmatter {
   updated?: string;
   related?: string[];
   tags?: string[];
-}
-
-/**
- * API endpoint specific frontmatter
- */
-export interface ApiEndpointFrontmatter extends KnowledgeFrontmatter {
-  type: "api-endpoint";
-  method: ApiMethod;
-  path: string;
-  version?: string;
-}
-
-/**
- * Design pattern specific frontmatter
- */
-export interface PatternFrontmatter extends KnowledgeFrontmatter {
-  type: "design-pattern";
-  category: PatternCategory;
 }
 
 /**
@@ -201,11 +176,18 @@ export function getDocumentTypeIcon(
 ): string {
   const icons: Record<KnowledgeDocumentType, string> = {
     index: "folder",
-    "business-logic": "workflow",
-    "api-endpoint": "globe",
-    "design-pattern": "puzzle",
-    "database-table": "database",
     module: "package",
+    spec: "file-text",
+    decision: "scale",
+    proposal: "lightbulb",
+    guide: "book-open",
+    reference: "bookmark",
+    template: "layout",
+    checklist: "check-square",
+    pattern: "puzzle",
+    skill: "zap",
+    principle: "shield",
+    rule: "alert-triangle",
   };
   return icons[type] || "file";
 }
@@ -216,8 +198,9 @@ export function getDocumentTypeIcon(
 export function getStatusColor(status: KnowledgeStatus): string {
   const colors: Record<KnowledgeStatus, string> = {
     draft: "yellow",
-    implemented: "green",
-    deprecated: "red",
+    active: "green",
+    review: "blue",
+    archived: "gray",
   };
   return colors[status] || "gray";
 }

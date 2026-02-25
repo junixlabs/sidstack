@@ -1,0 +1,35 @@
+# Exclude everything not needed for server packages
+node_modules
+dist
+.git
+.gitignore
+
+# Frontend (Tauri desktop app)
+src/
+src-tauri/
+public/
+
+# Other packages not needed for server
+packages/cli/
+packages/bot-server/
+packages/vscode-extension/
+
+# Dev/docs
+desks/
+openspec/
+docs/
+.sidstack/
+.claude/
+scripts/
+
+# Build artifacts
+*.png
+*.html
+.turbo
+.vscode
+.tsbuildinfo
+
+# Env files (use docker env instead)
+.env
+.env.*
+!.env.example

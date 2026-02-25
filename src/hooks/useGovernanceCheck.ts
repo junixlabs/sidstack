@@ -136,9 +136,9 @@ export function useGovernanceCheck(): UseGovernanceCheckResult {
     try {
       setStatus((prev) => ({ ...prev, isLoading: true }));
 
-      // Run sidstack init --governance command
+      // Run sidstack init command
       const result = await executeBash(
-        `sidstack init "${projectPath}" --governance --skip-health-check`,
+        `npx @sidstack/cli init "${projectPath}" --force --json`,
         projectPath
       );
 

@@ -1,0 +1,23 @@
+---
+id: {{title}}
+type: reference
+title: {{title}}
+module: {{module}}
+status: draft
+created: {{date}}
+tags: [reference, {{module}}]
+---
+
+# {{title}}
+
+## Overview
+
+Reference documentation for this component/system.
+
+## Details
+
+Content here...
+
+## Related
+
+- Link to related documents

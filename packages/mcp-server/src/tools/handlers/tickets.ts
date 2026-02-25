@@ -10,18 +10,8 @@
  * - ticket_convert_to_task: Convert ticket to task
  */
 
-import { SidStackDB, getDB } from '@sidstack/shared';
-import type { TicketStatus, TicketType, TicketPriority, TicketSource, TerminalApp } from '@sidstack/shared';
-
-// Database instance
-let db: SidStackDB | null = null;
-
-async function getDatabase(): Promise<SidStackDB> {
-  if (!db) {
-    db = await getDB();
-  }
-  return db;
-}
+import type { TicketStatus, TicketType, TicketPriority, TicketSource } from '@sidstack/shared';
+import { createApiClient, ApiClientError } from '@sidstack/shared';
 
 // =============================================================================
 // Tool Definitions
@@ -88,7 +78,7 @@ export const ticketTools = [
   },
   {
     name: 'ticket_list',
-    description: 'List tickets with optional filters.',
+    description: 'List tickets with optional filters. Default returns compact mode (truncated descriptions, array counts).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -122,8 +112,13 @@ export const ticketTools = [
         },
         limit: {
           type: 'number',
-          description: 'Max tickets to return (default: 50)',
-          default: 50,
+          description: 'Max tickets to return (default: 20)',
+          default: 20,
+        },
+        compact: {
+          type: 'boolean',
+          description: 'Compact mode: truncate description, return array counts instead of full arrays (default: true)',
+          default: true,
         },
       },
       required: ['projectId'],
@@ -231,57 +226,33 @@ export async function handleTicketCreate(args: {
   externalUrls?: string[];
   reporter?: string;
 }) {
-  const database = await getDatabase();
+  const apiClient = createApiClient();
 
-  // Check for existing ticket with same externalId
-  if (args.externalId) {
-    const existing = database.getTicketByExternalId(args.externalId, args.projectId);
-    if (existing) {
+  try {
+    const result = await apiClient.tickets.create({
+      projectId: args.projectId,
+      title: args.title,
+      description: args.description,
+      type: args.type,
+      priority: args.priority,
+      externalId: args.externalId,
+      source: args.source,
+      labels: args.labels,
+      externalUrls: args.externalUrls,
+      reporter: args.reporter,
+    });
+
+    return result;
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 409) {
       return {
         success: false,
         error: 'Ticket with this externalId already exists',
-        existingTicket: existing,
+        existingTicket: (error.body as any)?.existingTicket,
       };
     }
+    throw error;
   }
-
-  // Ensure project exists
-  let project = database.getProject(args.projectId);
-  if (!project) {
-    project = database.createProject({
-      id: args.projectId,
-      name: args.projectId,
-      path: process.cwd(),
-      status: 'active',
-    });
-  }
-
-  const ticket = database.createTicket({
-    projectId: args.projectId,
-    externalId: args.externalId,
-    source: args.source || 'api',
-    title: args.title,
-    description: args.description || '',
-    type: args.type || 'task',
-    priority: args.priority || 'medium',
-    status: 'new',
-    labels: JSON.stringify(args.labels || []),
-    attachments: '[]',
-    linkedIssues: '[]',
-    externalUrls: JSON.stringify(args.externalUrls || []),
-    reporter: args.reporter,
-  });
-
-  return {
-    success: true,
-    ticket: {
-      ...ticket,
-      labels: JSON.parse(ticket.labels),
-      attachments: [],
-      linkedIssues: [],
-      externalUrls: JSON.parse(ticket.externalUrls),
-    },
-  };
 }
 
 export async function handleTicketList(args: {
@@ -290,51 +261,77 @@ export async function handleTicketList(args: {
   type?: TicketType[];
   priority?: TicketPriority[];
   limit?: number;
+  compact?: boolean;
 }) {
-  const database = await getDatabase();
+  const apiClient = createApiClient();
+  const compact = args.compact !== false; // default true
 
-  const tickets = database.listTickets(args.projectId, {
-    status: args.status,
-    type: args.type,
-    priority: args.priority,
-    limit: args.limit || 50,
+  // API expects comma-separated strings for array filters
+  const statusJoined = args.status?.join(',');
+  const typeJoined = args.type?.join(',');
+  const priorityJoined = args.priority?.join(',');
+
+  const result = await apiClient.tickets.list({
+    projectId: args.projectId,
+    status: statusJoined,
+    type: typeJoined,
+    priority: priorityJoined,
+    limit: String(args.limit || 20),
+  } as any);
+
+  // API already parses JSON fields (labels, attachments, etc.)
+  // Apply compact mode transformation if needed
+  const tickets = result.tickets || [];
+
+  const mapped = tickets.map((t: any) => {
+    if (compact) {
+      // Compact mode: truncate description, return array counts
+      const labels = Array.isArray(t.labels) ? t.labels : [];
+      const attachments = Array.isArray(t.attachments) ? t.attachments : [];
+      const linkedIssues = Array.isArray(t.linkedIssues) ? t.linkedIssues : [];
+      const externalUrls = Array.isArray(t.externalUrls) ? t.externalUrls : [];
+      return {
+        id: t.id,
+        title: t.title,
+        description: t.description ? t.description.slice(0, 150) + (t.description.length > 150 ? '...' : '') : '',
+        type: t.type,
+        priority: t.priority,
+        status: t.status,
+        externalId: t.externalId,
+        assignee: t.assignee,
+        taskId: t.taskId,
+        labelsCount: labels.length,
+        attachmentsCount: attachments.length,
+        linkedIssuesCount: linkedIssues.length,
+        externalUrlsCount: externalUrls.length,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+      };
+    }
+    // Full mode — pass through as-is from API
+    return t;
   });
-
-  const parsed = tickets.map((t) => ({
-    ...t,
-    labels: JSON.parse(t.labels),
-    attachments: JSON.parse(t.attachments),
-    linkedIssues: JSON.parse(t.linkedIssues),
-    externalUrls: JSON.parse(t.externalUrls),
-  }));
-
-  const total = database.countTickets(args.projectId);
 
   return {
     success: true,
-    tickets: parsed,
-    total,
+    tickets: mapped,
+    total: result.total,
+    compact,
   };
 }
 
 export async function handleTicketGet(args: { ticketId: string }) {
-  const database = await getDatabase();
-  const ticket = database.getTicket(args.ticketId);
+  const apiClient = createApiClient();
 
-  if (!ticket) {
-    return { success: false, error: 'Ticket not found' };
+  try {
+    const result = await apiClient.tickets.get(args.ticketId);
+    return result;
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 404) {
+      return { success: false, error: 'Ticket not found' };
+    }
+    throw error;
   }
-
-  return {
-    success: true,
-    ticket: {
-      ...ticket,
-      labels: JSON.parse(ticket.labels),
-      attachments: JSON.parse(ticket.attachments),
-      linkedIssues: JSON.parse(ticket.linkedIssues),
-      externalUrls: JSON.parse(ticket.externalUrls),
-    },
-  };
 }
 
 export async function handleTicketUpdate(args: {
@@ -344,30 +341,23 @@ export async function handleTicketUpdate(args: {
   assignee?: string;
   labels?: string[];
 }) {
-  const database = await getDatabase();
+  const apiClient = createApiClient();
 
   const updates: Record<string, unknown> = {};
   if (args.status !== undefined) updates.status = args.status;
   if (args.priority !== undefined) updates.priority = args.priority;
   if (args.assignee !== undefined) updates.assignee = args.assignee;
-  if (args.labels !== undefined) updates.labels = JSON.stringify(args.labels);
+  if (args.labels !== undefined) updates.labels = args.labels;
 
-  const ticket = database.updateTicket(args.ticketId, updates);
-
-  if (!ticket) {
-    return { success: false, error: 'Ticket not found' };
+  try {
+    const result = await apiClient.tickets.update(args.ticketId, updates);
+    return result;
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 404) {
+      return { success: false, error: 'Ticket not found' };
+    }
+    throw error;
   }
-
-  return {
-    success: true,
-    ticket: {
-      ...ticket,
-      labels: JSON.parse(ticket.labels),
-      attachments: JSON.parse(ticket.attachments),
-      linkedIssues: JSON.parse(ticket.linkedIssues),
-      externalUrls: JSON.parse(ticket.externalUrls),
-    },
-  };
 }
 
 export async function handleTicketStartSession(args: {
@@ -375,107 +365,67 @@ export async function handleTicketStartSession(args: {
   workspacePath: string;
   terminal?: string;
 }) {
-  const database = await getDatabase();
-  const ticket = database.getTicket(args.ticketId);
+  const apiClient = createApiClient();
 
+  // Fetch ticket via API
+  let ticketResult: any;
+  try {
+    ticketResult = await apiClient.tickets.get(args.ticketId);
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 404) {
+      return { success: false, error: 'Ticket not found' };
+    }
+    throw error;
+  }
+
+  const ticket = ticketResult.ticket;
   if (!ticket) {
     return { success: false, error: 'Ticket not found' };
   }
 
-  const labels = JSON.parse(ticket.labels);
-  const linkedIssues = JSON.parse(ticket.linkedIssues);
-  const externalUrls = JSON.parse(ticket.externalUrls);
+  // API already returns parsed arrays
+  const labels = Array.isArray(ticket.labels) ? ticket.labels : [];
+  const linkedIssues = Array.isArray(ticket.linkedIssues) ? ticket.linkedIssues : [];
+  const externalUrls = Array.isArray(ticket.externalUrls) ? ticket.externalUrls : [];
 
   // Build context prompt
   const contextPrompt = buildTicketContextPrompt(ticket, labels, linkedIssues, externalUrls);
 
-  // Create Claude session
-  const session = database.createClaudeSession({
-    workspacePath: args.workspacePath,
-    terminal: (args.terminal || 'iTerm') as TerminalApp,
-    launchMode: 'normal',
-    initialPrompt: contextPrompt,
-  });
-
-  // Update ticket with session link
-  database.updateTicket(ticket.id, {
-    sessionId: session.id,
-    status: 'in_progress',
-  });
-
-  // Log event
-  database.logSessionEvent({
-    claudeSessionId: session.id,
-    eventType: 'launched',
-    details: {
-      source: 'ticket',
-      ticketId: ticket.id,
-      ticketTitle: ticket.title,
-    },
-  });
+  // Update ticket status to in_progress via API
+  try {
+    await apiClient.tickets.update(ticket.id, { status: 'in_progress' });
+  } catch {
+    // Non-critical: continue even if status update fails
+  }
 
   return {
     success: true,
-    session,
     contextPrompt,
     message: `Session started. Use this prompt to initialize Claude Code:\n\n${contextPrompt}`,
   };
 }
 
 export async function handleTicketConvertToTask(args: { ticketId: string }) {
-  const database = await getDatabase();
-  const ticket = database.getTicket(args.ticketId);
+  const apiClient = createApiClient();
 
-  if (!ticket) {
-    return { success: false, error: 'Ticket not found' };
-  }
-
-  // Check if already converted
-  if (ticket.taskId) {
-    const existingTask = database.getTask(ticket.taskId);
-    if (existingTask) {
-      return {
-        success: false,
-        error: 'Ticket already converted to task',
-        task: existingTask,
-      };
+  try {
+    const result = await apiClient.tickets.convertToTask(args.ticketId);
+    return result;
+  } catch (error) {
+    if (error instanceof ApiClientError) {
+      if (error.status === 404) {
+        return { success: false, error: 'Ticket not found' };
+      }
+      if (error.status === 409) {
+        return {
+          success: false,
+          error: 'Ticket already converted to task',
+          task: (error.body as any)?.task,
+        };
+      }
     }
+    throw error;
   }
-
-  // Map ticket type to task type
-  const taskTypeMap: Record<string, string> = {
-    bug: 'bugfix',
-    feature: 'feature',
-    improvement: 'refactor',
-    task: 'feature',
-    epic: 'feature',
-  };
-
-  const taskType = taskTypeMap[ticket.type] || 'feature';
-
-  // Create task from ticket
-  const task = database.createTask({
-    projectId: ticket.projectId,
-    title: `[${taskType.toUpperCase()}] ${ticket.title}`,
-    description: `From ticket: ${ticket.externalId || ticket.id}\n\n${ticket.description}`,
-    status: 'pending',
-    priority: ticket.priority === 'critical' ? 'high' : (ticket.priority as 'low' | 'medium' | 'high'),
-    taskType: taskType as 'feature' | 'bugfix' | 'refactor',
-    createdBy: 'ticket-system',
-  });
-
-  // Link ticket to task
-  database.updateTicket(ticket.id, {
-    taskId: task.id,
-    status: 'approved',
-  });
-
-  return {
-    success: true,
-    task,
-    ticketId: ticket.id,
-    message: `Ticket converted to task: ${task.id}`,
-  };
 }
 
 // =============================================================================

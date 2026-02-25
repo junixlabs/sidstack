@@ -40,7 +40,7 @@ Interactive knowledge building:
 ```yaml
 ---
 id: unique-identifier
-type: business-logic | api-endpoint | design-pattern | database-table | module
+type: guide | spec | decision | reference | pattern | rule | module
 title: Human Readable Title
 module: module-name
 ---

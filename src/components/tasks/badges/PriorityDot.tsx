@@ -13,19 +13,15 @@ const PRIORITY_CONFIG: Record<TaskPriority, { colorVar: string; label: string }>
   low:    { colorVar: "var(--priority-low)",    label: "Low priority" },
 };
 
-export function PriorityDot({ priority, showLow = false, className }: PriorityDotProps) {
-  // Don't show for low priority unless explicitly requested
+export function PriorityDot({ priority, showLow = true, className }: PriorityDotProps) {
   if (priority === "low" && !showLow) return null;
 
   const config = PRIORITY_CONFIG[priority];
 
   return (
     <span
-      className={cn("w-2 h-2 rounded-full ring-2 flex-shrink-0", className)}
-      style={{
-        backgroundColor: config.colorVar,
-        boxShadow: `0 0 0 2px color-mix(in srgb, ${config.colorVar} 30%, transparent)`,
-      }}
+      className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", className)}
+      style={{ backgroundColor: config.colorVar }}
       title={config.label}
       aria-label={config.label}
     />

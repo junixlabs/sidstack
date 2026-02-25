@@ -277,9 +277,9 @@ projectsApiRouter.get('/:id', async (req, res) => {
     }
 
     // Get project tasks
-    const tasks = db.listTasks(req.params.id);
+    const result = db.listTasks(req.params.id, { fields: 'standard' });
 
-    res.json({ project, tasks });
+    res.json({ project, tasks: result.tasks });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get project' });
   }

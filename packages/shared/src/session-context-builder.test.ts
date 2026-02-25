@@ -88,7 +88,7 @@ describe('Session Context Builder', () => {
         title: 'OAuth Flow',
         path: 'docs/auth/oauth.md',
         content: '# OAuth Integration\n\nThis module supports OAuth 2.0...',
-        type: 'api',
+        type: 'reference',
       },
     ],
     ...overrides,

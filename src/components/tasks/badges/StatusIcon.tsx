@@ -1,5 +1,6 @@
 import {
   Circle,
+  Eye,
   PlayCircle,
   CheckCircle2,
   PauseCircle,
@@ -17,6 +18,7 @@ interface StatusIconProps {
 
 const STATUS_ICON_MAP: Record<TaskStatus, { icon: (className: string) => ReactNode; colorVar: string }> = {
   pending:     { icon: (c) => <Circle className={c} />, colorVar: "var(--status-pending)" },
+  review:      { icon: (c) => <Eye className={c} />, colorVar: "var(--status-review)" },
   in_progress: { icon: (c) => <PlayCircle className={c} />, colorVar: "var(--status-in-progress)" },
   completed:   { icon: (c) => <CheckCircle2 className={c} />, colorVar: "var(--status-completed)" },
   blocked:     { icon: (c) => <PauseCircle className={c} />, colorVar: "var(--status-blocked)" },

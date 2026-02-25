@@ -3,23 +3,13 @@
  *
  * Tools for creating, querying, and removing typed references
  * between all SidStack entities.
+ *
+ * Uses API client instead of direct database access.
  */
 
-import { getDB } from '@sidstack/shared';
-import type {
-  SidStackDB,
-  EntityType,
-  EntityReferenceRelationship,
-} from '@sidstack/shared';
+import { createApiClient } from '@sidstack/shared';
 
-let db: SidStackDB | null = null;
-
-async function getDatabase(): Promise<SidStackDB> {
-  if (!db) {
-    db = await getDB();
-  }
-  return db;
-}
+const apiClient = createApiClient();
 
 // =============================================================================
 // Tool Definitions
@@ -28,20 +18,20 @@ async function getDatabase(): Promise<SidStackDB> {
 export const entityReferenceTools = [
   {
     name: 'entity_link',
-    description: 'Create a typed reference between two SidStack entities. Supports all entity types: task, session, knowledge, capability, impact, ticket, incident, lesson, rule, skill.',
+    description: 'Create a typed reference between two SidStack entities. Supports all entity types: task, session, knowledge, impact, ticket, incident, lesson, rule, skill.',
     inputSchema: {
       type: 'object',
       properties: {
         sourceType: {
           type: 'string',
           description: 'Source entity type',
-          enum: ['task', 'session', 'knowledge', 'capability', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill'],
+          enum: ['task', 'session', 'knowledge', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill', 'test_result'],
         },
         sourceId: { type: 'string', description: 'Source entity ID' },
         targetType: {
           type: 'string',
           description: 'Target entity type',
-          enum: ['task', 'session', 'knowledge', 'capability', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill'],
+          enum: ['task', 'session', 'knowledge', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill', 'test_result'],
         },
         targetId: { type: 'string', description: 'Target entity ID' },
         relationship: {
@@ -51,7 +41,7 @@ export const entityReferenceTools = [
             'converts_to', 'implemented_by', 'analyzed_by', 'requires_context',
             'governed_by', 'creates', 'discovers', 'describes', 'codified_from',
             'originates_from', 'generates', 'enables', 'depends_on', 'feeds_into',
-            'blocks', 'related_to', 'mentions',
+            'blocks', 'validates', 'related_to', 'mentions',
           ],
         },
         metadata: {
@@ -76,13 +66,13 @@ export const entityReferenceTools = [
         sourceType: {
           type: 'string',
           description: 'Source entity type',
-          enum: ['task', 'session', 'knowledge', 'capability', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill'],
+          enum: ['task', 'session', 'knowledge', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill', 'test_result'],
         },
         sourceId: { type: 'string', description: 'Source entity ID' },
         targetType: {
           type: 'string',
           description: 'Target entity type',
-          enum: ['task', 'session', 'knowledge', 'capability', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill'],
+          enum: ['task', 'session', 'knowledge', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill', 'test_result'],
         },
         targetId: { type: 'string', description: 'Target entity ID' },
         relationship: {
@@ -92,7 +82,7 @@ export const entityReferenceTools = [
             'converts_to', 'implemented_by', 'analyzed_by', 'requires_context',
             'governed_by', 'creates', 'discovers', 'describes', 'codified_from',
             'originates_from', 'generates', 'enables', 'depends_on', 'feeds_into',
-            'blocks', 'related_to', 'mentions',
+            'blocks', 'validates', 'related_to', 'mentions',
           ],
         },
       },
@@ -108,7 +98,7 @@ export const entityReferenceTools = [
         entityType: {
           type: 'string',
           description: 'Entity type to query (searches both source and target)',
-          enum: ['task', 'session', 'knowledge', 'capability', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill'],
+          enum: ['task', 'session', 'knowledge', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill', 'test_result'],
         },
         entityId: { type: 'string', description: 'Entity ID to query' },
         direction: {
@@ -155,25 +145,23 @@ export async function handleEntityLink(args: {
   metadata?: Record<string, unknown>;
   createdBy?: string;
 }) {
-  const database = await getDatabase();
-
   try {
-    const ref = database.createEntityReference({
-      sourceType: args.sourceType as EntityType,
+    const result = await apiClient.references.create({
+      sourceType: args.sourceType,
       sourceId: args.sourceId,
-      targetType: args.targetType as EntityType,
+      targetType: args.targetType,
       targetId: args.targetId,
-      relationship: args.relationship as EntityReferenceRelationship,
+      relationship: args.relationship,
       metadata: args.metadata,
       createdBy: args.createdBy || 'agent',
     });
 
     return {
       success: true,
-      reference: ref,
+      reference: result.reference,
     };
   } catch (error: any) {
-    if (error.message?.includes('UNIQUE constraint failed')) {
+    if (error.status === 409 || error.message?.includes('UNIQUE constraint')) {
       return {
         success: false,
         error: 'Reference already exists between these entities with this relationship',
@@ -193,24 +181,22 @@ export async function handleEntityUnlink(args: {
   targetId: string;
   relationship: string;
 }) {
-  const database = await getDatabase();
+  try {
+    await apiClient.references.deleteByLink({
+      sourceType: args.sourceType,
+      sourceId: args.sourceId,
+      targetType: args.targetType,
+      targetId: args.targetId,
+      relationship: args.relationship,
+    });
 
-  const deleted = database.deleteEntityReferenceByLink(
-    args.sourceType as EntityType,
-    args.sourceId,
-    args.targetType as EntityType,
-    args.targetId,
-    args.relationship as EntityReferenceRelationship,
-  );
-
-  if (!deleted) {
+    return { success: true };
+  } catch (error: any) {
     return {
       success: false,
-      error: 'Reference not found',
+      error: error.message || 'Reference not found',
     };
   }
-
-  return { success: true };
 }
 
 export async function handleEntityReferences(args: {
@@ -221,20 +207,20 @@ export async function handleEntityReferences(args: {
   maxDepth?: number;
   limit?: number;
 }) {
-  const database = await getDatabase();
   const maxDepth = args.maxDepth || 1;
 
   if (maxDepth > 1) {
-    // Depth traversal
-    const refs = database.getRelatedEntities(
-      args.entityType as EntityType,
+    // Depth traversal via related endpoint
+    const result = await apiClient.references.getRelated(
+      args.entityType,
       args.entityId,
-      maxDepth,
+      { maxDepth },
     );
 
     // Filter by relationship types if specified
+    const refs = result.references || [];
     const filtered = args.relationshipTypes
-      ? refs.filter(r => args.relationshipTypes!.includes(r.relationship))
+      ? refs.filter((r: any) => args.relationshipTypes!.includes(r.relationship))
       : refs;
 
     return {
@@ -246,25 +232,21 @@ export async function handleEntityReferences(args: {
   }
 
   // Direct query
-  const relationship = args.relationshipTypes as EntityReferenceRelationship[] | undefined;
-  const refs = database.queryEntityReferences({
-    entityType: args.entityType as EntityType,
+  const query: Record<string, string | undefined> = {
+    entityType: args.entityType,
     entityId: args.entityId,
-    direction: (args.direction as 'forward' | 'reverse' | 'both') || 'both',
-    relationship,
-    limit: args.limit || 100,
-  });
+    direction: args.direction || 'both',
+    limit: String(args.limit || 100),
+  };
+  if (args.relationshipTypes) {
+    query.relationship = args.relationshipTypes.join(',');
+  }
 
-  const total = database.countEntityReferences({
-    entityType: args.entityType as EntityType,
-    entityId: args.entityId,
-    direction: (args.direction as 'forward' | 'reverse' | 'both') || 'both',
-    relationship,
-  });
+  const result = await apiClient.references.query(query);
 
   return {
     success: true,
-    references: refs,
-    total,
+    references: result.references || [],
+    total: result.total || 0,
   };
 }

@@ -1,9 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir, join } from "@tauri-apps/api/path";
+import { readTextFile } from "@tauri-apps/plugin-fs";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-import type { Project, Worktree, PortAllocation, PortRanges } from "@/types";
+import type { Project, Worktree, PortAllocation, PortRanges, AgentRole, AgentDeskStatus } from "@/types";
 
 // =============================================================================
 // Constants
@@ -77,6 +78,29 @@ async function getSharedContextPath(projectId: string): Promise<string> {
   return await join(home, ".sidstack", "projects", projectId);
 }
 
+/**
+ * Write .sidstack-local/session.json for an agent desk.
+ * This bridges Desktop App state to the filesystem for CLI/MCP to read.
+ */
+async function writeDeskSession(
+  worktreePath: string,
+  session: Record<string, unknown>
+): Promise<void> {
+  const localDir = await join(worktreePath, ".sidstack-local");
+  const sessionFile = await join(localDir, "session.json");
+
+  // Ensure .sidstack-local/ directory exists
+  const dirExists = await invoke<boolean>("path_exists", { path: localDir }).catch(() => false);
+  if (!dirExists) {
+    await invoke("create_folder", { path: localDir });
+  }
+
+  await invoke("create_file", {
+    path: sessionFile,
+    content: JSON.stringify(session, null, 2),
+  });
+}
+
 // =============================================================================
 // Store Interface
 // =============================================================================
@@ -99,10 +123,19 @@ interface ProjectStore {
   switchWorktree: (worktreeId: string) => void;
   getActiveWorktree: () => Worktree | null;
 
-  // Port management
-  allocatePorts: (projectId: string, worktreeId: string) => PortAllocation;
+  // Port management (allocates globally to avoid cross-project conflicts)
+  allocatePorts: () => PortAllocation;
   releasePorts: (projectId: string, worktreeId: string) => void;
   getAllocatedPorts: (portType: keyof PortAllocation) => Set<number>;
+
+  // Agent Desk actions
+  createAgentDesk: (projectId: string, worktreePath: string, branch: string, role: AgentRole, name?: string) => void;
+  updateDeskStatus: (worktreeId: string, status: AgentDeskStatus, taskId?: string, taskTitle?: string) => void;
+  renameDeskAgent: (worktreeId: string, name: string) => void;
+  getNextAgentName: (role: AgentRole) => string;
+  getAgentDesks: () => Worktree[];
+  acquireDesk: (worktreeId: string, taskId: string, taskTitle: string, branchName: string) => Promise<void>;
+  releaseDesk: (worktreeId: string, options?: { force?: boolean; deleteBranch?: boolean }) => Promise<void>;
 
   // Internal helpers
   _discoverWorktrees: (folderPath: string) => Promise<Worktree[]>;
@@ -127,9 +160,29 @@ export const useProjectStore = create<ProjectStore>()(
       openProject: async (folderPath: string) => {
         const { projects, _getGitRemote, _discoverWorktrees, allocatePorts } = get();
 
+        // 0. Resolve workspace root (handles both Mode A and Mode B)
+        let resolvedRoot = folderPath;
+        let resolvedSharedContextPath: string | null = null;
+        try {
+          const wsInfo = await invoke<{
+            workspace_root: string;
+            project_root: string;
+            is_workspace_structure: boolean;
+            is_worktree: boolean;
+          } | null>("resolve_workspace_root", { cwd: folderPath });
+
+          if (wsInfo) {
+            // Use workspace root for project identity and .sidstack/ resolution
+            resolvedRoot = wsInfo.workspace_root;
+            resolvedSharedContextPath = await join(wsInfo.workspace_root, ".sidstack");
+          }
+        } catch {
+          // resolve_workspace_root not available, fall back to default behavior
+        }
+
         // 1. Get git remote (or use folder path as fallback)
-        const gitRemote = await _getGitRemote(folderPath);
-        const projectId = hashString(gitRemote || folderPath);
+        const gitRemote = await _getGitRemote(resolvedRoot);
+        const projectId = hashString(gitRemote || resolvedRoot);
 
         // 2. Check if project already exists
         const existing = projects.find((p) => p.id === projectId);
@@ -146,19 +199,32 @@ export const useProjectStore = create<ProjectStore>()(
         }
 
         // 3. Discover existing worktrees
-        const worktrees = await _discoverWorktrees(folderPath);
+        const worktrees = await _discoverWorktrees(resolvedRoot);
 
         // 4. Allocate ports for each worktree
         const worktreesWithPorts = worktrees.map((w) => ({
           ...w,
-          ports: allocatePorts(projectId, w.id),
+          ports: allocatePorts(),
         }));
 
-        // 5. Create new project
-        const sharedContextPath = await getSharedContextPath(projectId);
+        // 5. Try to read project name from .sidstack/config.json
+        let projectName = extractProjectName(gitRemote || resolvedRoot);
+        try {
+          const configPath = await join(resolvedRoot, ".sidstack", "config.json");
+          const configContent = await readTextFile(configPath);
+          const config = JSON.parse(configContent);
+          if (config.projectName) {
+            projectName = config.projectName;
+          }
+        } catch {
+          // No config.json or invalid — use fallback name
+        }
+
+        // 6. Create new project
+        const sharedContextPath = resolvedSharedContextPath || await getSharedContextPath(projectId);
         const project: Project = {
           id: projectId,
-          name: extractProjectName(gitRemote || folderPath),
+          name: projectName,
           gitRemote: gitRemote || "",
           worktrees: worktreesWithPorts,
           activeWorktreeId: worktreesWithPorts[0]?.id || "main",
@@ -225,7 +291,7 @@ export const useProjectStore = create<ProjectStore>()(
         }
 
         const worktreeId = generateWorktreeId(branch);
-        const ports = allocatePorts(projectId, worktreeId);
+        const ports = allocatePorts();
 
         const newWorktree: Worktree = {
           id: worktreeId,
@@ -235,6 +301,9 @@ export const useProjectStore = create<ProjectStore>()(
           ports,
           isActive: false,
           lastActive: new Date().toISOString(),
+          agentRole: "worker",
+          agentName: branch,
+          agentStatus: "idle",
         };
 
         set((state) => ({
@@ -273,8 +342,10 @@ export const useProjectStore = create<ProjectStore>()(
         const worktree = project?.worktrees.find((w) => w.id === worktreeId);
         if (!worktree || !project) return;
 
-        // Use the main worktree as cwd for the git command
-        const mainWorktree = project.worktrees[0];
+        // Find the reference worktree (main/master) as cwd for the git command
+        const mainWorktree =
+          project.worktrees.find((w) => w.branch === "main" || w.branch === "master") ||
+          project.worktrees.find((w) => w.id !== worktreeId);
         if (!mainWorktree) return;
 
         try {
@@ -350,7 +421,8 @@ export const useProjectStore = create<ProjectStore>()(
       // Port Management
       // =======================================================================
 
-      allocatePorts: (_projectId: string, _worktreeId: string): PortAllocation => {
+      // Allocates globally across all projects to avoid port conflicts
+      allocatePorts: (): PortAllocation => {
         const { getAllocatedPorts } = get();
         const allocated: PortAllocation = { dev: 0, api: 0, preview: 0 };
 
@@ -405,6 +477,216 @@ export const useProjectStore = create<ProjectStore>()(
       },
 
       // =======================================================================
+      // Agent Desk Actions
+      // =======================================================================
+
+      createAgentDesk: (projectId: string, worktreePath: string, branch: string, role: AgentRole, name?: string) => {
+        const { allocatePorts, getNextAgentName } = get();
+        const agentName = name || getNextAgentName(role);
+        const worktreeId = generateWorktreeId(branch);
+        const ports = allocatePorts();
+
+        const newWorktree: Worktree = {
+          id: worktreeId,
+          path: worktreePath,
+          branch,
+          ports,
+          isActive: false,
+          lastActive: new Date().toISOString(),
+          agentRole: role,
+          agentName,
+          agentStatus: "idle",
+        };
+
+        // Synchronous state update — saves to localStorage immediately
+        // before Vite file watcher can trigger a page reload
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === projectId
+              ? { ...p, worktrees: [...p.worktrees, newWorktree] }
+              : p
+          ),
+        }));
+
+        // Write .sidstack-local/session.json to filesystem (non-blocking)
+        writeDeskSession(worktreePath, {
+          status: "idle",
+          branch,
+          agentRole: role,
+          agentName,
+          lastActivity: new Date().toISOString(),
+          currentTaskId: null,
+          ports,
+        }).catch(console.error);
+      },
+
+      updateDeskStatus: (worktreeId: string, status: AgentDeskStatus, taskId?: string, taskTitle?: string) => {
+        set((state) => ({
+          projects: state.projects.map((p) => ({
+            ...p,
+            worktrees: p.worktrees.map((w) =>
+              w.id === worktreeId
+                ? {
+                    ...w,
+                    agentStatus: status,
+                    currentTaskId: taskId ?? (status === "idle" ? undefined : w.currentTaskId),
+                    currentTaskTitle: taskTitle ?? (status === "idle" ? undefined : w.currentTaskTitle),
+                  }
+                : w
+            ),
+          })),
+        }));
+
+        // Sync to .sidstack-local/session.json (non-blocking)
+        const project = get().getActiveProject();
+        const worktree = project?.worktrees.find((w) => w.id === worktreeId);
+        if (worktree) {
+          writeDeskSession(worktree.path, {
+            status,
+            branch: worktree.branch,
+            agentRole: worktree.agentRole || "worker",
+            agentName: worktree.agentName,
+            lastActivity: new Date().toISOString(),
+            currentTaskId: taskId ?? (status === "idle" ? null : worktree.currentTaskId ?? null),
+            ports: worktree.ports,
+          }).catch(console.error);
+        }
+      },
+
+      renameDeskAgent: (worktreeId: string, name: string) => {
+        set((state) => ({
+          projects: state.projects.map((p) => ({
+            ...p,
+            worktrees: p.worktrees.map((w) =>
+              w.id === worktreeId ? { ...w, agentName: name } : w
+            ),
+          })),
+        }));
+      },
+
+      getNextAgentName: (role: AgentRole): string => {
+        const project = get().getActiveProject();
+        if (!project) return role === "worker" ? "Worker 1" : "Reviewer 1";
+
+        const prefix = role === "worker" ? "Worker" : "Reviewer";
+        const existing = project.worktrees
+          .filter((w) => w.agentRole === role && w.agentName?.startsWith(prefix))
+          .map((w) => {
+            const num = parseInt(w.agentName?.replace(`${prefix} `, "") || "0");
+            return isNaN(num) ? 0 : num;
+          });
+
+        const maxNum = existing.length > 0 ? Math.max(...existing) : 0;
+        return `${prefix} ${maxNum + 1}`;
+      },
+
+      getAgentDesks: (): Worktree[] => {
+        const project = get().getActiveProject();
+        if (!project) return [];
+        return project.worktrees;
+      },
+
+      acquireDesk: async (worktreeId: string, taskId: string, taskTitle: string, branchName: string) => {
+        // Find the worktree
+        const state = get();
+        let worktree: Worktree | undefined;
+        for (const project of state.projects) {
+          const wt = project.worktrees.find((w) => w.id === worktreeId);
+          if (wt) { worktree = wt; break; }
+        }
+        if (!worktree) throw new Error("Desk not found");
+
+        // Git: ensure on main, pull latest, create feature branch
+        const currentBranch = (await invoke<string>("run_git_command", {
+          cwd: worktree.path, args: ["rev-parse", "--abbrev-ref", "HEAD"],
+        })).trim();
+
+        if (currentBranch !== "main") {
+          await invoke("run_git_command", { cwd: worktree.path, args: ["checkout", "main"] });
+        }
+        try {
+          await invoke("run_git_command", { cwd: worktree.path, args: ["pull", "origin", "main"] });
+        } catch { /* no remote */ }
+
+        await invoke("run_git_command", { cwd: worktree.path, args: ["checkout", "-b", branchName] });
+
+        // Update store state
+        set((s) => ({
+          projects: s.projects.map((p) => ({
+            ...p,
+            worktrees: p.worktrees.map((w) =>
+              w.id === worktreeId
+                ? { ...w, agentStatus: "working" as AgentDeskStatus, currentTaskId: taskId, currentTaskTitle: taskTitle, branch: branchName }
+                : w
+            ),
+          })),
+        }));
+
+        // Sync session.json
+        await writeDeskSession(worktree.path, {
+          status: "working",
+          branch: branchName,
+          agentRole: worktree.agentRole || "worker",
+          agentName: worktree.agentName,
+          lastActivity: new Date().toISOString(),
+          currentTaskId: taskId,
+          ports: worktree.ports,
+        });
+      },
+
+      releaseDesk: async (worktreeId: string, options?: { force?: boolean; deleteBranch?: boolean }) => {
+        const state = get();
+        let worktree: Worktree | undefined;
+        for (const project of state.projects) {
+          const wt = project.worktrees.find((w) => w.id === worktreeId);
+          if (wt) { worktree = wt; break; }
+        }
+        if (!worktree) throw new Error("Desk not found");
+
+        const previousBranch = worktree.branch;
+
+        // Discard changes if force
+        if (options?.force) {
+          try { await invoke("run_git_command", { cwd: worktree.path, args: ["checkout", "--", "."] }); } catch { /* ignore */ }
+          try { await invoke("run_git_command", { cwd: worktree.path, args: ["clean", "-fd"] }); } catch { /* ignore */ }
+        }
+
+        // Switch to main
+        await invoke("run_git_command", { cwd: worktree.path, args: ["checkout", "main"] });
+        try {
+          await invoke("run_git_command", { cwd: worktree.path, args: ["pull", "origin", "main"] });
+        } catch { /* no remote */ }
+
+        // Delete feature branch
+        if (options?.deleteBranch !== false && previousBranch && previousBranch !== "main") {
+          try { await invoke("run_git_command", { cwd: worktree.path, args: ["branch", "-D", previousBranch] }); } catch { /* ignore */ }
+        }
+
+        // Update store state
+        set((s) => ({
+          projects: s.projects.map((p) => ({
+            ...p,
+            worktrees: p.worktrees.map((w) =>
+              w.id === worktreeId
+                ? { ...w, agentStatus: "idle" as AgentDeskStatus, currentTaskId: undefined, currentTaskTitle: undefined, branch: "main" }
+                : w
+            ),
+          })),
+        }));
+
+        // Sync session.json
+        await writeDeskSession(worktree.path, {
+          status: "idle",
+          branch: "main",
+          agentRole: worktree.agentRole || "worker",
+          agentName: worktree.agentName,
+          lastActivity: new Date().toISOString(),
+          currentTaskId: null,
+          ports: worktree.ports,
+        });
+      },
+
+      // =======================================================================
       // Internal Helpers
       // =======================================================================
 
@@ -437,6 +719,9 @@ export const useProjectStore = create<ProjectStore>()(
                 ports: { dev: 0, api: 0, preview: 0 }, // Allocated later
                 isActive: false,
                 lastActive: new Date().toISOString(),
+                agentRole: "worker",
+                agentName: branch,
+                agentStatus: "idle",
               });
             }
           }
@@ -461,6 +746,9 @@ export const useProjectStore = create<ProjectStore>()(
               ports: { dev: 0, api: 0, preview: 0 },
               isActive: true,
               lastActive: new Date().toISOString(),
+              agentRole: "worker",
+              agentName: branch,
+              agentStatus: "idle",
             });
           }
 
@@ -475,6 +763,9 @@ export const useProjectStore = create<ProjectStore>()(
               ports: { dev: 0, api: 0, preview: 0 },
               isActive: true,
               lastActive: new Date().toISOString(),
+              agentRole: "worker",
+              agentName: "main",
+              agentStatus: "idle",
             },
           ];
         }
@@ -495,6 +786,22 @@ export const useProjectStore = create<ProjectStore>()(
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
+      version: 1,
+      migrate: (persistedState: unknown) => {
+        // Auto-convert legacy worktrees (no agentRole) to worker agents
+        const state = persistedState as { projects: Project[]; activeProjectId: string | null };
+        if (state?.projects) {
+          state.projects = state.projects.map((p) => ({
+            ...p,
+            worktrees: p.worktrees.map((w) =>
+              w.agentRole !== undefined
+                ? w
+                : { ...w, agentRole: "worker" as AgentRole, agentName: w.branch || w.id, agentStatus: "idle" as AgentDeskStatus }
+            ),
+          }));
+        }
+        return state;
+      },
       partialize: (state) => ({
         projects: state.projects,
         activeProjectId: state.activeProjectId,

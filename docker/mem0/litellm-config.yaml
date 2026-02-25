@@ -1,0 +1,46 @@
+# LiteLLM Proxy Configuration for SidStack
+# Unified LLM gateway - all providers configured here
+# Docs: https://docs.litellm.ai/docs/proxy/configs
+
+model_list:
+  # ── Chat Models ──────────────────────────────────────
+  # Google Gemini (default for mem0 extraction)
+  - model_name: gemini-flash
+    litellm_params:
+      model: gemini/gemini-2.0-flash
+      api_key: os.environ/GOOGLE_API_KEY
+    model_info:
+      supports_function_calling: true
+
+  # OpenAI (fallback / alternative)
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Anthropic (optional)
+  - model_name: claude-haiku
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # ── Embedding Models ─────────────────────────────────
+  # Google Gemini embeddings (default)
+  - model_name: gemini-embedding
+    litellm_params:
+      model: gemini/gemini-embedding-001
+      api_key: os.environ/GOOGLE_API_KEY
+
+  # OpenAI embeddings (alternative)
+  - model_name: text-embedding-3-small
+    litellm_params:
+      model: openai/text-embedding-3-small
+      api_key: os.environ/OPENAI_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  drop_params: true
+  num_retries: 2
+  request_timeout: 30

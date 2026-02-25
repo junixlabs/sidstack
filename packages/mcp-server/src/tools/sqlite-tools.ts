@@ -5,43 +5,130 @@
  * - Task management (create, update, list)
  * - Work history (sessions, entries, progress)
  * - Task governance and validation
+ *
+ * All database operations go through the SidStack API server via HTTP.
  */
 
 import {
-  SidStackDB,
-  getDB,
   type TaskType,
-  TASK_TYPES,
   resolveGovernance,
   inferTaskType,
   normalizeTitle,
-  validateTaskCompletion,
-  validateTaskGovernance,
-  validateSubtasksForCompletion,
-  createViolation,
   type AcceptanceCriterion,
-  type TaskForValidation,
-  type ProgressLogEntry,
-  type SubtaskForValidation,
+  // Workspace detection
+  detectWorkspace,
+  loadWorkspaceConfig,
+  createApiClient,
+  ApiClientError,
 } from '@sidstack/shared';
 import * as path from 'path';
+import * as fs from 'fs';
 
-// Get database - always goes through getDB() which handles singleton + auto-reload
-async function getDatabase(): Promise<SidStackDB> {
-  // getDB() manages singleton instance and auto-reloads if file changed externally
-  // No local caching here - let getDB() handle it centrally
-  return await getDB();
+interface SidStackConfig {
+  projectId: string;
+  projectName: string;
+  projectPath: string;
+  version?: string;
+}
+
+// Singleton API client
+const apiClient = createApiClient();
+
+/**
+ * Read projectId from .sidstack/config.json in the given directory
+ * Uses workspace detection to find config from worktree paths
+ * Returns null if config doesn't exist or is invalid
+ */
+function readProjectConfig(projectPath: string): SidStackConfig | null {
+  // First try workspace detection (handles worktrees)
+  const workspace = detectWorkspace(projectPath);
+  if (workspace) {
+    try {
+      return loadWorkspaceConfig(workspace.workspaceRoot);
+    } catch {
+      // Fall through to legacy check
+    }
+  }
+
+  // Legacy: direct config.json check
+  const configPath = path.join(projectPath, '.sidstack', 'config.json');
+  try {
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, 'utf-8');
+      return JSON.parse(content) as SidStackConfig;
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
 }
 
 /**
- * Resolve projectId: projectId is now REQUIRED in schema
- * Throws error if not provided to prevent accidental 'default' usage
+ * Resolve projectId via API fallback (for remote/HTTP mode).
+ * Calls the API server to match projectPath to a known project.
+ * Returns null if API is unavailable or project not found.
  */
-function resolveProjectId(providedProjectId?: string): string {
-  if (!providedProjectId) {
-    throw new Error('projectId is required');
+async function resolveProjectIdViaApi(projectPath: string): Promise<string | null> {
+  try {
+    const result = await apiClient.request<any>('GET', '/api/projects/by-path', undefined, {
+      path: projectPath,
+    });
+    return result?.project?.id || null;
+  } catch {
+    // API unavailable or project not found
+    return null;
   }
-  return providedProjectId;
+}
+
+/**
+ * Resolve projectId with workspace detection and API fallback
+ *
+ * Resolution order:
+ * 1. Use provided projectId if given
+ * 2. Detect workspace from cwd (handles worktrees)
+ * 3. Fallback: resolve via API (for remote/HTTP mode)
+ * 4. Throw error if none works
+ */
+async function resolveProjectId(providedProjectId?: string, startPath?: string): Promise<string> {
+  // If projectId provided, use it
+  if (providedProjectId) {
+    return providedProjectId;
+  }
+
+  // Try workspace detection from startPath or cwd
+  const searchPath = startPath || process.cwd();
+  const workspace = detectWorkspace(searchPath);
+
+  if (workspace?.projectId) {
+    return workspace.projectId;
+  }
+
+  // Fallback: resolve via API (for remote/HTTP mode)
+  const apiProjectId = await resolveProjectIdViaApi(searchPath);
+  if (apiProjectId) {
+    return apiProjectId;
+  }
+
+  throw new Error(
+    'projectId is required. Either provide it explicitly or run from inside a SidStack workspace/project.'
+  );
+}
+
+/**
+ * Resolve workspace path from projectPath (handles worktrees)
+ * Returns the actual workspace root where .sidstack/ lives.
+ * Falls back to projectPath as-is when workspace detection fails (remote mode).
+ */
+function resolveWorkspacePath(projectPath: string): string {
+  try {
+    const workspace = detectWorkspace(projectPath);
+    if (workspace) {
+      return workspace.workspaceRoot;
+    }
+  } catch {
+    // Workspace detection can fail in remote mode — fall through
+  }
+  return projectPath;
 }
 
 // =============================================================================
@@ -112,22 +199,32 @@ export const sqliteTools = [
   },
   {
     name: 'task_update',
-    description: 'Update a task status, progress, or notes',
+    description: `Update a task status, progress, notes, or solution plan.
+
+Solution plan flow:
+1. Analyze task → write solutionPlan (root cause + approach + logic changes) → set status="review"
+2. User reviews plan → approves (planStatus="approved") or requests revision (planStatus="revision_requested" + planReviewNotes)
+3. Plan approved → set status="in_progress" → implement according to plan
+4. Done → provide implementSummary → set status="completed"`,
     inputSchema: {
       type: 'object',
       properties: {
         taskId: { type: 'string', description: 'ID of the task to update' },
-        status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'blocked', 'failed', 'cancelled'] },
+        status: { type: 'string', enum: ['pending', 'review', 'in_progress', 'completed', 'blocked', 'failed', 'cancelled'] },
         progress: { type: 'number', minimum: 0, maximum: 100, description: 'Progress percentage' },
         notes: { type: 'string', description: 'Status update notes' },
         branch: { type: 'string', description: 'Git branch name to link this task to' },
+        solutionPlan: { type: 'string', description: 'Solution plan: root cause, approach, logic changes. Required when moving to "review" status.' },
+        planStatus: { type: 'string', enum: ['draft', 'approved', 'revision_requested'], description: 'Plan review status' },
+        planReviewNotes: { type: 'string', description: 'Review feedback when requesting plan revision' },
+        implementSummary: { type: 'string', description: 'Summary of what was changed and how it was verified. Required when completing a task.' },
       },
       required: ['taskId'],
     },
   },
   {
     name: 'task_list',
-    description: `List tasks with smart filtering. Default returns actionable tasks (pending/in_progress) in compact mode.
+    description: `List tasks with smart filtering and field selection.
 
 Presets:
 - "actionable" (default): pending + in_progress tasks
@@ -136,11 +233,19 @@ Presets:
 - "epics": top-level tasks only (no parent)
 - "all": everything with pagination
 
+Fields (controls response size):
+- "minimal" (default): id, title, status, taskType, priority, assignedAgent (~100 bytes/task, ~2.6k tokens for 100 tasks)
+- "standard": + description, notes, progress, branch, moduleId, timestamps
+- "full": all columns including governance, acceptanceCriteria, validation
+
+Use task_get for full details of a specific task.
+
 Examples:
-- task_list({ projectId: "x" }) → actionable tasks, compact
+- task_list({ projectId: "x" }) → actionable tasks, minimal fields
 - task_list({ projectId: "x", search: "auth" }) → search in title/description
 - task_list({ projectId: "x", preset: "epics" }) → top-level tasks only
-- task_list({ projectId: "x", preset: "all", limit: 10 }) → paginated`,
+- task_list({ projectId: "x", preset: "all", limit: 50 }) → paginated
+- task_list({ projectId: "x", fields: "standard" }) → more detail per task`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -152,7 +257,7 @@ Examples:
         },
         status: {
           type: 'array',
-          items: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'blocked', 'failed', 'cancelled'] },
+          items: { type: 'string', enum: ['pending', 'review', 'in_progress', 'completed', 'blocked', 'failed', 'cancelled'] },
           description: 'Filter by status(es). Overrides preset.'
         },
         taskType: {
@@ -164,9 +269,13 @@ Examples:
         parentOnly: { type: 'boolean', description: 'Only top-level tasks (no parentTaskId)' },
         search: { type: 'string', description: 'Search in title and description' },
         assignedAgent: { type: 'string', description: 'Filter by assigned agent' },
-        limit: { type: 'number', description: 'Max results (default: 30, max: 100)' },
+        limit: { type: 'number', description: 'Max results (default: 50). Limits: minimal=500, standard=200, full=50' },
         offset: { type: 'number', description: 'Skip first N results' },
-        compact: { type: 'boolean', description: 'Exclude large JSON fields (default: true)' },
+        fields: {
+          type: 'string',
+          enum: ['minimal', 'standard', 'full'],
+          description: 'Field detail level (default: "minimal"). Use "minimal" for overview, "standard" for more context, "full" for governance data'
+        },
       },
       required: ['projectId'],
     },
@@ -203,6 +312,7 @@ Examples:
         force: { type: 'boolean', default: false, description: 'Force completion even if validation fails (logs governance violation)' },
         reason: { type: 'string', description: 'Reason for force completion (required if force=true)' },
         agentId: { type: 'string', description: 'Agent ID completing the task' },
+        projectPath: { type: 'string', description: 'Project path for running quality gates and doc sync (optional, resolved from task if not provided)' },
       },
       required: ['taskId'],
     },
@@ -328,138 +438,6 @@ Examples:
     },
   },
 
-  // =========================================================================
-  // Claude Session Tools
-  // =========================================================================
-  {
-    name: 'session_launch',
-    description: 'Launch Claude Code session in external terminal and track it. Returns session ID for tracking.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        projectDir: { type: 'string', description: 'Project directory (required)' },
-        taskId: { type: 'string', description: 'Task ID to link session to' },
-        moduleId: { type: 'string', description: 'Module ID to link session to' },
-        prompt: { type: 'string', description: 'Initial prompt for Claude (passed as CLI argument)' },
-        terminal: {
-          type: 'string',
-          enum: ['iTerm', 'Terminal', 'Warp', 'Alacritty', 'kitty', 'ghostty'],
-          description: 'Override terminal detection'
-        },
-        mode: {
-          type: 'string',
-          enum: ['normal', 'skip-permissions', 'continue', 'print', 'verbose'],
-          description: 'Launch mode. "skip-permissions" adds --dangerously-skip-permissions flag'
-        },
-        includeContext: {
-          type: 'boolean',
-          description: 'Auto-inject knowledge context (task, module docs, training) into the session prompt. Defaults to true when taskId or moduleId is provided.'
-        },
-        includeTraining: {
-          type: 'boolean',
-          description: 'Include training context (skills, rules) in the session prompt. Requires moduleId.'
-        },
-        agentRole: {
-          type: 'string',
-          description: 'Agent role for filtering applicable training context (e.g., dev, qa, ba)'
-        },
-        taskType: {
-          type: 'string',
-          description: 'Task type for filtering applicable training context (e.g., feature, bugfix)'
-        },
-      },
-      required: ['projectDir'],
-    },
-  },
-  {
-    name: 'session_list',
-    description: 'List Claude sessions with filters',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        workspacePath: { type: 'string', description: 'Filter by workspace path' },
-        taskId: { type: 'string', description: 'Filter by task ID' },
-        moduleId: { type: 'string', description: 'Filter by module ID' },
-        status: {
-          type: 'array',
-          items: { type: 'string', enum: ['launching', 'active', 'completed', 'error', 'terminated'] },
-          description: 'Filter by status(es)'
-        },
-        limit: { type: 'number', default: 20, description: 'Max results (default: 20)' },
-        offset: { type: 'number', default: 0, description: 'Offset for pagination' },
-      },
-    },
-  },
-  {
-    name: 'session_get',
-    description: 'Get Claude session details by ID',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        sessionId: { type: 'string', description: 'Session ID' },
-      },
-      required: ['sessionId'],
-    },
-  },
-  {
-    name: 'session_update_status',
-    description: 'Update session status',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        sessionId: { type: 'string', description: 'Session ID' },
-        status: {
-          type: 'string',
-          enum: ['active', 'completed', 'error', 'terminated'],
-          description: 'New status'
-        },
-        exitCode: { type: 'number', description: 'Exit code (for completed status)' },
-        errorMessage: { type: 'string', description: 'Error message (for error status)' },
-      },
-      required: ['sessionId', 'status'],
-    },
-  },
-  {
-    name: 'session_resume',
-    description: 'Resume a previous Claude session with context. Launches new session with --continue flag.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        sessionId: { type: 'string', description: 'Session ID to resume' },
-        additionalPrompt: { type: 'string', description: 'Additional context for resume' },
-      },
-      required: ['sessionId'],
-    },
-  },
-  {
-    name: 'session_stats',
-    description: 'Get session statistics',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        workspacePath: { type: 'string', description: 'Filter by workspace' },
-        taskId: { type: 'string', description: 'Filter by task ID' },
-        moduleId: { type: 'string', description: 'Filter by module ID' },
-      },
-    },
-  },
-  {
-    name: 'session_log_event',
-    description: 'Log an event for a session',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        sessionId: { type: 'string', description: 'Session ID' },
-        eventType: {
-          type: 'string',
-          enum: ['launched', 'prompt_sent', 'active', 'error', 'resumed', 'completed', 'terminated'],
-          description: 'Event type'
-        },
-        details: { type: 'object', description: 'Event details (optional)' },
-      },
-      required: ['sessionId', 'eventType'],
-    },
-  },
 ] satisfies Array<{
   name: string;
   description: string;
@@ -474,11 +452,39 @@ Examples:
 // Tool Handlers
 // =============================================================================
 
+/**
+ * Helper to format an API error into a tool response
+ */
+function formatApiError(error: unknown, fallbackMessage: string): { content: Array<{ type: string; text: string }> } {
+  if (error instanceof ApiClientError) {
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          success: false,
+          error: error.message,
+          status: error.status,
+          details: error.body,
+        }),
+      }],
+    };
+  }
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify({
+        success: false,
+        error: fallbackMessage,
+        details: error instanceof Error ? error.message : String(error),
+      }),
+    }],
+  };
+}
+
 export async function handleSqliteTool(
   toolName: string,
   args: Record<string, unknown>
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
-  const database = await getDatabase();
 
   switch (toolName) {
     // =========================================================================
@@ -488,7 +494,7 @@ export async function handleSqliteTool(
       const title = (args.title as string || '').trim();
       const description = (args.description as string || '').trim();
 
-      // Validate: title must have meaningful content (not just prefix)
+      // Client-side validation: title must have meaningful content (not just prefix)
       const titleContent = title.replace(/^\[[\w-]+\]\s*/, '').trim();
       if (!titleContent || titleContent.length < 5) {
         return {
@@ -498,12 +504,12 @@ export async function handleSqliteTool(
               success: false,
               error: 'Title must contain a meaningful description (at least 5 characters after [TYPE] prefix)',
               hint: 'Example: [feature] Add user authentication to login page',
-            }, null, 2),
+            }),
           }],
         };
       }
 
-      // Validate: description must be substantive
+      // Client-side validation: description must be substantive
       if (!description || description.length < 20) {
         return {
           content: [{
@@ -512,7 +518,7 @@ export async function handleSqliteTool(
               success: false,
               error: 'Description is too short. Provide a detailed description (at least 20 characters)',
               hint: 'Include: what needs to be done, why, and the expected outcome. Analyze the problem before creating a task.',
-            }, null, 2),
+            }),
           }],
         };
       }
@@ -526,7 +532,7 @@ export async function handleSqliteTool(
       // Normalize title to include [TYPE] prefix
       const normalizedTitle = normalizeTitle(title, taskType);
 
-      // Resolve governance based on task type
+      // Resolve governance based on task type (client-side for early validation)
       const governance = resolveGovernance(taskType);
 
       // Build acceptance criteria if provided
@@ -537,7 +543,7 @@ export async function handleSqliteTool(
         completed: false,
       }));
 
-      // Validate: feature/bugfix/security require acceptance criteria
+      // Client-side validation: feature/bugfix/security require acceptance criteria
       if (governance.requiredCriteria && acceptanceCriteria.length === 0) {
         return {
           content: [{
@@ -546,147 +552,90 @@ export async function handleSqliteTool(
               success: false,
               error: `${taskType} tasks require acceptance criteria`,
               hint: 'Add acceptanceCriteria array with at least one criterion. Analyze the task requirements first.',
-            }, null, 2),
+            }),
           }],
         };
       }
 
-      // Validate: project must exist (prevent orphaned tasks)
-      let projectId = resolveProjectId(args.projectId as string);
-      let project = database.getProject(projectId);
-
-      // If project not found by ID, try to find by current working directory path
-      if (!project) {
-        const cwd = process.cwd();
-        const projectByPath = database.getProjectByPath(cwd);
-        if (projectByPath) {
-          // Found project by path - use its ID
-          projectId = projectByPath.id;
-          project = projectByPath;
-        }
-      }
-
-      if (!project) {
-        // Get available projects for helpful error message
-        const availableProjects = database.listProjects();
-        const projectIds = availableProjects.map(p => p.id);
+      // Resolve projectId
+      let projectId: string;
+      try {
+        projectId = await resolveProjectId(args.projectId as string);
+      } catch (e) {
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
               success: false,
-              error: `Project not found: ${projectId}`,
-              hint: 'Open the project in SidStack first to auto-register it, or use an existing projectId',
-              availableProjects: projectIds.length > 0 ? projectIds : [],
-              nextAction: projectIds.length > 0
-                ? `Use one of: ${projectIds.join(', ')}`
-                : 'Open this project in SidStack app first to register it',
-            }, null, 2),
+              error: e instanceof Error ? e.message : 'Failed to resolve projectId',
+            }),
           }],
         };
       }
 
-      const task = database.createTask({
-        projectId,
-        title: normalizedTitle,
-        description,
-        priority: (args.priority as 'low' | 'medium' | 'high') || 'medium',
-        assignedAgent: args.assignedAgent as string | undefined,
-        createdBy: (args.createdBy as string) || 'user',
-        status: 'pending',
-        taskType,
-        moduleId: args.moduleId as string | undefined,
-        branch: args.branch as string | undefined,
-        governance: JSON.stringify(governance),
-        acceptanceCriteria: JSON.stringify(acceptanceCriteria),
-        validation: JSON.stringify({
-          progressHistoryCount: 0,
-          titleFormatValid: true,
-          qualityGatesPassed: false,
-          acceptanceCriteriaValid: acceptanceCriteria.length === 0 || !governance.requiredCriteria,
-        }),
-      });
+      try {
+        // The API server handles project auto-creation, governance resolution, and task creation
+        const result = await apiClient.tasks.create({
+          title: normalizedTitle,
+          description,
+          projectId,
+          priority: (args.priority as string) || 'medium',
+          assignedAgent: args.assignedAgent as string | undefined,
+          createdBy: (args.createdBy as string) || 'user',
+          taskType,
+          moduleId: args.moduleId as string | undefined,
+          branch: args.branch as string | undefined,
+          acceptanceCriteria: rawCriteria,
+        });
 
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            task,
-            governance: {
-              taskType,
-              principles: governance.principles,
-              skills: governance.skills,
-              qualityGates: governance.qualityGates.map(g => g.id),
-              requiredCriteria: governance.requiredCriteria,
-            },
-          }, null, 2),
-        }],
-      };
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              task: result.task,
+              governance: result.governance,
+            }),
+          }],
+        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to create task');
+      }
     }
 
     case 'task_breakdown': {
       const parentTaskId = args.parentTaskId as string;
-      let projectId = resolveProjectId(args.projectId as string);
-      const subtasks = args.subtasks as Array<{ title: string; description?: string; priority?: string }>;
-
-      // Validate: project must exist
-      let project = database.getProject(projectId);
-
-      // If project not found by ID, try to find by current working directory path
-      if (!project) {
-        const cwd = process.cwd();
-        const projectByPath = database.getProjectByPath(cwd);
-        if (projectByPath) {
-          projectId = projectByPath.id;
-          project = projectByPath;
-        }
-      }
-
-      if (!project) {
-        const availableProjects = database.listProjects();
-        const projectIds = availableProjects.map(p => p.id);
+      let projectId: string;
+      try {
+        projectId = await resolveProjectId(args.projectId as string);
+      } catch (e) {
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
               success: false,
-              error: `Project not found: ${projectId}`,
-              hint: 'Open the project in SidStack first to auto-register it, or use an existing projectId',
-              availableProjects: projectIds.length > 0 ? projectIds : [],
-              nextAction: projectIds.length > 0
-                ? `Use one of: ${projectIds.join(', ')}`
-                : 'Open this project in SidStack app first to register it',
-            }, null, 2),
+              error: e instanceof Error ? e.message : 'Failed to resolve projectId',
+            }),
           }],
         };
       }
+      const subtasks = args.subtasks as Array<{ title: string; description?: string; priority?: string }>;
 
-      const parentTask = database.getTask(parentTaskId);
-      if (!parentTask) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Parent task not found' }) }],
-        };
-      }
-
-      const createdSubtasks = subtasks.map((st) =>
-        database.createTask({
+      try {
+        const result = await apiClient.tasks.breakdown(parentTaskId, {
+          subtasks,
           projectId,
-          parentTaskId,
-          title: st.title,
-          description: st.description || '',
-          priority: (st.priority as 'low' | 'medium' | 'high') || 'medium',
-          status: 'pending',
-          createdBy: 'orchestrator',
-        })
-      );
+        });
 
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({ success: true, parentTaskId, subtasks: createdSubtasks }, null, 2),
-        }],
-      };
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true, parentTaskId: result.parentTaskId, subtasks: result.subtasks }),
+          }],
+        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to break down task');
+      }
     }
 
     case 'task_update': {
@@ -695,256 +644,128 @@ export async function handleSqliteTool(
       const newProgress = args.progress as number | undefined;
       const notes = args.notes as string | undefined;
       const branch = args.branch as string | undefined;
+      const solutionPlan = args.solutionPlan as string | undefined;
+      const planStatus = args.planStatus as string | undefined;
+      const planReviewNotes = args.planReviewNotes as string | undefined;
+      const implementSummary = args.implementSummary as string | undefined;
 
-      // Validate subtasks when completing a task
-      if (newStatus === 'completed') {
-        const subtasks = database.getSubtasks(taskId);
-        if (subtasks.length > 0) {
-          const subtaskValidation = validateSubtasksForCompletion(
-            subtasks.map(s => ({
-              id: s.id,
-              title: s.title,
-              status: s.status,
-              notes: s.notes,
-            } as SubtaskForValidation))
-          );
+      try {
+        // Build update body — the API server handles progress logging, subtask validation, etc.
+        const updateBody: Record<string, unknown> = {};
+        if (newStatus !== undefined) updateBody.status = newStatus;
+        if (newProgress !== undefined) updateBody.progress = newProgress;
+        if (notes !== undefined) updateBody.notes = notes;
+        if (branch !== undefined) updateBody.branch = branch;
+        if (solutionPlan !== undefined) updateBody.solutionPlan = solutionPlan;
+        if (planStatus !== undefined) updateBody.planStatus = planStatus;
+        if (planReviewNotes !== undefined) updateBody.planReviewNotes = planReviewNotes;
+        if (implementSummary !== undefined) updateBody.implementSummary = implementSummary;
 
-          if (!subtaskValidation.canComplete) {
-            return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  success: false,
-                  error: 'Cannot complete task with incomplete subtasks',
-                  blockers: subtaskValidation.blockers,
-                  incompleteSubtasks: subtaskValidation.incompleteSubtasks.map(s => ({
-                    id: s.id,
-                    title: s.title,
-                    status: s.status,
-                  })),
-                  cancelledWithoutReason: subtaskValidation.cancelledWithoutReason.map(s => ({
-                    id: s.id,
-                    title: s.title,
-                  })),
-                  hint: 'Complete or cancel all subtasks first. Cancelled subtasks must have notes explaining the reason.',
-                }, null, 2),
-              }],
-            };
-          }
-        }
+        const result = await apiClient.tasks.update(taskId, updateBody);
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: true, task: result.task }) }],
+        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to update task');
+      }
+    }
+
+    case 'task_list': {
+      let projectId: string;
+      try {
+        projectId = await resolveProjectId(args.projectId as string);
+      } catch (e) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: false,
+              error: e instanceof Error ? e.message : 'Failed to resolve projectId',
+            }),
+          }],
+        };
       }
 
-      // Auto-log to task_progress_log when progress changes
-      if (newProgress !== undefined) {
-        const currentTask = database.getTask(taskId);
-        if (!currentTask) {
+      // Build query params
+      const query: Record<string, string | number | boolean | undefined> = {
+        projectId,
+      };
+
+      if (args.preset) query.preset = args.preset as string;
+      if (args.status) query.status = (args.status as string[]).join(',');
+      if (args.taskType) query.taskType = (args.taskType as string[]).join(',');
+      if (args.priority) query.priority = args.priority as string;
+      if (args.parentOnly !== undefined) query.parentOnly = args.parentOnly as boolean;
+      if (args.search) query.search = args.search as string;
+      if (args.assignedAgent) query.assignedAgent = args.assignedAgent as string;
+      query.limit = (args.limit as number) || 50;
+      query.offset = (args.offset as number) || 0;
+      query.fields = (args.fields as string) || 'minimal';
+
+      try {
+        const result = await apiClient.tasks.list(query as any);
+        return {
+          content: [{ type: 'text', text: JSON.stringify({
+            success: true,
+            ...result,
+            _query: { projectId, ...query }
+          }) }],
+        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to list tasks');
+      }
+    }
+
+    case 'task_get': {
+      try {
+        const result = await apiClient.tasks.get(args.taskId as string);
+        if (!result.task) {
           return {
             content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Task not found' }) }],
           };
         }
-
-        if (currentTask.progress !== newProgress) {
-          // logTaskProgress handles both the log entry AND updating the task's progress/status/notes
-          database.logTaskProgress({
-            taskId,
-            sessionId: 'direct',
-            progress: newProgress,
-            status: (newStatus || currentTask.status) as 'pending' | 'in_progress' | 'blocked' | 'completed' | 'failed',
-            notes: notes,
-            artifacts: '[]',
-          });
-
-          // Update branch separately if provided (logTaskProgress doesn't handle it)
-          if (branch !== undefined) {
-            database.updateTask(taskId, { branch });
-          }
-        } else {
-          // Progress didn't change — just do a normal update
-          const updates: Record<string, unknown> = {};
-          if (newStatus) updates.status = newStatus;
-          if (notes) updates.notes = notes;
-          if (branch !== undefined) updates.branch = branch;
-          if (Object.keys(updates).length > 0) {
-            database.updateTask(taskId, updates);
-          }
-        }
-      } else {
-        // No progress in this update — normal path
-        const updates: Record<string, unknown> = {};
-        if (newStatus) updates.status = newStatus;
-        if (notes) updates.notes = notes;
-        if (branch !== undefined) updates.branch = branch;
-        if (Object.keys(updates).length > 0) {
-          database.updateTask(taskId, updates);
-        }
-      }
-
-      const task = database.getTask(taskId);
-      if (!task) {
         return {
-          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Task not found' }) }],
+          content: [{ type: 'text', text: JSON.stringify({ success: true, task: result.task }) }],
         };
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 404) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Task not found' }) }],
+          };
+        }
+        return formatApiError(error, 'Failed to get task');
       }
-
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, task }, null, 2) }],
-      };
-    }
-
-    case 'task_list': {
-      const projectId = resolveProjectId(args.projectId as string);
-
-      // Build smart filters
-      type PresetType = 'actionable' | 'blocked' | 'recent' | 'epics' | 'all';
-      const filters: {
-        preset?: PresetType;
-        status?: string[];
-        taskType?: string[];
-        priority?: string;
-        parentOnly?: boolean;
-        search?: string;
-        assignedAgent?: string;
-        limit?: number;
-        offset?: number;
-        compact?: boolean;
-      } = {};
-
-      // Apply preset or default to 'actionable'
-      const presetValue = args.preset as string | undefined;
-      const validPresets: PresetType[] = ['actionable', 'blocked', 'recent', 'epics', 'all'];
-      filters.preset = validPresets.includes(presetValue as PresetType)
-        ? (presetValue as PresetType)
-        : 'actionable';
-
-      // Override with specific filters if provided
-      if (args.status) filters.status = args.status as string[];
-      if (args.taskType) filters.taskType = args.taskType as string[];
-      if (args.priority) filters.priority = args.priority as string;
-      if (args.parentOnly !== undefined) filters.parentOnly = args.parentOnly as boolean;
-      if (args.search) filters.search = args.search as string;
-      if (args.assignedAgent) filters.assignedAgent = args.assignedAgent as string;
-
-      // Pagination
-      filters.limit = Math.min((args.limit as number) || 30, 100);
-      filters.offset = (args.offset as number) || 0;
-
-      // Compact mode (default true)
-      filters.compact = args.compact !== false;
-
-      const result = database.listTasksSmart(projectId, filters);
-      return {
-        content: [{ type: 'text', text: JSON.stringify({
-          success: true,
-          ...result,
-          _query: { projectId, ...filters }
-        }, null, 2) }],
-      };
-    }
-
-    case 'task_get': {
-      const task = database.getTask(args.taskId as string);
-      if (!task) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Task not found' }) }],
-        };
-      }
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, task }, null, 2) }],
-      };
     }
 
     case 'task_governance_check': {
       const taskId = args.taskId as string;
-      const task = database.getTask(taskId);
 
-      if (!task) {
+      try {
+        const result = await apiClient.tasks.check(taskId);
+
         return {
-          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Task not found' }) }],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              taskId,
+              canComplete: result.canComplete,
+              blockers: result.blockers,
+              warnings: result.warnings,
+              hints: result.hints,
+              validation: result.validation,
+            }),
+          }],
         };
-      }
-
-      // Get progress history for this task
-      const progressHistory = database.getTaskProgressHistory(taskId);
-      const progressEntries: ProgressLogEntry[] = progressHistory.map(p => ({
-        id: p.id,
-        taskId: p.taskId,
-        progress: p.progress,
-        createdAt: p.createdAt,
-      }));
-
-      // Parse stored JSON fields
-      const taskForValidation: TaskForValidation = {
-        id: task.id,
-        title: task.title,
-        taskType: task.taskType as TaskType | undefined,
-        governance: task.governance ? JSON.parse(task.governance) : undefined,
-        acceptanceCriteria: task.acceptanceCriteria ? JSON.parse(task.acceptanceCriteria) : undefined,
-        validation: task.validation ? JSON.parse(task.validation) : undefined,
-      };
-
-      // Run validation
-      const result = validateTaskCompletion(taskForValidation, progressEntries);
-
-      // Get applicable training rules if moduleId is set
-      let trainingRules: {
-        blockers: Array<{ id: string; name: string; content: string; level: string }>;
-        warnings: Array<{ id: string; name: string; content: string; level: string }>;
-      } = { blockers: [], warnings: [] };
-
-      if (task.moduleId) {
-        try {
-          const trainingContext = database.getTrainingContext(
-            task.moduleId,
-            'dev',
-            task.taskType || 'general'
-          );
-
-          // Separate rules by level
-          for (const rule of trainingContext.rules) {
-            const ruleInfo = { id: rule.id, name: rule.name, content: rule.content, level: rule.level };
-            if (rule.level === 'must' && rule.enforcement === 'gate') {
-              trainingRules.blockers.push(ruleInfo);
-            } else if (rule.level === 'should') {
-              trainingRules.warnings.push(ruleInfo);
-            }
-          }
-        } catch {
-          // Ignore training context errors
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 404) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Task not found' }) }],
+          };
         }
+        return formatApiError(error, 'Failed to check task governance');
       }
-
-      // Merge training rule blockers with validation blockers
-      const allBlockers = [
-        ...result.blockers,
-        ...trainingRules.blockers.map(r => `[TRAINING RULE] ${r.name}: ${r.content}`),
-      ];
-      const allWarnings = [
-        ...result.warnings,
-        ...trainingRules.warnings.map(r => `[TRAINING RULE] ${r.name}: ${r.content}`),
-      ];
-
-      // If training rules have blockers, task cannot complete
-      const canComplete = result.canComplete && trainingRules.blockers.length === 0;
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            taskId,
-            canComplete,
-            blockers: allBlockers,
-            warnings: allWarnings,
-            hints: result.hints,
-            validation: result.validation,
-            trainingRules: {
-              blockingRules: trainingRules.blockers.length,
-              warningRules: trainingRules.warnings.length,
-              rules: trainingRules,
-            },
-          }, null, 2),
-        }],
-      };
     }
 
     case 'task_complete': {
@@ -952,263 +773,213 @@ export async function handleSqliteTool(
       const force = (args.force as boolean) || false;
       const reason = args.reason as string | undefined;
       const agentId = args.agentId as string | undefined;
+      const projectPath = args.projectPath as string | undefined;
 
-      const task = database.getTask(taskId);
-      if (!task) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Task not found' }) }],
-        };
-      }
-
-      // Get progress history
-      const progressHistory = database.getTaskProgressHistory(taskId);
-      const progressEntries: ProgressLogEntry[] = progressHistory.map(p => ({
-        id: p.id,
-        taskId: p.taskId,
-        progress: p.progress,
-        createdAt: p.createdAt,
-      }));
-
-      // Parse stored JSON fields
-      const taskForValidation: TaskForValidation = {
-        id: task.id,
-        title: task.title,
-        taskType: task.taskType as TaskType | undefined,
-        governance: task.governance ? JSON.parse(task.governance) : undefined,
-        acceptanceCriteria: task.acceptanceCriteria ? JSON.parse(task.acceptanceCriteria) : undefined,
-        validation: task.validation ? JSON.parse(task.validation) : undefined,
-      };
-
-      // Run validation
-      const validationResult = validateTaskCompletion(taskForValidation, progressEntries);
-
-      // If validation fails and not forcing
-      if (!validationResult.canComplete && !force) {
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: false,
-              error: 'Task cannot be completed due to governance blockers',
-              blockers: validationResult.blockers,
-              hints: validationResult.hints,
-              validation: validationResult.validation,
-              hint: 'Use force=true with reason to bypass (logs governance violation)',
-            }, null, 2),
-          }],
-        };
-      }
-
-      // If forcing without reason
-      if (force && !validationResult.canComplete && !reason) {
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: false,
-              error: 'Force completion requires a reason',
-              hint: 'Provide reason parameter explaining why bypass is needed',
-            }, null, 2),
-          }],
-        };
-      }
-
-      // Log governance violation if forcing past blockers
-      let violationId: string | undefined;
-      if (force && !validationResult.canComplete) {
-        const violation = createViolation(
-          taskId,
-          'forced_completion',
-          validationResult.blockers,
-          reason,
-          agentId
-        );
-        // Serialize blockers for database storage
-        const dbViolation = database.logGovernanceViolation({
-          taskId: violation.taskId,
-          violationType: violation.violationType,
-          blockers: JSON.stringify(violation.blockers),
-          reason: violation.reason,
-          agentId: violation.agentId,
-          timestamp: violation.timestamp,
-          resolvedBy: violation.resolvedBy,
-          resolvedAt: violation.resolvedAt,
-        });
-        violationId = dbViolation.id;
-      }
-
-      // Update task to completed
-      const updatedTask = database.updateTask(taskId, {
-        status: 'completed',
-        progress: 100,
-        validation: JSON.stringify({
-          progressHistoryCount: progressEntries.length,
-          titleFormatValid: validationResult.validation.titleFormat.passed,
-          qualityGatesPassed: validationResult.validation.qualityGates.passed_overall,
-          acceptanceCriteriaValid: validationResult.validation.acceptanceCriteria.passed,
-          lastValidatedAt: Date.now(),
-        }),
-      });
-
-      // Auto-complete linked ticket if this task was created from a ticket
-      let linkedTicketCompleted: string | undefined;
       try {
-        const linkedTicket = database.getTicketByTaskId(taskId);
-        if (linkedTicket && linkedTicket.status !== 'completed' && linkedTicket.status !== 'rejected') {
-          database.updateTicket(linkedTicket.id, { status: 'completed' });
-          linkedTicketCompleted = linkedTicket.id;
-        }
-      } catch {
-        // Non-blocking: ticket completion failure should not affect task completion
-      }
+        // The API server handles all validation, governance, quality gates,
+        // violation logging, ticket completion, and follow-up task creation
+        const result = await apiClient.tasks.complete(taskId, {
+          force,
+          reason,
+          agentId,
+          projectPath,
+        });
 
-      // Get applicable training context for feedback prompt
-      let trainingFeedbackPrompt: {
-        message: string;
-        skills: Array<{ id: string; name: string }>;
-        rules: Array<{ id: string; name: string }>;
-      } | undefined;
-
-      if (task.moduleId) {
-        try {
-          const trainingContext = database.getTrainingContext(
-            task.moduleId,
-            agentId || 'dev',
-            task.taskType || 'general'
-          );
-
-          if (trainingContext.skills.length > 0 || trainingContext.rules.length > 0) {
-            trainingFeedbackPrompt = {
-              message: `Task completed! Please provide feedback on the training content that was applicable:`,
-              skills: trainingContext.skills.map(s => ({ id: s.id, name: s.name })),
-              rules: trainingContext.rules.map(r => ({ id: r.id, name: r.name })),
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              task: result.task,
+              validation: result.validation,
+              forcedCompletion: result.forcedCompletion,
+              violationId: result.violationId,
+              linkedTicketCompleted: result.linkedTicketCompleted,
+              gateResults: result.gateResults,
+              humanFollowUps: result.humanFollowUps,
+              staleDocWarnings: result.staleDocWarnings,
+              trainingFeedbackPrompt: result.trainingFeedbackPrompt,
+              hint: result.trainingFeedbackPrompt
+                ? 'Use training_feedback_submit to record whether skills/rules helped or hindered this task.'
+                : undefined,
+            }),
+          }],
+        };
+      } catch (error) {
+        if (error instanceof ApiClientError) {
+          // Handle structured error responses from the API (422 for governance blockers, 400 for missing reason)
+          const body = error.body as Record<string, unknown> | undefined;
+          if (body && (error.status === 422 || error.status === 400)) {
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({
+                  success: false,
+                  ...body,
+                }),
+              }],
             };
           }
-        } catch {
-          // Ignore training context errors
         }
+        return formatApiError(error, 'Failed to complete task');
       }
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            task: updatedTask,
-            validation: validationResult.validation,
-            forcedCompletion: force && !validationResult.canComplete,
-            violationId,
-            linkedTicketCompleted,
-            trainingFeedbackPrompt,
-            hint: trainingFeedbackPrompt
-              ? 'Use training_feedback_submit to record whether skills/rules helped or hindered this task.'
-              : undefined,
-          }, null, 2),
-        }],
-      };
     }
 
     // =========================================================================
     // Work History Handlers
     // =========================================================================
     case 'work_session_start': {
-      const session = database.startWorkSession(
-        args.workspacePath as string,
-        args.claudeSessionId as string | undefined
-      );
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, session }, null, 2) }],
-      };
+      try {
+        const result = await apiClient.request<any>('POST', '/api/progress/sessions/start', {
+          workspacePath: args.workspacePath as string,
+          claudeSessionId: args.claudeSessionId as string | undefined,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: true, session: result.session }) }],
+        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to start work session');
+      }
     }
 
     case 'work_session_end': {
-      database.endWorkSession(
-        args.sessionId as string,
-        args.summary as string | undefined
-      );
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, sessionId: args.sessionId }) }],
-      };
+      const sessionId = args.sessionId as string;
+      try {
+        await apiClient.request<any>('POST', `/api/progress/sessions/${sessionId}/end`, {
+          summary: args.summary as string | undefined,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: true, sessionId }) }],
+        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to end work session');
+      }
     }
 
     case 'work_entry_log': {
-      const entry = database.logWorkEntry({
-        sessionId: args.sessionId as string,
-        workspacePath: args.workspacePath as string,
-        actionType: args.actionType as 'tool_call' | 'file_change' | 'decision' | 'status_update' | 'error',
-        actionName: args.actionName as string,
-        taskId: args.taskId as string | undefined,
-        details: args.details as string | undefined,
-        resultSummary: args.resultSummary as string | undefined,
-        durationMs: args.durationMs as number | undefined,
-      });
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, entry }, null, 2) }],
-      };
+      try {
+        const result = await apiClient.request<any>('POST', '/api/progress/entries', {
+          sessionId: args.sessionId as string,
+          workspacePath: args.workspacePath as string,
+          actionType: args.actionType as string,
+          actionName: args.actionName as string,
+          taskId: args.taskId as string | undefined,
+          details: args.details as string | undefined,
+          resultSummary: args.resultSummary as string | undefined,
+          durationMs: args.durationMs as number | undefined,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: true, entry: result.entry }) }],
+        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to log work entry');
+      }
     }
 
     case 'work_history_get': {
-      const { entries, total } = database.getWorkHistory(
-        args.workspacePath as string,
-        (args.timeframeHours as number) || 24,
-        {
+      try {
+        const result = await apiClient.request<any>('GET', '/api/progress/history', undefined, {
+          workspacePath: args.workspacePath as string,
+          timeframeHours: (args.timeframeHours as number) || 24,
           sessionId: args.sessionId as string | undefined,
           taskId: args.taskId as string | undefined,
-        },
-        (args.page as number) || 1,
-        (args.pageSize as number) || 50
-      );
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, entries, total }, null, 2) }],
-      };
+          page: (args.page as number) || 1,
+          pageSize: (args.pageSize as number) || 50,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: true, entries: result.entries, total: result.total }) }],
+        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to get work history');
+      }
     }
 
     case 'task_progress_history': {
-      const history = database.getTaskProgressHistory(args.taskId as string);
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, history }, null, 2) }],
-      };
+      try {
+        const result = await apiClient.tasks.getProgress(args.taskId as string);
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: true, history: result.progressHistory }) }],
+        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to get task progress history');
+      }
     }
 
     // =========================================================================
     // Project Handlers
     // =========================================================================
     case 'project_list': {
-      const projects = database.listProjects();
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, projects }, null, 2) }],
-      };
+      try {
+        const result = await apiClient.projects.list();
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: true, projects: result.projects }) }],
+        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to list projects');
+      }
     }
 
     case 'project_get': {
-      const project = database.getProjectByPath(args.path as string);
-      if (!project) {
+      try {
+        const result = await apiClient.request<any>('GET', '/api/projects/by-path', undefined, {
+          path: args.path as string,
+        });
+        if (!result.project) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Project not found' }) }],
+          };
+        }
         return {
-          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Project not found' }) }],
+          content: [{ type: 'text', text: JSON.stringify({ success: true, project: result.project }) }],
         };
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 404) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Project not found' }) }],
+          };
+        }
+        return formatApiError(error, 'Failed to get project');
       }
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, project }, null, 2) }],
-      };
     }
 
     case 'project_current': {
       const cwd = process.cwd();
-      const projectId = path.basename(cwd) || 'unknown';
-      const project = database.getProjectByPath(cwd);
+
+      // Read projectId from .sidstack/config.json (created by sidstack init) — local FS operation
+      const config = readProjectConfig(cwd);
+      const projectId = config?.projectId || null;
+      const projectName = config?.projectName || path.basename(cwd);
+
+      // Check if project exists in database via API
+      let project = null;
+      try {
+        if (projectId) {
+          const result = await apiClient.projects.get(projectId);
+          project = result.project || null;
+        } else {
+          const result = await apiClient.request<any>('GET', '/api/projects/by-path', undefined, { path: cwd });
+          project = result.project || null;
+        }
+      } catch {
+        // Project not found in DB, that's ok
+      }
 
       return {
         content: [{
           type: 'text',
           text: JSON.stringify({
             success: true,
-            projectId,
+            projectId: projectId || 'not-initialized',
+            projectName,
             projectPath: cwd,
+            configExists: !!config,
             project: project || null,
-            hint: project
-              ? 'Project exists in database'
-              : 'Project not in database yet - will be auto-created on first task',
-          }, null, 2),
+            hint: !config
+              ? 'No .sidstack/config.json found. Run "sidstack init" to initialize this project.'
+              : project
+                ? 'Project exists in database'
+                : 'Project config found but not in database yet - will be auto-created on first task',
+          }),
         }],
       };
     }
@@ -1217,398 +988,25 @@ export async function handleSqliteTool(
     // Migration Handlers
     // =========================================================================
     case 'task_migrate_governance': {
-      const result = database.migrateTasksToGovernance();
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            migrated: result.migrated,
-            skipped: result.skipped,
-            errors: result.errors,
-            message: result.migrated > 0
-              ? `Migrated ${result.migrated} tasks with legacy flag (validation skipped)`
-              : 'No tasks needed migration',
-          }, null, 2),
-        }],
-      };
-    }
-
-    // =========================================================================
-    // Claude Session Handlers
-    // =========================================================================
-    case 'session_launch': {
-      const { projectDir, taskId, moduleId, prompt, terminal, mode, includeContext, includeTraining, agentRole, taskType } = args as {
-        projectDir: string;
-        taskId?: string;
-        moduleId?: string;
-        prompt?: string;
-        terminal?: string;
-        mode?: string;
-        includeContext?: boolean;
-        includeTraining?: boolean;
-        agentRole?: string;
-        taskType?: string;
-      };
-
-      // Import external session launcher and settings dynamically
-      const { launchClaudeSession, detectTerminal, getSessionSettings, createKnowledgeService, buildSessionContext, createSessionContextOptions } = await import('@sidstack/shared');
-
-      // Load project settings as defaults
-      const projectSessionSettings = getSessionSettings(projectDir);
-
-      // Use explicit params if provided, otherwise fall back to project settings, then system detection
-      const resolvedTerminal = terminal || projectSessionSettings.defaultTerminal || detectTerminal();
-      const resolvedMode = mode || projectSessionSettings.defaultMode || 'normal';
-
-      // Determine if context should be injected
-      // Default: true when taskId or moduleId is provided, false otherwise
-      const shouldInjectContext = includeContext !== undefined
-        ? includeContext
-        : !!(taskId || moduleId);
-
-      // Build knowledge + training context via buildSessionContext
-      let contextPrompt: string | undefined;
-      let contextEntities: string[] = [];
-      if (shouldInjectContext && (taskId || moduleId)) {
-        try {
-          const knowledgeService = createKnowledgeService(projectDir);
-          const contextOptions = createSessionContextOptions({
-            db: database,
-            knowledgeService,
-            workspacePath: projectDir,
-            taskId,
-            moduleId,
-            includeTraining: includeTraining !== undefined ? includeTraining : !!moduleId,
-            agentRole: agentRole || 'dev',
-            taskType: taskType || 'general',
-          });
-          const builtContext = await buildSessionContext(contextOptions);
-          if (builtContext.prompt && builtContext.metadata.entities.length > 0) {
-            contextPrompt = builtContext.prompt;
-            contextEntities = builtContext.metadata.entities;
-          }
-        } catch {
-          // Context failure must NOT block launch
-        }
-      }
-
-      // Combine context with user prompt
-      const finalPrompt = contextPrompt && prompt
-        ? `${contextPrompt}\n---\n\n${prompt}`
-        : contextPrompt || prompt;
-
-      // Create session record
-      const session = database.createClaudeSession({
-        workspacePath: projectDir,
-        taskId,
-        moduleId,
-        terminal: resolvedTerminal as any,
-        launchMode: resolvedMode as any,
-        initialPrompt: finalPrompt,
-      });
-
-      // Log launched event with settings info
-      database.logSessionEvent({
-        claudeSessionId: session.id,
-        eventType: 'launched',
-        details: {
-          terminal: resolvedTerminal,
-          mode: resolvedMode,
-          taskId,
-          moduleId,
-          usedProjectSettings: !terminal || !mode,
-          contextInjected: !!contextPrompt,
-          contextEntities,
-        },
-      });
-
-      // Launch the actual session
-      const result = await launchClaudeSession({
-        projectDir,
-        context: { prompt: finalPrompt },
-        terminal: resolvedTerminal as any,
-        mode: resolvedMode as any,
-      });
-
-      if (result.success) {
-        // Update session with process info
-        database.updateClaudeSession(session.id, {
-          status: 'active',
-          pid: result.pid,
-          terminalWindowId: result.terminalWindowId,
-        });
-
-        // Create linked work session
-        const workSession = database.startWorkSession(projectDir, session.id);
-        database.linkClaudeSessionToWorkSession(session.id, workSession.id);
-
+      try {
+        const result = await apiClient.request<any>('POST', '/api/tasks/migrate-governance');
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
               success: true,
-              sessionId: session.id,
-              workSessionId: workSession.id,
-              terminal: result.terminal,
-              command: result.command,
-              pid: result.pid,
-              contextInjected: !!contextPrompt,
-              contextEntities,
-            }, null, 2),
+              migrated: result.migrated,
+              skipped: result.skipped,
+              errors: result.errors,
+              message: result.migrated > 0
+                ? `Migrated ${result.migrated} tasks with legacy flag (validation skipped)`
+                : 'No tasks needed migration',
+            }),
           }],
         };
-      } else {
-        database.markClaudeSessionError(session.id, result.error || 'Launch failed');
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: false,
-              sessionId: session.id,
-              error: result.error,
-            }, null, 2),
-          }],
-        };
+      } catch (error) {
+        return formatApiError(error, 'Failed to migrate task governance. The API endpoint may not be available yet.');
       }
-    }
-
-    case 'session_list': {
-      const { workspacePath, taskId, moduleId, status, limit, offset } = args as {
-        workspacePath?: string;
-        taskId?: string;
-        moduleId?: string;
-        status?: string[];
-        limit?: number;
-        offset?: number;
-      };
-
-      const result = database.listClaudeSessions({
-        workspacePath,
-        taskId,
-        moduleId,
-        status: status as any,
-        limit: limit || 20,
-        offset: offset || 0,
-      });
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            sessions: result.sessions,
-            total: result.total,
-          }, null, 2),
-        }],
-      };
-    }
-
-    case 'session_get': {
-      const { sessionId } = args as { sessionId: string };
-      const session = database.getClaudeSession(sessionId);
-
-      if (!session) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Session not found' }) }],
-        };
-      }
-
-      const events = database.getSessionEvents(sessionId);
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            session,
-            events,
-          }, null, 2),
-        }],
-      };
-    }
-
-    case 'session_update_status': {
-      const { sessionId, status, exitCode, errorMessage } = args as {
-        sessionId: string;
-        status: string;
-        exitCode?: number;
-        errorMessage?: string;
-      };
-
-      let session;
-      switch (status) {
-        case 'active':
-          session = database.markClaudeSessionActive(sessionId);
-          break;
-        case 'completed':
-          session = database.markClaudeSessionCompleted(sessionId, exitCode);
-          break;
-        case 'error':
-          session = database.markClaudeSessionError(sessionId, errorMessage || 'Unknown error');
-          break;
-        case 'terminated':
-          session = database.markClaudeSessionTerminated(sessionId);
-          break;
-        default:
-          return {
-            content: [{ type: 'text', text: JSON.stringify({ success: false, error: `Invalid status: ${status}` }) }],
-          };
-      }
-
-      if (!session) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Session not found' }) }],
-        };
-      }
-
-      database.logSessionEvent({
-        claudeSessionId: sessionId,
-        eventType: status as any,
-        details: { exitCode, errorMessage },
-      });
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({ success: true, session }, null, 2),
-        }],
-      };
-    }
-
-    case 'session_resume': {
-      const { sessionId, additionalPrompt } = args as {
-        sessionId: string;
-        additionalPrompt?: string;
-      };
-
-      const original = database.getClaudeSession(sessionId);
-      if (!original) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Session not found' }) }],
-        };
-      }
-
-      if (!original.canResume) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Session cannot be resumed' }) }],
-        };
-      }
-
-      // Build resume context
-      const context = database.buildResumeContext(sessionId);
-
-      // Build resume prompt
-      const parts = [`Continuing work on ${original.taskId || 'this project'}.`];
-      if (context.filesTouched.length > 0) {
-        parts.push(`Files previously touched: ${context.filesTouched.join(', ')}`);
-      }
-      if (context.lastActions.length > 0) {
-        parts.push(`Last actions: ${context.lastActions.join(', ')}`);
-      }
-      if (context.taskProgress) {
-        parts.push(`Task progress: ${context.taskProgress}%`);
-      }
-      if (additionalPrompt) {
-        parts.push(additionalPrompt);
-      }
-      const resumePrompt = parts.join('\n\n');
-
-      // Import external session launcher
-      const { launchClaudeSession } = await import('@sidstack/shared');
-
-      // Create new session with continue mode
-      const newSession = database.createClaudeSession({
-        workspacePath: original.workspacePath,
-        taskId: original.taskId,
-        moduleId: original.moduleId,
-        terminal: original.terminal,
-        launchMode: 'continue',
-        initialPrompt: resumePrompt,
-      });
-
-      // Launch the session
-      const result = await launchClaudeSession({
-        projectDir: original.workspacePath,
-        context: { prompt: resumePrompt },
-        terminal: original.terminal,
-        mode: 'continue',
-      });
-
-      if (result.success) {
-        database.updateClaudeSession(newSession.id, {
-          status: 'active',
-          pid: result.pid,
-          terminalWindowId: result.terminalWindowId,
-        });
-
-        // Record resume on original session
-        database.recordClaudeSessionResume(sessionId);
-        database.logSessionEvent({
-          claudeSessionId: sessionId,
-          eventType: 'resumed',
-          details: { newSessionId: newSession.id },
-        });
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: true,
-              originalSessionId: sessionId,
-              newSessionId: newSession.id,
-              terminal: result.terminal,
-              resumeContext: context,
-            }, null, 2),
-          }],
-        };
-      } else {
-        database.markClaudeSessionError(newSession.id, result.error || 'Resume failed');
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({ success: false, error: result.error }, null, 2),
-          }],
-        };
-      }
-    }
-
-    case 'session_stats': {
-      const { workspacePath, taskId, moduleId } = args as {
-        workspacePath?: string;
-        taskId?: string;
-        moduleId?: string;
-      };
-
-      const stats = database.getClaudeSessionStats({ workspacePath, taskId, moduleId });
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({ success: true, stats }, null, 2),
-        }],
-      };
-    }
-
-    case 'session_log_event': {
-      const { sessionId, eventType, details } = args as {
-        sessionId: string;
-        eventType: string;
-        details?: Record<string, unknown>;
-      };
-
-      const event = database.logSessionEvent({
-        claudeSessionId: sessionId,
-        eventType: eventType as any,
-        details,
-      });
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({ success: true, event }, null, 2),
-        }],
-      };
     }
 
     default:

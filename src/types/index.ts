@@ -137,6 +137,9 @@ export interface PortAllocation {
  * A git worktree within a project.
  * Multiple worktrees can exist for the same project (same git remote).
  */
+export type AgentRole = 'worker' | 'reviewer';
+export type AgentDeskStatus = 'idle' | 'assigned' | 'working' | 'review';
+
 export interface Worktree {
   id: string;                    // Unique ID derived from branch name (e.g., "main", "feature-auth")
   path: string;                  // Absolute filesystem path (e.g., "/Users/x/sidstack-feature-auth")
@@ -145,6 +148,13 @@ export interface Worktree {
   ports: PortAllocation;         // Allocated ports for dev servers
   isActive: boolean;             // Whether this worktree is currently selected
   lastActive: string;            // ISO timestamp of last activity
+
+  // Agent Desk fields (optional — when set, this worktree is an "agent desk")
+  agentRole?: AgentRole;         // 'worker' | 'reviewer'
+  agentName?: string;            // Display name (e.g., "Worker 1")
+  agentStatus?: AgentDeskStatus; // 'idle' | 'assigned' | 'working' | 'review'
+  currentTaskId?: string;        // Active task reference
+  currentTaskTitle?: string;     // Display text for assigned task
 }
 
 /**

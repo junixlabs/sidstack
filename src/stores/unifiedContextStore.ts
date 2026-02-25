@@ -7,6 +7,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
 
 // =============================================================================
 // Types
@@ -52,13 +53,13 @@ export type NavigationTarget =
 // API Helpers
 // =============================================================================
 
-const API_BASE = "http://localhost:19432/api/context";
+const API_BASE = `${getApiBaseUrl()}/api/context`;
 
 async function fetchApi<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const response = await apiFetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -306,7 +307,7 @@ export const useUnifiedContextStore = create<UnifiedContextStore>()(
 
         try {
           // Fetch task details to extract keywords
-          const taskRes = await fetch(`http://localhost:19432/api/tasks/${taskId}`);
+          const taskRes = await apiFetch(`${getApiBaseUrl()}/api/tasks/${taskId}`);
           if (!taskRes.ok) {
             set({ suggestions: [] });
             return;
@@ -332,8 +333,8 @@ export const useUnifiedContextStore = create<UnifiedContextStore>()(
 
           // Search knowledge base using keywords
           const query = keywords.join(' ');
-          const searchRes = await fetch(
-            `http://localhost:19432/api/knowledge/search?q=${encodeURIComponent(query)}&limit=5&projectPath=${encodeURIComponent(task.projectId || '')}`
+          const searchRes = await apiFetch(
+            `${getApiBaseUrl()}/api/knowledge/search?q=${encodeURIComponent(query)}&limit=5&projectPath=${encodeURIComponent(task.projectId || '')}`
           );
 
           if (!searchRes.ok) {

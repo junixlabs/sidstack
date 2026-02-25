@@ -48,6 +48,7 @@ export interface TaskGovernance {
   qualityGates: QualityGate[]; // Required gates before completion
   moduleRules?: string[];    // Module-specific rules
   requiredCriteria: boolean; // Whether acceptance criteria is required
+  reviewRequired: boolean;       // Whether reviewer PASS is required before completion
 }
 
 export interface AcceptanceCriterion {
@@ -84,6 +85,7 @@ interface GovernanceConfig {
   skills: string[];
   qualityGates: string[];
   requiredCriteria: boolean;
+  reviewRequired: boolean;
 }
 
 export const GATE_COMMANDS: Record<string, string> = {
@@ -101,60 +103,70 @@ export const TASK_TYPE_GOVERNANCE: Record<TaskType, GovernanceConfig> = {
     skills: ['dev/implement-feature'],
     qualityGates: ['typecheck', 'lint', 'test'],
     requiredCriteria: true,
+    reviewRequired: true,
   },
   bugfix: {
     principles: ['task-management', 'code-quality', 'testing'],
     skills: ['dev/fix-bug'],
     qualityGates: ['typecheck', 'lint', 'test'],
     requiredCriteria: true,
+    reviewRequired: true,
   },
   refactor: {
     principles: ['task-management', 'code-quality', 'patterns'],
     skills: ['dev/refactoring'],
     qualityGates: ['typecheck', 'lint', 'test'],
     requiredCriteria: false,
+    reviewRequired: false,
   },
   test: {
     principles: ['task-management', 'testing'],
     skills: ['qa/test-feature', 'dev/tdd-workflow'],
     qualityGates: ['typecheck', 'test'],
     requiredCriteria: false,
+    reviewRequired: false,
   },
   docs: {
     principles: ['task-management'],
     skills: [],
     qualityGates: [],
     requiredCriteria: false,
+    reviewRequired: false,
   },
   infra: {
     principles: ['task-management', 'hooks', 'git-workflow'],
     skills: [],
     qualityGates: ['typecheck'],
     requiredCriteria: false,
+    reviewRequired: false,
   },
   security: {
     principles: ['task-management', 'security', 'code-quality'],
     skills: ['dev/security-review'],
     qualityGates: ['typecheck', 'lint', 'test'],
     requiredCriteria: true,
+    reviewRequired: true,
   },
   perf: {
     principles: ['task-management', 'performance', 'code-quality'],
     skills: [],
     qualityGates: ['typecheck', 'lint', 'test'],
     requiredCriteria: false,
+    reviewRequired: false,
   },
   debt: {
     principles: ['task-management', 'code-quality', 'patterns'],
     skills: ['dev/refactoring'],
     qualityGates: ['typecheck', 'lint', 'test'],
     requiredCriteria: false,
+    reviewRequired: false,
   },
   spike: {
     principles: ['task-management'],
     skills: [],
     qualityGates: [],
     requiredCriteria: false,
+    reviewRequired: false,
   },
 };
 
@@ -213,6 +225,7 @@ export function resolveGovernance(
     patterns: [],
     qualityGates,
     requiredCriteria: config.requiredCriteria,
+    reviewRequired: config.reviewRequired,
   };
 
   // If no module governance, return base
@@ -253,6 +266,7 @@ export function mergeGovernance(
     moduleRules: module.rules?.critical || [],
     // Required criteria from base
     requiredCriteria: base.requiredCriteria,
+    reviewRequired: base.reviewRequired,
   };
 }
 

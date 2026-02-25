@@ -10,7 +10,8 @@ import { useProjectHubStore } from '@/stores/projectHubStore';
 import { CreateTaskDialog } from './CreateTaskDialog';
 import type { CapabilityDefinition } from '@sidstack/shared';
 
-const API_BASE = 'http://localhost:19432';
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
+const API_BASE = getApiBaseUrl();
 
 interface CapabilityActionsProps {
   capability: CapabilityDefinition;
@@ -18,7 +19,7 @@ interface CapabilityActionsProps {
 
 export function CapabilityActions({ capability }: CapabilityActionsProps) {
   const projectPath = useProjectHubStore((s) => s.projectPath);
-  const projectId = projectPath.split('/').pop() || 'default';
+  const projectId = useProjectHubStore((s) => s.projectId);
   const [isLaunching, setIsLaunching] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -26,7 +27,7 @@ export function CapabilityActions({ capability }: CapabilityActionsProps) {
     setIsLaunching(true);
     try {
       const prompt = `Working on capability: ${capability.name} (${capability.id}). Module: ${capability.modules?.join(', ') || 'none'}`;
-      const res = await fetch(`${API_BASE}/api/sessions`, {
+      const res = await apiFetch(`${API_BASE}/api/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

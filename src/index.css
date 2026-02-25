@@ -76,7 +76,7 @@
   /* Text Colors - Simple gray scale */
   --text-primary: #e0e0e0;
   --text-secondary: #999999;
-  --text-muted: #777777;  /* Improved contrast: 4.5:1 on surface-1 */
+  --text-muted: #888888;  /* Improved contrast: ~5.5:1 on surface-1 */
   --text-placeholder: #555555;
 
   /* Single accent color - neutral blue */
@@ -150,6 +150,7 @@
 
   /* Task Status Colors */
   --status-pending: var(--text-muted);
+  --status-review: #a78bfa;           /* violet-400 */
   --status-in-progress: #60a5fa;      /* blue-400 */
   --status-completed: #4ade80;        /* green-400 */
   --status-blocked: #fbbf24;          /* amber-400 */
@@ -190,6 +191,9 @@
   --kanban-pending: rgba(100, 116, 139, 0.2);
   --kanban-pending-text: #94a3b8;
   --kanban-pending-border: rgba(100, 116, 139, 0.3);
+  --kanban-review: rgba(167, 139, 250, 0.2);
+  --kanban-review-text: #c4b5fd;
+  --kanban-review-border: rgba(167, 139, 250, 0.3);
   --kanban-in-progress: rgba(59, 130, 246, 0.2);
   --kanban-in-progress-text: #93c5fd;
   --kanban-in-progress-border: rgba(59, 130, 246, 0.3);
@@ -260,7 +264,7 @@
   /* Text Colors */
   --text-primary: #1a1a1a;
   --text-secondary: #555555;
-  --text-muted: #666666;  /* Improved contrast for light theme */
+  --text-muted: #555555;  /* Improved contrast for light theme */
   --text-placeholder: #999999;
 
   /* Single accent - neutral blue */
@@ -324,6 +328,7 @@
 
   /* Task Status Colors - Light Theme */
   --status-pending: var(--text-muted);
+  --status-review: #7c3aed;           /* violet-600 */
   --status-in-progress: #2563eb;      /* blue-600 */
   --status-completed: #16a34a;        /* green-600 */
   --status-blocked: #d97706;          /* amber-600 */
@@ -364,6 +369,9 @@
   --kanban-pending: rgba(71, 85, 105, 0.15);
   --kanban-pending-text: #475569;
   --kanban-pending-border: rgba(71, 85, 105, 0.3);
+  --kanban-review: rgba(124, 58, 237, 0.15);
+  --kanban-review-text: #7c3aed;
+  --kanban-review-border: rgba(124, 58, 237, 0.3);
   --kanban-in-progress: rgba(37, 99, 235, 0.15);
   --kanban-in-progress-text: #2563eb;
   --kanban-in-progress-border: rgba(37, 99, 235, 0.3);
@@ -633,6 +641,17 @@ pre {
   overflow-y: auto;
 }
 
+/* ===== SidBot Animations ===== */
+@keyframes sidbot-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+@keyframes sidbot-dot {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
 /* Ensure xterm accessibility textarea stays hidden */
 .xterm-accessibility,
 .xterm-helper-textarea,
@@ -644,4 +663,41 @@ pre {
   width: 1px !important;
   clip: rect(0, 0, 0, 0) !important;
   white-space: nowrap !important;
+}
+
+/* ===== SidBot Content Containment ===== */
+/* Force all SidBot panel content to stay within bounds */
+[data-sidbot-panel] {
+  overflow: hidden !important;
+}
+
+[data-sidbot-panel] * {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+[data-sidbot-messages] {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+[data-sidbot-messages] > * {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+/* Force prose content to respect container width */
+[data-sidbot-messages] .prose {
+  max-width: 100% !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+}
+
+[data-sidbot-messages] .prose pre {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+}
+
+[data-sidbot-messages] .prose code {
+  word-break: break-all !important;
 }

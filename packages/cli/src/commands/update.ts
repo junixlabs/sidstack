@@ -155,7 +155,7 @@ export default class Update extends Command {
   private updateMcpConfig(mcpPath: string): void {
     const sidstackServer = {
       command: 'npx',
-      args: ['-y', '@sidstack/mcp-server'],
+      args: ['-y', '@sidstack/mcp-server@latest'],
     };
 
     let mcpConfig: any = { mcpServers: {} };
@@ -301,6 +301,9 @@ pnpm test        # All pass
     this.log(`  Current: v${currentVersion.sidstackVersion}`);
     this.log(`  Latest:  v${this.config.version}`);
 
+    // Step 1: Cleanup old managed files before copying new ones
+    this.cleanupManagedFiles(projectPath);
+
     // Get templates directory
     const templatesDir = resolveTemplatesDir(__dirname, 'governance');
 
@@ -309,23 +312,42 @@ pnpm test        # All pass
       return false;
     }
 
-    // Update .sidstack directory (principles, skills, workflows)
+    // Update .sidstack directory
     const sourceSidstack = path.join(templatesDir, '.sidstack');
     const targetSidstack = path.join(projectPath, '.sidstack');
 
-    // Update each subdirectory
-    const subdirs = ['principles', 'skills', 'workflows'];
+    // Update managed subdirectories (analysis only — principles/skills/workflows were removed as dead docs)
+    const subdirs = ['analysis'];
     for (const subdir of subdirs) {
       const sourceSubdir = path.join(sourceSidstack, subdir);
       const targetSubdir = path.join(targetSidstack, subdir);
 
       if (fs.existsSync(sourceSubdir)) {
         this.copyDirectorySync(sourceSubdir, targetSubdir);
-        this.log(`  ✓ Updated ${subdir}/`);
+        this.log(`  ✓ Updated .sidstack/${subdir}/`);
       }
     }
 
-    // Update .claude/commands/sidstack directory
+    // Update additional governance files (training-templates.json, project-profile.template.yaml)
+    const additionalFiles = ['training-templates.json', 'project-profile.template.yaml'];
+    for (const file of additionalFiles) {
+      const sourceFile = path.join(sourceSidstack, file);
+      const targetFile = path.join(targetSidstack, file);
+      if (fs.existsSync(sourceFile)) {
+        fs.copyFileSync(sourceFile, targetFile);
+      }
+    }
+
+    // Update .claude/commands/sidstack.md hub file (FIX: was missing)
+    const sourceHubCommand = path.join(templatesDir, '.claude/commands/sidstack.md');
+    const targetHubCommand = path.join(projectPath, '.claude/commands/sidstack.md');
+    if (fs.existsSync(sourceHubCommand)) {
+      fs.mkdirSync(path.dirname(targetHubCommand), { recursive: true });
+      fs.copyFileSync(sourceHubCommand, targetHubCommand);
+      this.log('  ✓ Updated .claude/commands/sidstack.md');
+    }
+
+    // Update .claude/commands/sidstack/ directory
     const sourceCommands = path.join(templatesDir, '.claude/commands/sidstack');
     const targetCommands = path.join(projectPath, '.claude/commands/sidstack');
 
@@ -350,7 +372,46 @@ pnpm test        # All pass
           fs.chmodSync(hookPath, 0o755);
         }
       }
-      this.log('  ✓ Updated .claude/hooks/ (API-integrated)');
+      this.log('  ✓ Updated .claude/hooks/');
+    }
+
+    // Update .claude/scripts directory (FIX: was missing)
+    const sourceScripts = path.join(templatesDir, '.claude/scripts');
+    const targetScripts = path.join(projectPath, '.claude/scripts');
+
+    if (fs.existsSync(sourceScripts)) {
+      fs.mkdirSync(targetScripts, { recursive: true });
+      this.copyDirectorySync(sourceScripts, targetScripts);
+      // Make scripts executable
+      const scriptFiles = fs.readdirSync(targetScripts);
+      for (const scriptFile of scriptFiles) {
+        const scriptPath = path.join(targetScripts, scriptFile);
+        if (scriptFile.endsWith('.sh')) {
+          fs.chmodSync(scriptPath, 0o755);
+        }
+      }
+      this.log('  ✓ Updated .claude/scripts/');
+    }
+
+    // Update .claude/skills/ from templates/skills/sidstack/ (FIX: was copying wrong source)
+    const sidstackSkillsSource = resolveTemplatesDir(__dirname, 'skills/sidstack');
+    const targetSkillsDir = path.join(projectPath, '.claude/skills');
+
+    if (fs.existsSync(sidstackSkillsSource)) {
+      fs.mkdirSync(targetSkillsDir, { recursive: true });
+      const skillDirs = fs.readdirSync(sidstackSkillsSource, { withFileTypes: true });
+      let copiedCount = 0;
+      for (const entry of skillDirs) {
+        if (entry.isDirectory()) {
+          const skillSourceDir = path.join(sidstackSkillsSource, entry.name);
+          const skillTargetDir = path.join(targetSkillsDir, entry.name);
+          this.copyDirectorySync(skillSourceDir, skillTargetDir);
+          copiedCount++;
+        }
+      }
+      if (copiedCount > 0) {
+        this.log(`  ✓ Updated .claude/skills/ (${copiedCount} auto-trigger skills)`);
+      }
     }
 
     // Update .claude/settings.json (hook configuration)
@@ -359,7 +420,7 @@ pnpm test        # All pass
 
     if (fs.existsSync(sourceSettings)) {
       // Merge with existing settings if present
-      let settings: any = {};
+      let settings: Record<string, unknown> = {};
       if (fs.existsSync(targetSettings)) {
         try {
           settings = JSON.parse(fs.readFileSync(targetSettings, 'utf-8'));
@@ -373,14 +434,14 @@ pnpm test        # All pass
       settings.hooks = templateSettings.hooks;
 
       fs.writeFileSync(targetSettings, JSON.stringify(settings, null, 2));
-      this.log('  ✓ Updated .claude/settings.json (hook config)');
+      this.log('  ✓ Updated .claude/settings.json');
     }
 
     // Update governance.md from template
     const sourceGovernance = path.join(sourceSidstack, 'governance.md');
     const targetGovernance = path.join(targetSidstack, 'governance.md');
     if (fs.existsSync(sourceGovernance)) {
-      this.copyDirectorySync(path.dirname(sourceGovernance), path.dirname(targetGovernance));
+      fs.copyFileSync(sourceGovernance, targetGovernance);
       this.log('  ✓ Updated governance.md');
     }
 
@@ -398,6 +459,7 @@ pnpm test        # All pass
       }
     };
     replacePlaceholders(targetGovernance);
+    replacePlaceholders(versionPath);
 
     // Update version.json
     const updatedVersion: GovernanceVersion = {
@@ -409,6 +471,72 @@ pnpm test        # All pass
     fs.writeFileSync(versionPath, JSON.stringify(updatedVersion, null, 2));
 
     return true;
+  }
+
+  /**
+   * Clean up old managed files before updating to prevent conflicts
+   * Only removes SidStack-managed files, preserves user customizations
+   */
+  private cleanupManagedFiles(projectPath: string): void {
+    // Directories managed entirely by SidStack (safe to remove and recreate)
+    const managedDirs = [
+      path.join(projectPath, '.claude', 'hooks'),
+      path.join(projectPath, '.claude', 'commands', 'sidstack'),
+      path.join(projectPath, '.claude', 'scripts'),
+    ];
+
+    // SidStack-managed skill folders (current + legacy for cleanup)
+    const managedSkillDirs = [
+      // Current skills
+      path.join(projectPath, '.claude', 'skills', 'sidstack-aware'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-dev'),
+      // Legacy skills (cleaned up on update)
+      path.join(projectPath, '.claude', 'skills', 'sidstack-implement'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-review'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-e2e-test'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-knowledge-first'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-impact-safe'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-lesson-detector'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-training-context'),
+    ];
+
+    // Files managed by SidStack
+    const managedFiles = [
+      path.join(projectPath, '.claude', 'commands', 'sidstack.md'),
+    ];
+
+    // Remove managed directories
+    for (const dir of managedDirs) {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    // Remove SidStack-managed skills only (preserve user's custom skills)
+    for (const skillDir of managedSkillDirs) {
+      if (fs.existsSync(skillDir)) {
+        fs.rmSync(skillDir, { recursive: true, force: true });
+      }
+    }
+
+    // Remove managed files
+    for (const file of managedFiles) {
+      if (fs.existsSync(file)) {
+        fs.unlinkSync(file);
+      }
+    }
+
+    // Remove hooks from settings.json (will be recreated from template)
+    const settingsPath = path.join(projectPath, '.claude', 'settings.json');
+    if (fs.existsSync(settingsPath)) {
+      try {
+        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        delete settings.hooks;
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+      } catch {
+        // Corrupt file, will be overwritten
+      }
+    }
   }
 
   /**

@@ -106,12 +106,12 @@ function formatType(type: string): string {
 
 function docTypeIcon(type: string): vscode.ThemeIcon {
   switch (type) {
-    case 'business-logic': return new vscode.ThemeIcon('briefcase');
-    case 'api-endpoint': return new vscode.ThemeIcon('plug');
-    case 'design-pattern': return new vscode.ThemeIcon('symbol-structure');
-    case 'database-table': return new vscode.ThemeIcon('database');
     case 'module': return new vscode.ThemeIcon('package');
-    case 'governance': return new vscode.ThemeIcon('shield');
+    case 'proposal': return new vscode.ThemeIcon('lightbulb');
+    case 'reference': return new vscode.ThemeIcon('bookmark');
+    case 'template': return new vscode.ThemeIcon('file-code');
+    case 'checklist': return new vscode.ThemeIcon('checklist');
+    case 'pattern': return new vscode.ThemeIcon('symbol-structure');
     case 'spec': return new vscode.ThemeIcon('file-text');
     case 'decision': return new vscode.ThemeIcon('git-compare');
     case 'guide': return new vscode.ThemeIcon('book');

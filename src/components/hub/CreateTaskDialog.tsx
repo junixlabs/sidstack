@@ -25,7 +25,8 @@ import {
 import { showSuccess, showError } from '@/lib/toast';
 import { useOnboardingStore } from '@/stores/onboardingStore';
 
-const API_BASE = 'http://localhost:19432';
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
+const API_BASE = getApiBaseUrl();
 
 const TASK_TYPES = [
   { value: 'feature', label: 'Feature' },
@@ -94,7 +95,7 @@ export function CreateTaskDialog({
 
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/tasks`, {
+      const res = await apiFetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -5,6 +5,7 @@
  */
 
 import { create } from "zustand";
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
 
 // ============================================================================
 // Types
@@ -86,7 +87,7 @@ interface TicketStoreState {
   clearError: () => void;
 }
 
-const API_BASE = "http://localhost:19432";
+const API_BASE = getApiBaseUrl();
 
 export const useTicketStore = create<TicketStoreState>((set, get) => ({
   // Initial state
@@ -106,7 +107,18 @@ export const useTicketStore = create<TicketStoreState>((set, get) => ({
     const { filters } = get();
     const pid = projectId || filters.projectId;
 
-    set({ isLoading: true, error: null });
+    // Clear stale tickets immediately when switching projects
+    const hasTickets = get().tickets.length > 0;
+    if (pid !== filters.projectId) {
+      // Project switched — clear old data and show loading
+      set({ tickets: [], filters: { ...filters, projectId: pid }, isLoading: true, error: null });
+    } else if (!hasTickets) {
+      // Same project, no data yet — show loading
+      set({ isLoading: true, error: null });
+    } else {
+      // Same project, already have data — background refresh (no loading flash)
+      set({ error: null });
+    }
 
     try {
       const params = new URLSearchParams({ projectId: pid });
@@ -120,7 +132,7 @@ export const useTicketStore = create<TicketStoreState>((set, get) => ({
         params.append("priority", filters.priority);
       }
 
-      const response = await fetch(`${API_BASE}/api/tickets?${params}`);
+      const response = await apiFetch(`${API_BASE}/api/tickets?${params}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -174,7 +186,7 @@ export const useTicketStore = create<TicketStoreState>((set, get) => ({
 
   updateTicketStatus: async (ticketId, status) => {
     try {
-      const response = await fetch(`${API_BASE}/api/tickets/${ticketId}`, {
+      const response = await apiFetch(`${API_BASE}/api/tickets/${ticketId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -201,7 +213,7 @@ export const useTicketStore = create<TicketStoreState>((set, get) => ({
 
   startSession: async (ticketId, workspacePath) => {
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_BASE}/api/tickets/${ticketId}/start-session`,
         {
           method: "POST",
@@ -238,7 +250,7 @@ export const useTicketStore = create<TicketStoreState>((set, get) => ({
 
   convertToTask: async (ticketId) => {
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_BASE}/api/tickets/${ticketId}/convert-to-task`,
         {
           method: "POST",

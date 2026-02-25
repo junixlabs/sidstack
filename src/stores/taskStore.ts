@@ -6,12 +6,13 @@
  */
 
 import { create } from "zustand";
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type TaskStatus = "pending" | "in_progress" | "completed" | "blocked" | "failed" | "cancelled";
+export type TaskStatus = "pending" | "review" | "in_progress" | "completed" | "blocked" | "failed" | "cancelled";
 export type TaskPriority = "low" | "medium" | "high";
 export type TaskType = "feature" | "bugfix" | "refactor" | "test" | "docs" | "infra" | "security" | "perf" | "debt" | "spike";
 export type ViewMode = "list" | "tree" | "kanban" | "timeline";
@@ -60,6 +61,11 @@ export interface Task {
   governance?: TaskGovernance;
   acceptanceCriteria?: AcceptanceCriterion[];
   validation?: TaskValidation;
+  // Solution plan & review
+  solutionPlan?: string;
+  planStatus?: 'draft' | 'approved' | 'revision_requested';
+  planReviewNotes?: string;
+  implementSummary?: string;
 }
 
 export interface TaskProgressLog {
@@ -87,6 +93,7 @@ interface TaskStoreState {
   tasks: Task[];
   selectedTaskId: string | null;
   selectedTaskProgress: TaskProgressLog[];
+  detailTask: Task | null;
 
   // Progress cache: taskId -> { data, fetchedAt }
   progressCache: Map<string, { data: TaskProgressLog[]; fetchedAt: number }>;
@@ -100,6 +107,7 @@ interface TaskStoreState {
 
   // Actions (read-only)
   fetchTasks: (projectId?: string) => Promise<void>;
+  fetchTaskDetail: (taskId: string) => Promise<void>;
   fetchTaskProgress: (taskId: string) => Promise<void>;
 
   // Selection
@@ -145,7 +153,7 @@ export interface TaskStats {
   failed: number;
 }
 
-const API_BASE = "http://localhost:19432";
+const API_BASE = getApiBaseUrl();
 
 const defaultFilters: TaskFilters = {
   status: "all",
@@ -207,6 +215,7 @@ const saveViewMode = (mode: ViewMode) => {
 
 export const useTaskTasks = () => useTaskStore((s) => s.tasks);
 export const useTaskSelectedId = () => useTaskStore((s) => s.selectedTaskId);
+export const useTaskDetailTask = () => useTaskStore((s) => s.detailTask);
 export const useTaskSelectedProgress = () => useTaskStore((s) => s.selectedTaskProgress);
 export const useTaskFilters = () => useTaskStore((s) => s.filters);
 export const useTaskIsLoading = () => useTaskStore((s) => s.isLoading);
@@ -217,6 +226,7 @@ export const useTaskExpandedTasks = () => useTaskStore((s) => s.expandedTasks);
 // Action selectors (stable references)
 export const useTaskActions = () => useTaskStore((s) => ({
   fetchTasks: s.fetchTasks,
+  fetchTaskDetail: s.fetchTaskDetail,
   fetchTaskProgress: s.fetchTaskProgress,
   selectTask: s.selectTask,
   setStatusFilter: s.setStatusFilter,
@@ -248,6 +258,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
   tasks: [],
   selectedTaskId: null,
   selectedTaskProgress: [],
+  detailTask: null,
   progressCache: new Map(),
   filters: { ...defaultFilters },
   isLoading: false,
@@ -263,22 +274,29 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
   // Fetch tasks from API
   fetchTasks: async (projectId?: string) => {
     const pid = projectId || get().filters.projectId;
-    set({ isLoading: true, error: null });
+
+    // Clear stale tasks immediately when switching projects
+    const prevPid = get().filters.projectId;
+    const hasTasks = get().tasks.length > 0;
+    if (pid !== prevPid) {
+      // Project switched — clear old data and show loading
+      set({ tasks: [], filters: { ...get().filters, projectId: pid }, isLoading: true, error: null });
+    } else if (!hasTasks) {
+      // Same project, no data yet — show loading
+      set({ isLoading: true, error: null });
+    } else {
+      // Same project, already have data — background refresh (no loading flash)
+      set({ error: null });
+    }
 
     try {
-      const response = await fetch(`${API_BASE}/api/tasks?projectId=${pid}`);
+      const response = await apiFetch(`${API_BASE}/api/tasks?projectId=${pid}&fields=standard`);
       if (!response.ok) {
         throw new Error(`Failed to fetch tasks: ${response.statusText}`);
       }
 
       const data = await response.json();
-      // Parse JSON fields from database
-      const tasks = (data.tasks || []).map((t: any) => ({
-        ...t,
-        governance: t.governance ? JSON.parse(t.governance) : undefined,
-        acceptanceCriteria: t.acceptanceCriteria ? JSON.parse(t.acceptanceCriteria) : undefined,
-        validation: t.validation ? JSON.parse(t.validation) : undefined,
-      }));
+      const tasks = (data.tasks || []) as Task[];
       set({ tasks, isLoading: false });
     } catch (error) {
       console.error("[taskStore] Failed to fetch tasks:", error);
@@ -286,6 +304,38 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
         error: error instanceof Error ? error.message : "Failed to fetch tasks",
         isLoading: false,
       });
+    }
+  },
+
+  // Fetch full task detail (governance, acceptanceCriteria, validation)
+  fetchTaskDetail: async (taskId: string) => {
+    // Safely parse a JSON field that may be a string or already parsed
+    const safeParse = (val: unknown) => {
+      if (!val) return undefined;
+      if (typeof val === 'string') {
+        try { return JSON.parse(val); } catch { return undefined; }
+      }
+      return val; // already parsed
+    };
+
+    try {
+      const response = await apiFetch(`${API_BASE}/api/tasks/${taskId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch task detail: ${response.statusText}`);
+      }
+      const data = await response.json();
+      const task = data.task;
+      if (task) {
+        const detailTask: Task = {
+          ...task,
+          governance: safeParse(task.governance),
+          acceptanceCriteria: safeParse(task.acceptanceCriteria),
+          validation: safeParse(task.validation),
+        };
+        set({ detailTask });
+      }
+    } catch (error) {
+      console.error("[taskStore] Failed to fetch task detail:", error);
     }
   },
 
@@ -302,7 +352,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/tasks/${taskId}/progress`);
+      const response = await apiFetch(`${API_BASE}/api/tasks/${taskId}/progress`);
       if (!response.ok) {
         throw new Error(`Failed to fetch progress: ${response.statusText}`);
       }
@@ -332,10 +382,11 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
     const cached = taskId ? progressCache.get(taskId) : null;
     const cachedData = cached?.data ?? [];
 
-    set({ selectedTaskId: taskId, selectedTaskProgress: cachedData });
+    set({ selectedTaskId: taskId, selectedTaskProgress: cachedData, detailTask: null });
 
-    // Fetch in background (will update if stale or not cached)
+    // Fetch full detail and progress in background
     if (taskId) {
+      get().fetchTaskDetail(taskId);
       get().fetchTaskProgress(taskId);
     }
   },
@@ -483,6 +534,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
     const tasks = get().getFilteredTasks();
     const grouped: Record<TaskStatus, Task[]> = {
       pending: [],
+      review: [],
       in_progress: [],
       completed: [],
       blocked: [],

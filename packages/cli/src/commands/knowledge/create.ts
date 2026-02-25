@@ -16,6 +16,7 @@ import {
   applyKnowledgeTemplate,
   getKnowledgeTemplateNames,
   getTemplateMissingVariables,
+  getTemplateCategoryFolder,
 } from '../../lib/knowledge-template.js';
 import { successResponse, errorResponse, ExitCodes } from '../../lib/output.js';
 
@@ -23,11 +24,11 @@ export default class KnowledgeCreate extends Command {
   static description = 'Create a new knowledge document from template';
 
   static examples = [
-    '<%= config.bin %> knowledge create --type business-logic --title "User Authentication"',
-    '<%= config.bin %> knowledge create --type api-endpoint --title "GET /users" --module api-server',
-    '<%= config.bin %> knowledge create --type database-table --title "Users Table" --var table_name=users',
+    '<%= config.bin %> knowledge create --type guide --title "Getting Started"',
+    '<%= config.bin %> knowledge create --type decision --title "Adopt REST over GraphQL"',
+    '<%= config.bin %> knowledge create --type spec --title "User Auth Feature" --module auth',
     '<%= config.bin %> knowledge create  # Interactive mode',
-    '<%= config.bin %> knowledge create --type module --title "Auth Module" --json',
+    '<%= config.bin %> knowledge create --type reference --title "API Schema" --json',
   ];
 
   static args = {
@@ -45,7 +46,7 @@ export default class KnowledgeCreate extends Command {
     }),
     type: Flags.string({
       char: 't',
-      description: 'Template type (business-logic, api-endpoint, design-pattern, database-table, module)',
+      description: 'Template type (guide, spec, decision, reference, pattern)',
     }),
     title: Flags.string({
       description: 'Document title',
@@ -187,7 +188,8 @@ export default class KnowledgeCreate extends Command {
     }
 
     // Determine output path
-    const outputDir = flags['output-dir'] || path.join(projectPath, '.sidstack', 'knowledge', templateType);
+    const categoryFolder = getTemplateCategoryFolder(templateType);
+    const outputDir = flags['output-dir'] || path.join(projectPath, '.sidstack', 'knowledge', categoryFolder);
     const fileName = this.slugify(variables.title || 'untitled') + '.md';
     const outputPath = args.output || path.join(outputDir, fileName);
 

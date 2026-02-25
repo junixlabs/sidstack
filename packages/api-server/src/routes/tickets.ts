@@ -6,14 +6,14 @@
  */
 
 import { Router } from 'express';
-import { getDB, launchClaudeSession } from '@sidstack/shared';
+import { getDB } from '@sidstack/shared';
 import type {
   TicketStatus,
   TicketType,
   TicketPriority,
   TicketSource,
-  TerminalApp,
 } from '@sidstack/shared';
+import { emitSseEvent } from '../events';
 
 export const ticketsRouter: Router = Router();
 
@@ -82,6 +82,15 @@ ticketsRouter.post('/', async (req, res) => {
       externalUrls: JSON.stringify(externalUrls),
       reporter,
       assignee,
+    });
+
+    emitSseEvent({
+      type: 'ticket_created',
+      projectId,
+      entityId: ticket.id,
+      title: ticket.title,
+      summary: `New ${type} ticket`,
+      timestamp: Date.now(),
     });
 
     res.status(201).json({
@@ -198,6 +207,15 @@ ticketsRouter.patch('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
+    emitSseEvent({
+      type: 'ticket_updated',
+      projectId: ticket.projectId,
+      entityId: ticket.id,
+      title: ticket.title,
+      summary: status ? `Ticket status → ${status}` : 'Ticket updated',
+      timestamp: Date.now(),
+    });
+
     res.json({
       success: true,
       ticket: {
@@ -235,89 +253,6 @@ ticketsRouter.delete('/:id', async (req, res) => {
 // =============================================================================
 // Ticket Actions
 // =============================================================================
-
-// Start Claude session for ticket
-ticketsRouter.post('/:id/start-session', async (req, res) => {
-  try {
-    const db = await getDB();
-    const ticket = db.getTicket(req.params.id);
-
-    if (!ticket) {
-      return res.status(404).json({ error: 'Ticket not found' });
-    }
-
-    const { terminal, workspacePath, launchExternal = true } = req.body;
-
-    if (!workspacePath) {
-      return res.status(400).json({ error: 'workspacePath is required' });
-    }
-
-    // Build context prompt from ticket
-    const labels = JSON.parse(ticket.labels);
-    const linkedIssues = JSON.parse(ticket.linkedIssues);
-    const externalUrls = JSON.parse(ticket.externalUrls);
-
-    const contextPrompt = buildTicketContextPrompt(ticket, labels, linkedIssues, externalUrls);
-
-    // Launch Claude session in external terminal
-    let launchResult = null;
-    if (launchExternal) {
-      launchResult = await launchClaudeSession({
-        projectDir: workspacePath,
-        terminal: terminal as TerminalApp | undefined,
-        mode: 'normal',
-        context: {
-          prompt: contextPrompt,
-        },
-      });
-
-      if (!launchResult.success) {
-        return res.status(500).json({
-          error: launchResult.error || 'Failed to launch Claude session',
-        });
-      }
-    }
-
-    // Create Claude session record in DB
-    const session = db.createClaudeSession({
-      workspacePath,
-      terminal: launchResult?.terminal || terminal || 'external',
-      launchMode: 'normal',
-      initialPrompt: contextPrompt,
-      claudeSessionId: launchResult?.claudeSessionId,
-      terminalWindowId: launchResult?.terminalWindowId,
-    });
-
-    // Update ticket with session link
-    db.updateTicket(ticket.id, {
-      sessionId: session.id,
-      status: 'in_progress',
-    });
-
-    // Log event
-    db.logSessionEvent({
-      claudeSessionId: session.id,
-      eventType: 'launched',
-      details: {
-        source: 'ticket',
-        ticketId: ticket.id,
-        ticketTitle: ticket.title,
-        terminal: launchResult?.terminal,
-        command: launchResult?.command,
-      },
-    });
-
-    res.json({
-      success: true,
-      session,
-      contextPrompt,
-      launchResult,
-    });
-  } catch (error) {
-    console.error('Failed to start session:', error);
-    res.status(500).json({ error: 'Failed to start session' });
-  }
-});
 
 // Convert ticket to task
 ticketsRouter.post('/:id/convert-to-task', async (req, res) => {
@@ -381,60 +316,3 @@ ticketsRouter.post('/:id/convert-to-task', async (req, res) => {
   }
 });
 
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-function buildTicketContextPrompt(
-  ticket: { id: string; externalId?: string; title: string; description: string; type: string; priority: string },
-  labels: string[],
-  linkedIssues: { id: string; type: string; title?: string }[],
-  externalUrls: string[]
-): string {
-  const lines: string[] = [
-    '# Ticket Context',
-    '',
-    `**Ticket ID:** ${ticket.externalId || ticket.id}`,
-    `**Type:** ${ticket.type}`,
-    `**Priority:** ${ticket.priority}`,
-    '',
-    `## Title`,
-    ticket.title,
-    '',
-    `## Description`,
-    ticket.description || '_No description provided_',
-    '',
-  ];
-
-  if (labels.length > 0) {
-    lines.push(`## Labels`);
-    lines.push(labels.map((l) => `- ${l}`).join('\n'));
-    lines.push('');
-  }
-
-  if (linkedIssues.length > 0) {
-    lines.push(`## Linked Issues`);
-    linkedIssues.forEach((issue) => {
-      lines.push(`- [${issue.type}] ${issue.id}${issue.title ? `: ${issue.title}` : ''}`);
-    });
-    lines.push('');
-  }
-
-  if (externalUrls.length > 0) {
-    lines.push(`## Reference URLs`);
-    externalUrls.forEach((url) => {
-      lines.push(`- ${url}`);
-    });
-    lines.push('');
-  }
-
-  lines.push('---');
-  lines.push('');
-  lines.push('Please analyze this ticket and:');
-  lines.push('1. Research the codebase to understand the current state');
-  lines.push('2. Recommend optimal solutions with trade-offs');
-  lines.push('3. Break down into actionable tasks if approved');
-  lines.push('');
-
-  return lines.join('\n');
-}

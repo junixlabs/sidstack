@@ -1,0 +1,99 @@
+{
+  "skill": "sidstack-aware",
+  "tests": [
+    {
+      "id": "activation-file-edit",
+      "type": "activation",
+      "description": "Should activate before file edit",
+      "input": {
+        "prompt": "add a new function to utils.ts",
+        "context": {
+          "about_to_use": ["Write", "Edit"]
+        }
+      },
+      "expected": {
+        "should_activate": true,
+        "reason": "file_edit_detected"
+      },
+      "tags": ["auto-trigger", "file-edit"]
+    },
+    {
+      "id": "activation-implement-keyword",
+      "type": "activation",
+      "description": "Should activate on implement keyword",
+      "input": {
+        "prompt": "implement user authentication"
+      },
+      "expected": {
+        "should_activate": true,
+        "matched_keywords": ["implement"]
+      },
+      "tags": ["keyword-trigger"]
+    },
+    {
+      "id": "activation-fix-keyword",
+      "type": "activation",
+      "description": "Should activate on fix keyword",
+      "input": {
+        "prompt": "fix the login bug"
+      },
+      "expected": {
+        "should_activate": true,
+        "matched_keywords": ["fix"]
+      },
+      "tags": ["keyword-trigger"]
+    },
+    {
+      "id": "activation-task-query",
+      "type": "activation",
+      "description": "Should activate on task query",
+      "input": {
+        "prompt": "what tasks do I have?"
+      },
+      "expected": {
+        "should_activate": true,
+        "matched_keywords": ["tasks"]
+      },
+      "tags": ["task-query"]
+    },
+    {
+      "id": "activation-status-query",
+      "type": "activation",
+      "description": "Should activate on status query",
+      "input": {
+        "prompt": "what's the status of my work?"
+      },
+      "expected": {
+        "should_activate": true,
+        "matched_keywords": ["status"]
+      },
+      "tags": ["task-query"]
+    },
+    {
+      "id": "no-activation-read-only",
+      "type": "activation",
+      "description": "Should NOT activate for read-only operations",
+      "input": {
+        "prompt": "show me the contents of utils.ts"
+      },
+      "expected": {
+        "should_activate": false,
+        "reason": "read_only_no_task_needed"
+      },
+      "tags": ["false-positive-prevention"]
+    },
+    {
+      "id": "no-activation-question",
+      "type": "activation",
+      "description": "Should NOT activate for general questions",
+      "input": {
+        "prompt": "how does the auth module work?"
+      },
+      "expected": {
+        "should_activate": false,
+        "reason": "question_not_implementation"
+      },
+      "tags": ["false-positive-prevention"]
+    }
+  ]
+}

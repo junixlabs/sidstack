@@ -1,54 +1,149 @@
 ---
 name: sidstack-aware
-description: >
-  Use SidStack MCP tools for project management. Trigger when: (1) user asks to
-  "check task", "list tasks", or mentions "task" (use task_list), (2) user asks to
-  create/add/implement feature (use task_create), (3) working on code changes (use
-  task_update with progress), (4) completing work (use task_complete).
+user-invocable: false
+allowed-tools: mcp__sidstack__task_update, mcp__sidstack__task_list, mcp__sidstack__task_complete, mcp__sidstack__task_get, mcp__sidstack__incident_create, mcp__sidstack__lesson_create, mcp__sidstack__memory_add, mcp__sidstack__memory_search, mcp__sidstack__entity_link, mcp__sidstack__entity_references, mcp__sidstack__knowledge_search, mcp__sidstack__entity_context
+description: "Task lifecycle and completion flow. Auto-triggers during implementation."
 ---
 
-# SidStack MCP Tools
+# SidStack Task Progress & Completion
 
-## Task Management
+## When This Activates
 
-| Action | Tool | Example |
-|--------|------|---------|
-| Check tasks | `task_list({projectId: "folder-name"})` | "check task", "what tasks" |
-| Create task | `task_create({projectId, title, description})` | "implement X", "add feature" |
-| Update progress | `task_update({taskId, progress: 50})` | During implementation |
-| Complete | `task_complete({taskId})` | After finishing work |
+This skill provides workflow guidance during active implementation:
 
-## Knowledge
+- After code changes: update progress milestones
+- Work nearing completion: guide through quality gates
+- Task status queries: "check task", "list tasks", "what's the status"
 
-| Action | Tool | When |
-|--------|------|------|
-| Search | `knowledge_search({projectPath: ".", query})` | Before implementing |
-| Context | `knowledge_context({projectPath: ".", moduleId})` | Understanding module |
+> **Note:** Task lifecycle is guided by the `/sidstack-dev` skill. This skill tracks progress and completion flow.
 
-## Impact Analysis
+---
 
-| Action | Tool | When |
-|--------|------|------|
-| Analyze | `impact_analyze({description})` | Before risky changes |
-| Check gate | `impact_check_gate({analysisId})` | After analysis |
+## Progress Tracking
+
+Update progress at milestones during implementation:
+
+| Progress | Milestone | Also Consider |
+|----------|-----------|---------------|
+| 10% | Requirements understood | |
+| 25-30% | solutionPlan submitted → status `review` | Submit plan via `task_update({ status: "review", solutionPlan: "..." })`. Wait for `planStatus=approved` before coding. |
+| 60% | Core logic done | Note any patterns/workarounds as `[NOTE:pattern]` |
+| 80% | Testing/verifying | Note any issues found as `[NOTE:issue]` |
+| 95% | Submit `implementSummary` before completion | `task_update({ implementSummary: "[what was done, key decisions, files changed]" })` |
+| 100% | All checks pass | |
+
+```
+mcp__sidstack__task_update({ taskId: "[id]", progress: X, notes: "milestone" })
+```
+
+## Task Queries
+
+| User Says | Action |
+|-----------|--------|
+| "check task", "list tasks" | `mcp__sidstack__task_list({ projectId: "FOLDER_NAME" })` |
+| "what's the status", "where are we" | `mcp__sidstack__task_list` + show active task details |
+| "review tasks", "pending plans" | `mcp__sidstack__task_list({ status: ["review"] })` — show tasks with `planStatus` |
+
+## Completion Flow
+
+Before calling `mcp__sidstack__task_complete`:
+
+1. Code changes implemented
+2. Tests pass (if applicable)
+3. Build succeeds (if applicable)
+4. Manually verified the change works
+5. **Submit implementSummary**: what was done, key decisions, files changed
+   ```
+   mcp__sidstack__task_update({ taskId: "[id]", implementSummary: "[summary]" })
+   ```
+6. **Lesson check**: Any patterns, issues, or decisions worth noting?
+   - If yes: use `incident_create` -> `lesson_create` flow
+   - If no: proceed to completion
+
+```
+mcp__sidstack__task_complete({ taskId: "[id]" })
+```
+
+## Integrated Workflow (applies to ALL implementation work)
+
+These steps apply whether you're in `/sidstack-dev` mode or handling a regular prompt:
+
+### On Task Start (after create or resume)
+1. `knowledge_search` — find relevant docs for the work area
+2. `memory_search` — find past learnings, patterns, gotchas
+3. `entity_link` — link each relevant knowledge doc to the task (`relationship: "requires_context"`)
+
+### During Implementation
+4. `entity_context` — if you need full context for a task with linked entities
+5. `entity_link` — link any new knowledge docs you create to the task
+
+### On Task Complete
+6. `memory_add` — store key learnings: `{ content: "[summary + learnings]", projectId: "...", metadata: { sourceType: "task_completion", taskId: "..." } }`
+7. `test_result_create` — if tests were run, persist results with `taskId`
+
+> **Rule:** Always search before you build. Always store after you complete.
+
+## Task Creation Template
+
+When a task needs to be created (e.g., no active task found):
+
+```
+mcp__sidstack__task_create({
+  projectId: "FOLDER_NAME",
+  title: "[TYPE] Clear description",
+  description: "Problem: X. Solution: Y.",
+  taskType: "feature|bugfix|refactor|test|docs",
+  priority: "medium",
+  acceptanceCriteria: [
+    { description: "Specific verifiable outcome" }
+  ]
+})
+```
+
+## Output Templates
+
+**Progress Update:**
+```markdown
+Progress: [X]% - [milestone description]
+```
+
+**Task Complete:**
+```markdown
+Task [task-id] completed.
+Summary: [what was done]
+Quality gates: All passed
+```
+
+## Error Handling
+
+| Situation | Action |
+|-----------|--------|
+| MCP tools unavailable | Warn user, proceed without task tracking |
+| Task create fails | Report error, ask user to check config |
+| No project config found | Suggest running `sidstack init` |
+| Task already exists | Use existing task, don't create duplicate |
+
+## Task Systems: SidStack vs Built-in
+
+| System | Use For |
+|--------|---------|
+| **SidStack MCP** (`mcp__sidstack__task_*`) | Governance, quality gates, cross-session persistence |
+| **Built-in** (`TaskCreate/TaskUpdate`) | Session-local sub-step coordination |
+
+Rule: Always create the SidStack MCP task first (governance requires it). Optionally use built-in tasks for sub-steps within the session.
 
 ## Quick Reference
 
-```
-# User says "check task" or "list tasks"
-task_list({ projectId: "project-folder-name" })
-
-# User wants to implement something
-task_create({
-  projectId: "project-folder-name",
-  title: "[feature] Description",
-  description: "What and why",
-  taskType: "feature"
-})
-
-# During work - update progress
-task_update({ taskId: "xxx", progress: 50, status: "in_progress" })
-
-# Done - complete task
-task_complete({ taskId: "xxx" })
-```
+| Tool | When |
+|------|------|
+| `mcp__sidstack__task_list` | Session start, before new work |
+| `mcp__sidstack__task_create` | Before implementing (with acceptance criteria) |
+| `mcp__sidstack__task_update` | Progress updates during work |
+| `mcp__sidstack__task_complete` | After quality checks pass |
+| `mcp__sidstack__knowledge_search` | Before implementing unfamiliar area |
+| `mcp__sidstack__impact_analyze` | Before touching core/risky code |
+| `mcp__sidstack__memory_search` | Before starting unfamiliar task |
+| `mcp__sidstack__memory_add` | After task completion (store learnings) |
+| `mcp__sidstack__entity_link` | Link task to knowledge docs, specs |
+| `mcp__sidstack__entity_references` | Query what's linked to a task |
+| `mcp__sidstack__entity_context` | Get full context for any entity |

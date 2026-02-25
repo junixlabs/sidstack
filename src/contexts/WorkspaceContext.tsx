@@ -6,6 +6,7 @@
  * to be rendered simultaneously without sharing state.
  */
 
+import { exists, readTextFile } from "@tauri-apps/plugin-fs";
 import { createContext, useContext, ReactNode, useState, useCallback, useRef, useEffect } from "react";
 
 import type { BlockData, BlockState, LayoutNode, BlockViewType } from "@/types/block";
@@ -119,6 +120,10 @@ interface WorkspaceState {
 interface WorkspaceContextValue extends WorkspaceState {
   workspacePath: string;
   isActive: boolean;
+  isSidstackInitialized: boolean;
+  isWorkspaceReady: boolean;
+  sidstackProjectId: string | null;
+  sidstackProjectName: string | null;
   // Block actions
   addBlock: (data: Partial<BlockData> & { viewType: BlockViewType }, reuseId?: string) => string;
   removeBlock: (id: string) => void;
@@ -191,6 +196,10 @@ export function WorkspaceProvider({ workspacePath, isActive, children, workspace
   const [blockStates, setBlockStates] = useState<Record<string, BlockState>>({});
   const [activeBlockId, setActiveBlockIdState] = useState<string | null>(null);
   const [rootNode, setRootNode] = useState<LayoutNode | null>(null);
+  const [isSidstackInitialized, setIsSidstackInitialized] = useState(false);
+  const [isWorkspaceReady, setIsWorkspaceReady] = useState(false);
+  const [sidstackProjectId, setSidstackProjectId] = useState<string | null>(null);
+  const [sidstackProjectName, setSidstackProjectName] = useState<string | null>(null);
 
   const sessionInitializedRef = useRef(false);
   const wasActiveRef = useRef(isActive);
@@ -213,7 +222,8 @@ export function WorkspaceProvider({ workspacePath, isActive, children, workspace
       url: data.url,
       knowledgePath: data.knowledgePath,
       selectedDocPath: data.selectedDocPath,
-      worktreePath: data.worktreePath,
+      agentDeskId: data.agentDeskId,
+      projectId: data.projectId,
       createdAt: Date.now(),
     };
 
@@ -539,7 +549,8 @@ export function WorkspaceProvider({ workspacePath, isActive, children, workspace
       url: newBlockData.url,
       knowledgePath: newBlockData.knowledgePath,
       selectedDocPath: newBlockData.selectedDocPath,
-      worktreePath: newBlockData.worktreePath,
+      agentDeskId: newBlockData.agentDeskId,
+      projectId: newBlockData.projectId,
       createdAt: Date.now(),
     };
 
@@ -591,23 +602,42 @@ export function WorkspaceProvider({ workspacePath, isActive, children, workspace
 
     const init = async () => {
       try {
+        // Read .sidstack/config.json for projectId and projectName
+        let configProjectId: string | null = null;
+        let configProjectName: string | null = null;
+        try {
+          const configPath = `${workspacePath}/.sidstack/config.json`;
+          const configExists = await exists(configPath);
+          setIsSidstackInitialized(!!configExists);
+          if (configExists) {
+            const configContent = await readTextFile(configPath);
+            const config = JSON.parse(configContent);
+            configProjectId = config.projectId || null;
+            configProjectName = config.projectName || null;
+          }
+        } catch {
+          setIsSidstackInitialized(false);
+        }
+        setSidstackProjectId(configProjectId);
+        setSidstackProjectName(configProjectName);
+
         const { invoke } = await import("@tauri-apps/api/core");
 
-        const exists = await invoke<boolean>("workspace_exists", { workspacePath });
+        const wsExists = await invoke<boolean>("workspace_exists", { workspacePath });
 
-        if (!exists) {
-          const name = workspacePath.split("/").pop() || "workspace";
+        if (!wsExists) {
+          const name = configProjectName || workspacePath.split("/").pop() || "workspace";
           await invoke("workspace_init", { workspacePath, name });
         }
 
         // Register project in SQLite database (for MCP tools)
-        // This ensures task_create and other MCP tools can find the project
-        const projectName = workspacePath.split("/").pop() || "unknown";
+        // Use config.json values if available, fallback to folder name
+        const projectName = configProjectName || workspacePath.split("/").pop() || "unknown";
         try {
           const res = await fetch("http://localhost:19432/api/projects/by-path?path=" + encodeURIComponent(workspacePath));
           if (res.status === 404) {
-            // Project not registered, try to create with folder name as ID
-            let projectId = projectName;
+            // Project not registered — use config.json projectId or derive from folder name
+            let projectId = configProjectId || projectName;
             let createRes = await fetch("http://localhost:19432/api/projects", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -622,7 +652,7 @@ export function WorkspaceProvider({ workspacePath, isActive, children, workspace
             // If 409 conflict (same ID exists with different path), add path hash suffix
             if (createRes.status === 409) {
               const pathHash = Math.abs(workspacePath.split("").reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0)).toString(16).slice(0, 6);
-              projectId = `${projectName}-${pathHash}`;
+              projectId = `${projectId}-${pathHash}`;
               createRes = await fetch("http://localhost:19432/api/projects", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -637,6 +667,17 @@ export function WorkspaceProvider({ workspacePath, isActive, children, workspace
 
             if (createRes.ok) {
               console.log("[WorkspaceProvider] Project registered:", projectId);
+              // Update state with the actually-registered ID
+              setSidstackProjectId(projectId);
+            }
+          } else if (res.ok) {
+            // Project already exists — read its ID from the response
+            const existing = await res.json();
+            if (existing.project?.id) {
+              setSidstackProjectId(existing.project.id);
+            }
+            if (existing.project?.name && !configProjectName) {
+              setSidstackProjectName(existing.project.name);
             }
           }
         } catch (apiError) {
@@ -645,9 +686,11 @@ export function WorkspaceProvider({ workspacePath, isActive, children, workspace
         }
 
         sessionInitializedRef.current = true;
+        setIsWorkspaceReady(true);
       } catch (e) {
         console.error("[WorkspaceProvider] Init error:", e);
         sessionInitializedRef.current = true;
+        setIsWorkspaceReady(true);
       }
     };
 
@@ -680,6 +723,10 @@ export function WorkspaceProvider({ workspacePath, isActive, children, workspace
   const value: WorkspaceContextValue = {
     workspacePath,
     isActive,
+    isSidstackInitialized,
+    isWorkspaceReady,
+    sidstackProjectId,
+    sidstackProjectName,
     blocks,
     blockStates,
     activeBlockId,

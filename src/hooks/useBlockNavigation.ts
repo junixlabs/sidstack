@@ -164,10 +164,11 @@ function getBlockTitle(viewType: BlockViewType): string {
     "knowledge-browser": "Knowledge Browser",
     "training-room": "Training Room",
     "task-manager": "Task Manager",
-    "worktree-status": "Worktree Status",
-    "worktree-overview": "Worktree Overview",
     "ticket-queue": "Ticket Queue",
     "project-hub": "Project Hub",
+    "agent-desk": "Agent Desk",
+    "docs": "Documentation",
+    "traceability": "Traceability",
   };
   return titles[viewType] || viewType;
 }

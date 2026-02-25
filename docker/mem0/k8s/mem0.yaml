@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mem0
+  namespace: sidstack
+  labels:
+    app: mem0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mem0
+  template:
+    metadata:
+      labels:
+        app: mem0
+    spec:
+      containers:
+        - name: mem0
+          image: mem0-api:latest    # Build from Dockerfile, push to your registry
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: LITELLM_BASE_URL
+              value: "http://litellm.sidstack.svc.cluster.local:4000/v1"
+            - name: LITELLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mem0-secrets
+                  key: LITELLM_MASTER_KEY
+            - name: QDRANT_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: mem0-config
+                  key: QDRANT_HOST
+            - name: QDRANT_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: mem0-config
+                  key: QDRANT_PORT
+            - name: QDRANT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mem0-secrets
+                  key: QDRANT_API_KEY
+            - name: LLM_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: mem0-config
+                  key: LLM_MODEL
+            - name: EMBED_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: mem0-config
+                  key: EMBED_MODEL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mem0
+  namespace: sidstack
+spec:
+  selector:
+    app: mem0
+  ports:
+    - port: 8000
+      targetPort: 8000

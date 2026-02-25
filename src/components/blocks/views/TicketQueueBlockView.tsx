@@ -1,5 +1,4 @@
 import {
-  RotateCw,
   Inbox,
   Eye,
   CheckCircle,
@@ -39,6 +38,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { useBlockNavigation } from "@/hooks/useBlockNavigation";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/appStore";
+import { useWorkspaceContext } from "@/contexts/WorkspaceContext";
 import { useProjectSettingsStore } from "@/stores/projectSettingsStore";
 import {
   useTicketStore,
@@ -94,7 +94,9 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
   _props: BlockViewProps
 ) {
   const { projectPath } = useAppStore();
-  const projectId = projectPath?.split("/").pop() || "default";
+  const { isActive, isWorkspaceReady, sidstackProjectId } = useWorkspaceContext();
+  const fallbackId = projectPath?.split("/").pop() || "default";
+  const projectId = isWorkspaceReady ? (sidstackProjectId || fallbackId) : fallbackId;
 
   const {
     isLoading,
@@ -146,10 +148,8 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
     fetchTickets(projectId);
   }, [projectId, fetchTickets]);
 
-  // Auto-refresh
-  const { isActive: autoRefreshActive } = useAutoRefresh({
-    onRefresh: handleRefresh,
-  });
+  // Auto-refresh based on project settings (pauses when workspace is inactive)
+  useAutoRefresh({ onRefresh: handleRefresh, enabled: isActive });
 
   // Start session handler
   const handleStartSession = useCallback(
@@ -257,18 +257,7 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
             </Badge>
           </div>
           <div className="flex items-center gap-1">
-            {autoRefreshActive && (
-              <span className="text-[11px] text-[var(--text-muted)]">Auto</span>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isLoading}
-              title={autoRefreshActive ? "Auto-refresh enabled" : "Refresh"}
-            >
-              <RotateCw className={cn("w-4 h-4", (isLoading || autoRefreshActive) && "animate-spin")} />
-            </Button>
+            <span className="text-[11px] text-[var(--text-muted)]">⌘R to refresh</span>
           </div>
         </div>
 

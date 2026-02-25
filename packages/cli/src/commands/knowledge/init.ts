@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { Command, Flags } from '@oclif/core';
+import { FOLDER_CONFIG } from '@sidstack/shared';
 import chalk from 'chalk';
 
 export default class KnowledgeInit extends Command {
@@ -31,34 +32,31 @@ export default class KnowledgeInit extends Command {
 
     // Check if already exists
     if (fs.existsSync(knowledgePath) && !flags.force) {
-      this.log(chalk.yellow(`⚠ Knowledge folder already exists: ${knowledgePath}`));
+      this.log(chalk.yellow(`Warning: Knowledge folder already exists: ${knowledgePath}`));
       this.log(chalk.gray('  Use --force to overwrite existing files.'));
       return;
     }
 
     this.log('');
-    this.log(chalk.bold('🚀 Initializing Knowledge Documentation'));
+    this.log(chalk.bold('Initializing Knowledge Documentation'));
     this.log('');
 
-    // Create folder structure
-    const folders = [
-      '',
-      'business-logic',
-      'api',
-      'patterns',
-      'database',
-      'modules',
-    ];
-
-    for (const folder of folders) {
-      const folderPath = path.join(knowledgePath, folder);
+    // Create 9-folder structure with _README.md in each (from shared FOLDER_CONFIG)
+    for (const folder of FOLDER_CONFIG) {
+      const folderPath = path.join(knowledgePath, folder.name);
       if (!fs.existsSync(folderPath)) {
         fs.mkdirSync(folderPath, { recursive: true });
-        this.log(chalk.green(`  ✓ Created ${folder || 'knowledge/'}`));
       }
+
+      const readmePath = path.join(folderPath, '_README.md');
+      if (!fs.existsSync(readmePath) || flags.force) {
+        fs.writeFileSync(readmePath, folder.readmeContent);
+      }
+
+      this.log(chalk.green(`  Created ${folder.name}/`));
     }
 
-    // Create index file
+    // Create root index file
     const indexPath = path.join(knowledgePath, '_index.md');
     if (!fs.existsSync(indexPath) || flags.force) {
       const projectName = path.basename(projectPath);
@@ -69,74 +67,46 @@ id: knowledge-index
 type: index
 title: ${projectName} Knowledge Base
 status: draft
-created: ${today}
+createdAt: ${today}
 ---
 
 # ${projectName} Knowledge Base
 
-Welcome to the project knowledge documentation.
-
 ## Structure
 
-| Folder | Content |
-|--------|---------|
-| \`business-logic/\` | Workflows, rules, state machines |
-| \`api/\` | REST/GraphQL endpoint documentation |
-| \`patterns/\` | Design patterns, architectures |
-| \`database/\` | Table schemas, relationships |
-| \`modules/\` | Package/feature documentation |
+| Folder | Content | Type |
+|--------|---------|------|
+| \`00-context/\` | System purpose, business model, constraints | Living |
+| \`01-architecture/\` | System overview, module boundaries, data flow | Living |
+| \`02-decisions/\` | Architecture Decision Records (ADR) | Event |
+| \`03-standards/\` | Coding rules, conventions, checklists | Living |
+| \`04-data/\` | Database schema, ownership, retention | Living |
+| \`05-api/\` | API contracts, schemas, versioning | Living |
+| \`06-operations/\` | Deployment, rollback, monitoring | Living |
+| \`07-projects/\` | Project briefs, designs, post-mortems | Event |
+| \`08-incidents/\` | Incident reports, root cause, prevention | Event |
 
 ## Getting Started
 
-Use the SidStack Knowledge Builder to generate documentation:
-
 \`\`\`bash
-# Full project scan
-/sidstack:knowledge build
+# AI-powered knowledge generation
+sidstack init --scan
 
-# Focus on specific area
-/sidstack:knowledge build api
-/sidstack:knowledge build business-logic
-
-# Validate documents
+# Search knowledge
+sidstack knowledge list
 sidstack knowledge validate
 \`\`\`
-
-## Quick Links
-
-- Business Logic
-  - <!-- Add links to business logic docs -->
-- API Endpoints
-  - <!-- Add links to API docs -->
-- Design Patterns
-  - <!-- Add links to pattern docs -->
 `;
 
       fs.writeFileSync(indexPath, indexContent);
-      this.log(chalk.green('  ✓ Created _index.md'));
-    }
-
-    // Create example templates in each folder
-    const templates: Record<string, string> = {
-      'business-logic/.gitkeep': '',
-      'api/.gitkeep': '',
-      'patterns/.gitkeep': '',
-      'database/.gitkeep': '',
-      'modules/.gitkeep': '',
-    };
-
-    for (const [templatePath, content] of Object.entries(templates)) {
-      const fullPath = path.join(knowledgePath, templatePath);
-      if (!fs.existsSync(fullPath)) {
-        fs.writeFileSync(fullPath, content);
-      }
+      this.log(chalk.green('  Created _index.md'));
     }
 
     this.log('');
-    this.log(chalk.bold('📋 Next Steps:'));
+    this.log(chalk.bold('Next Steps:'));
     this.log('');
-    this.log(chalk.gray('  1. Run the Knowledge Builder to generate documentation:'));
-    this.log(chalk.cyan('     /sidstack:knowledge build'));
+    this.log(chalk.gray('  1. Run AI-powered scan to generate initial docs:'));
+    this.log(chalk.cyan('     sidstack init --scan'));
     this.log('');
     this.log(chalk.gray('  2. List existing documents:'));
     this.log(chalk.cyan('     sidstack knowledge list'));
@@ -144,7 +114,7 @@ sidstack knowledge validate
     this.log(chalk.gray('  3. Validate documents:'));
     this.log(chalk.cyan('     sidstack knowledge validate'));
     this.log('');
-    this.log(chalk.green('✓ Knowledge folder initialized successfully!'));
+    this.log(chalk.green('Knowledge folder initialized successfully!'));
     this.log('');
   }
 }

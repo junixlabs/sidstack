@@ -1,4 +1,4 @@
-import { Shield, Loader2, Check, X, BookOpen, Sparkles } from "lucide-react";
+import { Loader2, Check, X, BookOpen, Sparkles, FolderOpen } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,7 @@ export function GovernancePrompt() {
                 isDark ? "bg-[var(--surface-2)]" : "bg-gray-50"
               )}
             >
-              <Shield
+              <FolderOpen
                 className={cn(
                   "w-5 h-5",
                   isDark ? "text-[var(--text-secondary)]" : "text-gray-600"
@@ -79,10 +79,10 @@ export function GovernancePrompt() {
             </div>
             <div>
               <DialogTitle className={cn(isDark ? "" : "text-gray-900")}>
-                Enable Governance for {projectName}?
+                Initialize SidStack for {projectName}?
               </DialogTitle>
               <DialogDescription className={cn("mt-1", isDark ? "" : "text-gray-500")}>
-                Enhance agent quality with principles, skills, and workflows
+                Creates project structure, knowledge templates, and starter tasks
               </DialogDescription>
             </div>
           </div>
@@ -112,7 +112,7 @@ export function GovernancePrompt() {
                     isDark ? "text-[var(--text-primary)]" : "text-gray-900"
                   )}
                 >
-                  Agent Principles
+                  Project Structure
                 </div>
                 <div
                   className={cn(
@@ -120,7 +120,7 @@ export function GovernancePrompt() {
                     isDark ? "text-[var(--text-muted)]" : "text-gray-500"
                   )}
                 >
-                  Code quality, testing, security, and collaboration standards
+                  .sidstack/ directory, config, MCP integration, governance
                 </div>
               </div>
             </div>
@@ -146,7 +146,7 @@ export function GovernancePrompt() {
                     isDark ? "text-[var(--text-primary)]" : "text-gray-900"
                   )}
                 >
-                  Role-Based Skills
+                  Knowledge Templates
                 </div>
                 <div
                   className={cn(
@@ -154,7 +154,7 @@ export function GovernancePrompt() {
                     isDark ? "text-[var(--text-muted)]" : "text-gray-500"
                   )}
                 >
-                  Structured processes for dev, QA, BA, and DA agents
+                  9 knowledge categories with starter documentation tasks
                 </div>
               </div>
             </div>
@@ -180,7 +180,7 @@ export function GovernancePrompt() {
                     isDark ? "text-[var(--text-primary)]" : "text-gray-900"
                   )}
                 >
-                  Slash Commands
+                  Starter Tasks
                 </div>
                 <div
                   className={cn(
@@ -188,7 +188,7 @@ export function GovernancePrompt() {
                     isDark ? "text-[var(--text-muted)]" : "text-gray-500"
                   )}
                 >
-                  /sidstack:agent, /sidstack:assistant, and more
+                  11 tasks to bootstrap project knowledge via AI agents
                 </div>
               </div>
             </div>
@@ -233,12 +233,12 @@ export function GovernancePrompt() {
             {isInstalling ? (
               <>
                 <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                Installing...
+                Initializing...
               </>
             ) : (
               <>
-                <Shield className="w-4 h-4 mr-1.5" />
-                Enable Governance
+                <FolderOpen className="w-4 h-4 mr-1.5" />
+                Initialize Project
               </>
             )}
           </Button>

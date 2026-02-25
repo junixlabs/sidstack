@@ -6,6 +6,7 @@
  */
 
 import { create } from 'zustand';
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
 import type { CapabilityDefinition, CapabilityNode, CapabilityRegistryStats, CapabilityRequirement, EnrichedRequirement } from '@sidstack/shared';
 
 // ============================================================================
@@ -57,6 +58,7 @@ export interface ProjectGoalsData {
 interface ProjectHubState {
   // Current project context
   projectPath: string;
+  projectId: string;
 
   // Capability tree (resolved hierarchy)
   capabilityTree: CapabilityNode[];
@@ -88,7 +90,7 @@ interface ProjectHubState {
   error: string | null;
 
   // Actions
-  setProjectContext: (projectPath: string) => void;
+  setProjectContext: (projectPath: string, projectId?: string) => void;
   fetchCapabilityTree: (projectPath: string) => Promise<void>;
   selectCapability: (capabilityId: string | null) => void;
   toggleGroup: (groupId: string) => void;
@@ -99,7 +101,7 @@ interface ProjectHubState {
   computeProjectGoals: () => void;
 }
 
-const API_BASE = 'http://localhost:19432';
+const API_BASE = getApiBaseUrl();
 
 // ============================================================================
 // Store
@@ -107,6 +109,7 @@ const API_BASE = 'http://localhost:19432';
 
 export const useProjectHubStore = create<ProjectHubState>((set, get) => ({
   projectPath: '',
+  projectId: '',
   capabilityTree: [],
   capabilityStats: null,
   selectedCapabilityId: null,
@@ -121,13 +124,16 @@ export const useProjectHubStore = create<ProjectHubState>((set, get) => ({
   isLoadingConnected: false,
   error: null,
 
-  setProjectContext: (projectPath) => {
+  setProjectContext: (projectPath, projectId) => {
+    const resolvedId = projectId || projectPath.split('/').pop() || 'default';
     const currentPath = get().projectPath;
-    if (currentPath === projectPath) return;
+    const currentId = get().projectId;
+    if (currentPath === projectPath && currentId === resolvedId) return;
 
     // Reset all state for the new workspace
     set({
       projectPath,
+      projectId: resolvedId,
       capabilityTree: [],
       capabilityStats: null,
       selectedCapabilityId: null,
@@ -144,14 +150,13 @@ export const useProjectHubStore = create<ProjectHubState>((set, get) => ({
 
     // Fetch data for the new workspace
     get().fetchCapabilityTree(projectPath);
-    const projectId = projectPath.split('/').pop() || 'default';
-    get().fetchContextBar(projectId);
+    get().fetchContextBar(resolvedId);
   },
 
   fetchCapabilityTree: async (projectPath) => {
     set({ isLoading: true, error: null });
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}/api/capabilities/hierarchy?projectPath=${encodeURIComponent(projectPath)}`,
       );
       if (!res.ok) {
@@ -193,6 +198,14 @@ export const useProjectHubStore = create<ProjectHubState>((set, get) => ({
     } catch (err: any) {
       console.error('[ProjectHub] Failed to fetch capability tree:', err);
       set({ error: err.message || 'Failed to load capabilities', isLoading: false });
+
+      // API may not be ready yet — retry once after 3s
+      const { capabilityTree } = get();
+      if (capabilityTree.length === 0) {
+        setTimeout(() => {
+          get().fetchCapabilityTree(projectPath);
+        }, 3000);
+      }
     }
   },
 
@@ -249,17 +262,16 @@ export const useProjectHubStore = create<ProjectHubState>((set, get) => ({
       };
 
       // Query linked work items by moduleId from capability's modules field
-      const { selectedCapability, projectPath } = get();
+      const { selectedCapability, projectPath, projectId } = get();
       const moduleIds = selectedCapability?.modules || [];
-      const projectId = projectPath.split('/').pop() || 'default';
 
       if (moduleIds.length > 0) {
         const moduleId = moduleIds[0]; // Primary module
 
         const [tasksRes, sessionsRes, knowledgeRes] = await Promise.all([
-          fetch(`${API_BASE}/api/tasks?projectId=${encodeURIComponent(projectId)}&moduleId=${encodeURIComponent(moduleId)}`).catch(() => null),
-          fetch(`${API_BASE}/api/sessions/by-module/${encodeURIComponent(moduleId)}`).catch(() => null),
-          fetch(`${API_BASE}/api/knowledge?projectPath=${encodeURIComponent(projectPath)}&module=${encodeURIComponent(moduleId)}`).catch(() => null),
+          apiFetch(`${API_BASE}/api/tasks?projectId=${encodeURIComponent(projectId)}&moduleId=${encodeURIComponent(moduleId)}`).catch(() => null),
+          apiFetch(`${API_BASE}/api/sessions/by-module/${encodeURIComponent(moduleId)}`).catch(() => null),
+          apiFetch(`${API_BASE}/api/knowledge?projectPath=${encodeURIComponent(projectPath)}&module=${encodeURIComponent(moduleId)}`).catch(() => null),
         ]);
 
         if (tasksRes?.ok) {
@@ -368,8 +380,8 @@ export const useProjectHubStore = create<ProjectHubState>((set, get) => ({
   fetchContextBar: async (projectId) => {
     try {
       const [tasksRes, sessionsRes] = await Promise.all([
-        fetch(`${API_BASE}/api/tasks?projectId=${encodeURIComponent(projectId)}&status=in_progress`),
-        fetch(`${API_BASE}/api/sessions/query/active`),
+        apiFetch(`${API_BASE}/api/tasks?projectId=${encodeURIComponent(projectId)}&status=in_progress`),
+        apiFetch(`${API_BASE}/api/sessions/query/active`),
       ]);
       const tasksData = await tasksRes.json();
       const sessionsData = await sessionsRes.json();
@@ -380,7 +392,13 @@ export const useProjectHubStore = create<ProjectHubState>((set, get) => ({
         },
       });
     } catch {
-      // Silent fail
+      // API may not be ready — retry once after 3s
+      const { contextBar } = get();
+      if (contextBar.activeTasks === 0 && contextBar.runningSessions === 0) {
+        setTimeout(() => {
+          get().fetchContextBar(projectId);
+        }, 3000);
+      }
     }
   },
 }));

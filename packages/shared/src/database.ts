@@ -57,7 +57,7 @@ export interface Task {
   parentTaskId?: string;
   title: string;
   description: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'blocked' | 'failed' | 'cancelled';
+  status: 'pending' | 'review' | 'in_progress' | 'completed' | 'blocked' | 'failed' | 'cancelled';
   priority: 'low' | 'medium' | 'high';
   assignedAgent?: string;
   createdBy: string;
@@ -73,6 +73,11 @@ export interface Task {
   acceptanceCriteria?: string;    // JSON: AcceptanceCriterion[]
   validation?: string;            // JSON: TaskValidation
   context?: string;               // JSON: TaskContext
+  // Solution plan & review fields
+  solutionPlan?: string;          // Free-text: root cause + approach + logic changes
+  planStatus?: 'draft' | 'approved' | 'revision_requested';
+  planReviewNotes?: string;       // Feedback from reviewer
+  implementSummary?: string;      // Summary after implementation
 }
 
 // Re-export governance types for convenience
@@ -119,7 +124,7 @@ export interface WorkEntry {
 export interface TaskProgressLog {
   id: string;
   taskId: string;
-  sessionId: string;
+  sessionId: string | null; // null for direct MCP updates without active session
   progress: number; // 0-100
   status: 'pending' | 'in_progress' | 'blocked' | 'completed' | 'failed';
   currentStep?: string;
@@ -196,6 +201,7 @@ export type EntityReferenceRelationship =
   | 'depends_on'       // Capability → Capability
   | 'feeds_into'       // Capability → Capability
   | 'blocks'           // Task → Task
+  | 'validates'        // TestResult → Task/Knowledge
   | 'related_to'       // Any → Any
   | 'mentions';        // Any → Any (inline [[type:id]])
 
@@ -203,13 +209,13 @@ export type EntityType =
   | 'task'
   | 'session'
   | 'knowledge'
-  | 'capability'
   | 'impact'
   | 'ticket'
   | 'incident'
   | 'lesson'
   | 'rule'
-  | 'skill';
+  | 'skill'
+  | 'test_result';
 
 export interface EntityReference {
   id: string;
@@ -531,6 +537,7 @@ export interface IncidentFilters {
   type?: IncidentType;
   severity?: IncidentSeverity;
   status?: IncidentStatus;
+  taskId?: string;
 }
 
 export interface LessonFilters {
@@ -599,20 +606,32 @@ export class SidStackDB {
   private db: BetterSqlite3Database | null = null;
   private dbPath: string;
   private initialized: boolean = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtCache = new Map<string, any>();
 
-  constructor(projectPath?: string) {
-    // Use home directory for global database (shared between MCP and Tauri)
-    // This matches the Rust Tauri commands which use ~/.sidstack/sidstack.db
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-    const sidstackDir = projectPath
-      ? path.join(projectPath, '.sidstack')
-      : path.join(homeDir, '.sidstack');
-
-    if (!fs.existsSync(sidstackDir)) {
-      fs.mkdirSync(sidstackDir, { recursive: true });
+  constructor(customDbPath?: string) {
+    // GLOBAL database only - shared between MCP, API server, and Tauri app
+    // All projects share a single sidstack.db, distinguished by projectId field
+    // Per-project .sidstack/ folders contain config, knowledge, capabilities - NOT database
+    //
+    // Path resolution order:
+    // 1. Constructor parameter (for testing or embedded use)
+    // 2. DATABASE_PATH env var (for remote/Docker deployment)
+    // 3. Default: ~/.sidstack/sidstack.db
+    if (customDbPath) {
+      this.dbPath = customDbPath;
+    } else if (process.env.DATABASE_PATH) {
+      this.dbPath = process.env.DATABASE_PATH;
+    } else {
+      const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+      this.dbPath = path.join(homeDir, '.sidstack', 'sidstack.db');
     }
 
-    this.dbPath = path.join(sidstackDir, 'sidstack.db');
+    // Ensure parent directory exists
+    const dbDir = path.dirname(this.dbPath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
   }
 
   async init(): Promise<void> {
@@ -772,6 +791,22 @@ export class SidStackDB {
           this.db!.exec("CREATE INDEX IF NOT EXISTS idx_tasks_branch ON tasks(branch)");
           console.log('[SidStackDB] Migration: Added branch column to tasks');
         }
+        if (!columnNames.includes('solutionPlan')) {
+          this.db!.exec("ALTER TABLE tasks ADD COLUMN solutionPlan TEXT");
+          console.log('[SidStackDB] Migration: Added solutionPlan column to tasks');
+        }
+        if (!columnNames.includes('planStatus')) {
+          this.db!.exec("ALTER TABLE tasks ADD COLUMN planStatus TEXT");
+          console.log('[SidStackDB] Migration: Added planStatus column to tasks');
+        }
+        if (!columnNames.includes('planReviewNotes')) {
+          this.db!.exec("ALTER TABLE tasks ADD COLUMN planReviewNotes TEXT");
+          console.log('[SidStackDB] Migration: Added planReviewNotes column to tasks');
+        }
+        if (!columnNames.includes('implementSummary')) {
+          this.db!.exec("ALTER TABLE tasks ADD COLUMN implementSummary TEXT");
+          console.log('[SidStackDB] Migration: Added implementSummary column to tasks');
+        }
       }
     } catch (e) {
       // Table might not exist yet, that's ok
@@ -792,12 +827,68 @@ export class SidStackDB {
     } catch (e) {
       // Table might not exist yet, that's ok
     }
+
+    // Migration: Remove FK constraint from task_progress_log.sessionId
+    // SQLite doesn't allow dropping constraints, so we recreate the table
+    try {
+      const fkList = this.db!.pragma('foreign_key_list(task_progress_log)') as any[];
+      const hasSessionFk = fkList.some((fk: any) => fk.from === 'sessionId');
+
+      if (hasSessionFk) {
+        console.log('[SidStackDB] Migration: Removing FK constraint from task_progress_log.sessionId');
+        this.db!.exec(`
+          -- Disable FK checks during migration
+          PRAGMA foreign_keys = OFF;
+
+          -- Create new table without sessionId FK
+          CREATE TABLE task_progress_log_new (
+            id TEXT PRIMARY KEY,
+            taskId TEXT NOT NULL,
+            sessionId TEXT,
+            progress INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            currentStep TEXT,
+            notes TEXT,
+            artifacts TEXT DEFAULT '[]',
+            createdAt INTEGER NOT NULL,
+            FOREIGN KEY (taskId) REFERENCES tasks(id)
+          );
+
+          -- Copy data
+          INSERT INTO task_progress_log_new SELECT * FROM task_progress_log;
+
+          -- Swap tables
+          DROP TABLE task_progress_log;
+          ALTER TABLE task_progress_log_new RENAME TO task_progress_log;
+
+          -- Recreate index
+          CREATE INDEX IF NOT EXISTS idx_task_progress_task ON task_progress_log(taskId, createdAt);
+
+          -- Re-enable FK checks
+          PRAGMA foreign_keys = ON;
+        `);
+        console.log('[SidStackDB] Migration: Removed FK constraint from task_progress_log.sessionId');
+      }
+    } catch (e) {
+      // Table might not exist yet, that's ok
+    }
   }
 
   private ensureInit(): void {
     if (!this.db) {
       throw new Error('Database not initialized. Call init() first.');
     }
+  }
+
+  /** Get or create a cached prepared statement for the given SQL */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private getStmt(sql: string): any {
+    let stmt = this.stmtCache.get(sql);
+    if (!stmt) {
+      stmt = this.db!.prepare(sql);
+      this.stmtCache.set(sql, stmt);
+    }
+    return stmt;
   }
 
   private initSchema(): void {
@@ -840,7 +931,12 @@ export class SidStackDB {
         acceptanceCriteria TEXT DEFAULT '[]',
         validation TEXT DEFAULT '{}',
         context TEXT DEFAULT '{}',
-        branch TEXT
+        branch TEXT,
+        -- Solution plan & review fields
+        solutionPlan TEXT,
+        planStatus TEXT,
+        planReviewNotes TEXT,
+        implementSummary TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(projectId);
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
@@ -905,18 +1001,18 @@ export class SidStackDB {
       CREATE INDEX IF NOT EXISTS idx_work_entries_task ON work_entries(taskId);
 
       -- Task Progress Log (progress snapshots for tasks)
+      -- sessionId is nullable to allow direct updates without an active session
       CREATE TABLE IF NOT EXISTS task_progress_log (
         id TEXT PRIMARY KEY,
         taskId TEXT NOT NULL,
-        sessionId TEXT NOT NULL,
+        sessionId TEXT,
         progress INTEGER NOT NULL,
         status TEXT NOT NULL,
         currentStep TEXT,
         notes TEXT,
         artifacts TEXT DEFAULT '[]',
         createdAt INTEGER NOT NULL,
-        FOREIGN KEY (taskId) REFERENCES tasks(id),
-        FOREIGN KEY (sessionId) REFERENCES work_sessions(id)
+        FOREIGN KEY (taskId) REFERENCES tasks(id)
       );
       CREATE INDEX IF NOT EXISTS idx_task_progress_task ON task_progress_log(taskId, createdAt);
 
@@ -1441,6 +1537,43 @@ export class SidStackDB {
       CREATE INDEX IF NOT EXISTS idx_entity_ref_source_rel ON entity_references(source_type, source_id, relationship);
       CREATE INDEX IF NOT EXISTS idx_entity_ref_target_rel ON entity_references(target_type, target_id, relationship);
     `);
+
+    // Knowledge Documents (database-backed knowledge system)
+    this.db!.exec(`
+      -- =======================================================================
+      -- KNOWLEDGE DOCUMENTS (replacing filesystem-based knowledge)
+      -- =======================================================================
+      CREATE TABLE IF NOT EXISTS knowledge_documents (
+        id TEXT PRIMARY KEY,
+        projectId TEXT NOT NULL,
+        slug TEXT NOT NULL,
+        title TEXT NOT NULL,
+        type TEXT NOT NULL,
+        status TEXT DEFAULT 'active',
+        content TEXT NOT NULL,
+        summary TEXT,
+        module TEXT,
+        tags TEXT DEFAULT '[]',
+        category TEXT,
+        owner TEXT,
+        reviewDate TEXT,
+        related TEXT DEFAULT '[]',
+        dependsOn TEXT DEFAULT '[]',
+        covers TEXT DEFAULT '[]',
+        source TEXT DEFAULT 'manual',
+        sourcePath TEXT,
+        wordCount INTEGER,
+        readingTime INTEGER,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        UNIQUE(projectId, slug)
+      );
+      CREATE INDEX IF NOT EXISTS idx_knowledge_project ON knowledge_documents(projectId);
+      CREATE INDEX IF NOT EXISTS idx_knowledge_type ON knowledge_documents(projectId, type);
+      CREATE INDEX IF NOT EXISTS idx_knowledge_status ON knowledge_documents(projectId, status);
+      CREATE INDEX IF NOT EXISTS idx_knowledge_module ON knowledge_documents(projectId, module);
+      CREATE INDEX IF NOT EXISTS idx_knowledge_slug ON knowledge_documents(projectId, slug);
+    `);
   }
 
   private generateId(prefix: string): string {
@@ -1535,7 +1668,7 @@ export class SidStackDB {
 
   getTask(id: string): Task | null {
     this.ensureInit();
-    const row = this.db!.prepare(`SELECT * FROM tasks WHERE id = ?`).get(id) as Task | undefined;
+    const row = this.getStmt(`SELECT * FROM tasks WHERE id = ?`).get(id) as Task | undefined;
     return row ?? null;
   }
 
@@ -1562,6 +1695,11 @@ export class SidStackDB {
     if (updates.validation !== undefined) { sets.push('validation = ?'); values.push(updates.validation); }
     if (updates.context !== undefined) { sets.push('context = ?'); values.push(updates.context); }
     if (updates.branch !== undefined) { sets.push('branch = ?'); values.push(updates.branch); }
+    // Solution plan & review fields
+    if (updates.solutionPlan !== undefined) { sets.push('solutionPlan = ?'); values.push(updates.solutionPlan); }
+    if (updates.planStatus !== undefined) { sets.push('planStatus = ?'); values.push(updates.planStatus); }
+    if (updates.planReviewNotes !== undefined) { sets.push('planReviewNotes = ?'); values.push(updates.planReviewNotes); }
+    if (updates.implementSummary !== undefined) { sets.push('implementSummary = ?'); values.push(updates.implementSummary); }
 
     if (sets.length === 0) return task;
 
@@ -1576,35 +1714,21 @@ export class SidStackDB {
 
   deleteTask(id: string): boolean {
     this.ensureInit();
-    const info = this.db!.prepare(`DELETE FROM tasks WHERE id = ?`).run(id);
+    const info = this.getStmt(`DELETE FROM tasks WHERE id = ?`).run(id);
     return info.changes > 0;
   }
 
-  listTasks(projectId: string, filters?: { status?: string; assignedAgent?: string }): Task[] {
-    this.ensureInit();
-    let query = 'SELECT * FROM tasks WHERE projectId = ?';
-    const params: any[] = [projectId];
-
-    if (filters?.status) {
-      query += ' AND status = ?';
-      params.push(filters.status);
-    }
-    if (filters?.assignedAgent) {
-      query += ' AND assignedAgent = ?';
-      params.push(filters.assignedAgent);
-    }
-
-    query += ' ORDER BY createdAt DESC';
-    return this.db!.prepare(query).all(...params) as Task[];
-  }
-
   /**
-   * Smart task listing with presets, filters, search, and pagination.
-   * Optimized to reduce response size for MCP tool usage.
+   * Unified task listing with presets, filters, search, pagination, and field selection.
+   *
+   * Fields levels:
+   * - minimal: id, parentTaskId, title, status, taskType, priority, assignedAgent (~100 bytes/task)
+   * - standard: + description, notes, progress, branch, moduleId, createdBy, createdAt, updatedAt (~350 bytes/task)
+   * - full: all columns including governance, acceptanceCriteria, validation, context (~600 bytes/task)
    */
-  listTasksSmart(projectId: string, filters: {
+  listTasks(projectId: string, filters?: {
     preset?: 'actionable' | 'blocked' | 'recent' | 'epics' | 'all';
-    status?: string[];
+    status?: string[] | string;
     taskType?: string[];
     priority?: string;
     parentOnly?: boolean;
@@ -1612,18 +1736,25 @@ export class SidStackDB {
     assignedAgent?: string;
     limit?: number;
     offset?: number;
-    compact?: boolean;
+    fields?: 'minimal' | 'standard' | 'full';
   }): { tasks: Partial<Task>[]; total: number; hasMore: boolean } {
     this.ensureInit();
+
+    const fields = filters?.fields || 'standard';
 
     const conditions: string[] = ['projectId = ?'];
     const params: unknown[] = [projectId];
 
+    // Normalize status to array
+    const statusFilter = filters?.status
+      ? (Array.isArray(filters.status) ? filters.status : [filters.status])
+      : undefined;
+
     // Apply preset defaults (if no explicit status filter)
-    if (!filters.status) {
-      switch (filters.preset) {
+    if (!statusFilter) {
+      switch (filters?.preset) {
         case 'actionable':
-          conditions.push("status IN ('pending', 'in_progress')");
+          conditions.push("status IN ('pending', 'review', 'in_progress')");
           break;
         case 'blocked':
           conditions.push("status = 'blocked'");
@@ -1640,46 +1771,47 @@ export class SidStackDB {
           // No status filter
           break;
         default:
-          // Default to actionable
-          conditions.push("status IN ('pending', 'in_progress')");
+          // No preset specified — no automatic status filter
+          break;
       }
     }
 
     // Explicit status filter (array)
-    if (filters.status && filters.status.length > 0) {
-      const placeholders = filters.status.map(() => '?').join(', ');
+    if (statusFilter && statusFilter.length > 0) {
+      const placeholders = statusFilter.map(() => '?').join(', ');
       conditions.push(`status IN (${placeholders})`);
-      params.push(...filters.status);
+      params.push(...statusFilter);
     }
 
     // Task type filter (array)
-    if (filters.taskType && filters.taskType.length > 0) {
+    if (filters?.taskType && filters.taskType.length > 0) {
       const placeholders = filters.taskType.map(() => '?').join(', ');
       conditions.push(`taskType IN (${placeholders})`);
       params.push(...filters.taskType);
     }
 
     // Priority filter
-    if (filters.priority) {
+    if (filters?.priority) {
       conditions.push('priority = ?');
       params.push(filters.priority);
     }
 
     // Parent only filter
-    if (filters.parentOnly) {
+    if (filters?.parentOnly) {
       conditions.push('parentTaskId IS NULL');
     }
 
     // Assigned agent filter
-    if (filters.assignedAgent) {
+    if (filters?.assignedAgent) {
       conditions.push('assignedAgent = ?');
       params.push(filters.assignedAgent);
     }
 
     // Search filter (title and description)
-    if (filters.search) {
-      conditions.push("(title LIKE ? OR description LIKE ?)");
-      const searchPattern = `%${filters.search}%`;
+    if (filters?.search) {
+      conditions.push("(title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')");
+      const escaped = filters.search.replace(/[%_\\]/g, '\\$&');
+      const searchPattern = `%${escaped}%`;
       params.push(searchPattern, searchPattern);
     }
 
@@ -1689,19 +1821,34 @@ export class SidStackDB {
     const countRow = this.db!.prepare(`SELECT COUNT(*) as count FROM tasks WHERE ${whereClause}`).get(...params) as any;
     const total = countRow?.count ?? 0;
 
-    // Select fields based on compact mode
-    // Compact: exclude large JSON blobs (governance, acceptanceCriteria, validation, context)
-    // Keep: description, notes (useful for context)
-    const compactFields = [
-      'id', 'projectId', 'parentTaskId', 'title', 'description', 'status', 'priority',
-      'taskType', 'moduleId', 'assignedAgent', 'progress', 'notes', 'createdBy', 'createdAt', 'updatedAt'
+    // Field selection map
+    const minimalFields = ['id', 'parentTaskId', 'title', 'status', 'taskType', 'priority', 'assignedAgent', 'planStatus'];
+    const standardFields = [
+      'id', 'parentTaskId', 'title', 'description', 'status', 'priority',
+      'taskType', 'moduleId', 'assignedAgent', 'progress', 'notes', 'branch',
+      'createdBy', 'createdAt', 'updatedAt', 'planStatus', 'solutionPlan', 'implementSummary'
     ];
-    const allFields = '*';
-    const selectFields = filters.compact !== false ? compactFields.join(', ') : allFields;
 
-    // Build query with pagination
-    const limit = Math.min(filters.limit || 30, 100);
-    const offset = filters.offset || 0;
+    let selectFields: string;
+    let maxLimit: number;
+    switch (fields) {
+      case 'minimal':
+        selectFields = minimalFields.join(', ');
+        maxLimit = 500;
+        break;
+      case 'full':
+        selectFields = '*';
+        maxLimit = 50;
+        break;
+      case 'standard':
+      default:
+        selectFields = standardFields.join(', ');
+        maxLimit = 200;
+        break;
+    }
+
+    const limit = Math.min(filters?.limit || maxLimit, maxLimit);
+    const offset = filters?.offset || 0;
 
     const query = `
       SELECT ${selectFields} FROM tasks
@@ -1709,11 +1856,12 @@ export class SidStackDB {
       ORDER BY
         CASE status
           WHEN 'in_progress' THEN 1
-          WHEN 'blocked' THEN 2
-          WHEN 'pending' THEN 3
-          WHEN 'failed' THEN 4
-          WHEN 'completed' THEN 5
-          WHEN 'cancelled' THEN 6
+          WHEN 'review' THEN 2
+          WHEN 'blocked' THEN 3
+          WHEN 'pending' THEN 4
+          WHEN 'failed' THEN 5
+          WHEN 'completed' THEN 6
+          WHEN 'cancelled' THEN 7
         END,
         CASE priority
           WHEN 'high' THEN 1
@@ -1728,7 +1876,7 @@ export class SidStackDB {
     return {
       tasks,
       total,
-      hasMore: offset + tasks.length < total
+      hasMore: offset + tasks.length < total,
     };
   }
 
@@ -3308,7 +3456,7 @@ export class SidStackDB {
 
   getTrainingSessionByModule(moduleId: string, projectPath: string = ''): TrainingSession | null {
     this.ensureInit();
-    const row = this.db!.prepare(`SELECT * FROM training_sessions WHERE moduleId = ? AND projectPath = ?`).get(moduleId, projectPath) as TrainingSession | undefined;
+    const row = this.getStmt(`SELECT * FROM training_sessions WHERE moduleId = ? AND projectPath = ?`).get(moduleId, projectPath) as TrainingSession | undefined;
     return row ?? null;
   }
 
@@ -3418,6 +3566,10 @@ export class SidStackDB {
     if (filters.status) {
       query += ` AND status = ?`;
       params.push(filters.status);
+    }
+    if (filters.taskId) {
+      query += ` AND json_extract(context, '$.taskId') = ?`;
+      params.push(filters.taskId);
     }
     query += ` ORDER BY createdAt DESC`;
 
@@ -3580,7 +3732,7 @@ export class SidStackDB {
 
   getSkill(id: string): Skill | null {
     this.ensureInit();
-    const row = this.db!.prepare(`SELECT * FROM skills WHERE id = ?`).get(id) as Skill | undefined;
+    const row = this.getStmt(`SELECT * FROM skills WHERE id = ?`).get(id) as Skill | undefined;
     return row ?? null;
   }
 
@@ -3684,7 +3836,7 @@ export class SidStackDB {
 
   getRule(id: string): Rule | null {
     this.ensureInit();
-    const row = this.db!.prepare(`SELECT * FROM rules WHERE id = ?`).get(id) as Rule | undefined;
+    const row = this.getStmt(`SELECT * FROM rules WHERE id = ?`).get(id) as Rule | undefined;
     return row ?? null;
   }
 
@@ -3816,35 +3968,28 @@ export class SidStackDB {
   getTrainingContext(moduleId: string, projectPath: string = '', role?: string, taskType?: string): TrainingContext {
     this.ensureInit();
 
-    // Get active skills for this project (filter by applicability in app layer)
-    const allSkills = this.listSkills({ projectPath, status: 'active' });
-    const applicableSkills = allSkills.filter(skill => {
-      if (!skill.applicability) return true; // No filter = applies to all
-      try {
-        const app = JSON.parse(skill.applicability) as { modules?: string[]; roles?: string[]; taskTypes?: string[] };
-        const moduleMatch = !app.modules || app.modules.includes('*') || app.modules.includes(moduleId);
-        const roleMatch = !role || !app.roles || app.roles.includes('*') || app.roles.includes(role);
-        const taskMatch = !taskType || !app.taskTypes || app.taskTypes.includes('*') || app.taskTypes.includes(taskType);
-        return moduleMatch && roleMatch && taskMatch;
-      } catch {
-        return true;
-      }
-    }).slice(0, 5); // Max 5 skills
+    // Build applicability filter clause for SQL-level filtering
+    // Matches: no applicability (null) OR module/role/taskType match including wildcards
+    const applicabilityFilter = `
+      AND (
+        applicability IS NULL
+        OR (
+          (json_extract(applicability, '$.modules') IS NULL OR EXISTS (SELECT 1 FROM json_each(json_extract(applicability, '$.modules')) WHERE value = '*' OR value = ?))
+          AND (? IS NULL OR json_extract(applicability, '$.roles') IS NULL OR EXISTS (SELECT 1 FROM json_each(json_extract(applicability, '$.roles')) WHERE value = '*' OR value = ?))
+          AND (? IS NULL OR json_extract(applicability, '$.taskTypes') IS NULL OR EXISTS (SELECT 1 FROM json_each(json_extract(applicability, '$.taskTypes')) WHERE value = '*' OR value = ?))
+        )
+      )
+    `;
 
-    // Get active rules for this project
-    const allRules = this.listRules({ projectPath, status: 'active' });
-    const applicableRules = allRules.filter(rule => {
-      if (!rule.applicability) return true;
-      try {
-        const app = JSON.parse(rule.applicability) as { modules?: string[]; roles?: string[]; taskTypes?: string[] };
-        const moduleMatch = !app.modules || app.modules.includes('*') || app.modules.includes(moduleId);
-        const roleMatch = !role || !app.roles || app.roles.includes('*') || app.roles.includes(role);
-        const taskMatch = !taskType || !app.taskTypes || app.taskTypes.includes('*') || app.taskTypes.includes(taskType);
-        return moduleMatch && roleMatch && taskMatch;
-      } catch {
-        return true;
-      }
-    }).slice(0, 5); // Max 5 rules
+    // Filter skills at DB level
+    const applicableSkills = this.db!.prepare(
+      `SELECT * FROM skills WHERE projectPath = ? AND status = 'active' ${applicabilityFilter} ORDER BY usageCount DESC, successRate DESC, updatedAt DESC LIMIT 5`
+    ).all(projectPath, moduleId, role ?? null, role ?? null, taskType ?? null, taskType ?? null) as Skill[];
+
+    // Filter rules at DB level
+    const applicableRules = this.db!.prepare(
+      `SELECT * FROM rules WHERE projectPath = ? AND status = 'active' ${applicabilityFilter} ORDER BY level ASC, createdAt DESC LIMIT 5`
+    ).all(projectPath, moduleId, role ?? null, role ?? null, taskType ?? null, taskType ?? null) as Rule[];
 
     // Get recent approved lessons and incidents for this module's session
     const session = this.getTrainingSessionByModule(moduleId, projectPath);
@@ -4191,8 +4336,272 @@ export class SidStackDB {
     };
   }
 
+  // ==========================================================================
+  // Knowledge Document Methods
+  // ==========================================================================
+
+  createKnowledgeDocument(doc: {
+    projectId: string;
+    slug: string;
+    title: string;
+    type: string;
+    content: string;
+    status?: string;
+    summary?: string;
+    module?: string;
+    tags?: string[];
+    category?: string;
+    owner?: string;
+    reviewDate?: string;
+    related?: string[];
+    dependsOn?: string[];
+    covers?: string[];
+    source?: string;
+    sourcePath?: string;
+  }): any {
+    this.ensureInit();
+    const id = this.generateId('kb');
+    const now = new Date().toISOString();
+    const wordCount = doc.content.split(/\s+/).filter(Boolean).length;
+    const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+
+    this.db!.prepare(`
+      INSERT INTO knowledge_documents (id, projectId, slug, title, type, status, content, summary, module, tags, category, owner, reviewDate, related, dependsOn, covers, source, sourcePath, wordCount, readingTime, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, doc.projectId, doc.slug, doc.title, doc.type,
+      doc.status || 'active', doc.content, doc.summary || null,
+      doc.module || null, JSON.stringify(doc.tags || []),
+      doc.category || null, doc.owner || null, doc.reviewDate || null,
+      JSON.stringify(doc.related || []), JSON.stringify(doc.dependsOn || []),
+      JSON.stringify(doc.covers || []), doc.source || 'manual',
+      doc.sourcePath || null, wordCount, readingTime, now, now
+    );
+
+    return this.getKnowledgeDocument(id);
+  }
+
+  getKnowledgeDocument(id: string): any | null {
+    this.ensureInit();
+    const row = this.db!.prepare('SELECT * FROM knowledge_documents WHERE id = ?').get(id) as any;
+    return row ? this.mapKnowledgeRow(row) : null;
+  }
+
+  getKnowledgeDocumentBySlug(projectId: string, slug: string): any | null {
+    this.ensureInit();
+    const row = this.db!.prepare('SELECT * FROM knowledge_documents WHERE projectId = ? AND slug = ?').get(projectId, slug) as any;
+    return row ? this.mapKnowledgeRow(row) : null;
+  }
+
+  listKnowledgeDocuments(projectId: string, options?: {
+    type?: string | string[];
+    status?: string | string[];
+    module?: string;
+    tags?: string[];
+    search?: string;
+    limit?: number;
+    offset?: number;
+    sortBy?: string;
+    sortOrder?: string;
+  }): { documents: any[]; total: number; limit: number; offset: number } {
+    this.ensureInit();
+    const conditions: string[] = ['projectId = ?'];
+    const params: any[] = [projectId];
+
+    if (options?.type) {
+      const types = Array.isArray(options.type) ? options.type : [options.type];
+      conditions.push(`type IN (${types.map(() => '?').join(',')})`);
+      params.push(...types);
+    }
+    if (options?.status) {
+      const statuses = Array.isArray(options.status) ? options.status : [options.status];
+      conditions.push(`status IN (${statuses.map(() => '?').join(',')})`);
+      params.push(...statuses);
+    }
+    if (options?.module) {
+      conditions.push('module = ?');
+      params.push(options.module);
+    }
+    if (options?.search) {
+      conditions.push('(title LIKE ? OR content LIKE ? OR summary LIKE ?)');
+      const like = `%${options.search}%`;
+      params.push(like, like, like);
+    }
+    if (options?.tags && options.tags.length > 0) {
+      // Search within JSON array — match any tag
+      const tagConditions = options.tags.map(() => "tags LIKE ?");
+      conditions.push(`(${tagConditions.join(' OR ')})`);
+      for (const tag of options.tags) {
+        params.push(`%"${tag}"%`);
+      }
+    }
+
+    const where = conditions.join(' AND ');
+    const sortCol = options?.sortBy === 'title' ? 'title' : options?.sortBy === 'createdAt' ? 'createdAt' : options?.sortBy === 'type' ? 'type' : 'updatedAt';
+    const sortDir = options?.sortOrder === 'asc' ? 'ASC' : 'DESC';
+    const limit = options?.limit || 50;
+    const offset = options?.offset || 0;
+
+    const total = (this.db!.prepare(`SELECT COUNT(*) as count FROM knowledge_documents WHERE ${where}`).get(...params) as any).count;
+    const rows = this.db!.prepare(`SELECT * FROM knowledge_documents WHERE ${where} ORDER BY ${sortCol} ${sortDir} LIMIT ? OFFSET ?`).all(...params, limit, offset) as any[];
+
+    return {
+      documents: rows.map(r => this.mapKnowledgeRow(r)),
+      total,
+      limit,
+      offset,
+    };
+  }
+
+  updateKnowledgeDocument(id: string, updates: {
+    title?: string;
+    content?: string;
+    status?: string;
+    summary?: string;
+    module?: string;
+    tags?: string[];
+    category?: string;
+    owner?: string;
+    reviewDate?: string;
+    related?: string[];
+    dependsOn?: string[];
+    covers?: string[];
+  }): any | null {
+    this.ensureInit();
+    const existing = this.getKnowledgeDocument(id);
+    if (!existing) return null;
+
+    const sets: string[] = [];
+    const values: any[] = [];
+
+    if (updates.title !== undefined) { sets.push('title = ?'); values.push(updates.title); }
+    if (updates.content !== undefined) {
+      sets.push('content = ?'); values.push(updates.content);
+      const wc = updates.content.split(/\s+/).filter(Boolean).length;
+      sets.push('wordCount = ?'); values.push(wc);
+      sets.push('readingTime = ?'); values.push(Math.max(1, Math.ceil(wc / 200)));
+    }
+    if (updates.status !== undefined) { sets.push('status = ?'); values.push(updates.status); }
+    if (updates.summary !== undefined) { sets.push('summary = ?'); values.push(updates.summary); }
+    if (updates.module !== undefined) { sets.push('module = ?'); values.push(updates.module); }
+    if (updates.tags !== undefined) { sets.push('tags = ?'); values.push(JSON.stringify(updates.tags)); }
+    if (updates.category !== undefined) { sets.push('category = ?'); values.push(updates.category); }
+    if (updates.owner !== undefined) { sets.push('owner = ?'); values.push(updates.owner); }
+    if (updates.reviewDate !== undefined) { sets.push('reviewDate = ?'); values.push(updates.reviewDate); }
+    if (updates.related !== undefined) { sets.push('related = ?'); values.push(JSON.stringify(updates.related)); }
+    if (updates.dependsOn !== undefined) { sets.push('dependsOn = ?'); values.push(JSON.stringify(updates.dependsOn)); }
+    if (updates.covers !== undefined) { sets.push('covers = ?'); values.push(JSON.stringify(updates.covers)); }
+
+    if (sets.length === 0) return existing;
+
+    sets.push('updatedAt = ?');
+    values.push(new Date().toISOString());
+    values.push(id);
+
+    this.db!.prepare(`UPDATE knowledge_documents SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+    return this.getKnowledgeDocument(id);
+  }
+
+  deleteKnowledgeDocument(id: string, archive: boolean = true): boolean {
+    this.ensureInit();
+    if (archive) {
+      const result = this.db!.prepare('UPDATE knowledge_documents SET status = ?, updatedAt = ? WHERE id = ?').run('archived', new Date().toISOString(), id);
+      return result.changes > 0;
+    }
+    const result = this.db!.prepare('DELETE FROM knowledge_documents WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  searchKnowledgeDocuments(projectId: string, query: string, limit: number = 20): any[] {
+    this.ensureInit();
+    // Simple search: match in title, content, summary, tags
+    const like = `%${query}%`;
+    const rows = this.db!.prepare(`
+      SELECT *,
+        CASE
+          WHEN title LIKE ? THEN 3
+          WHEN summary LIKE ? THEN 2
+          ELSE 1
+        END as _score
+      FROM knowledge_documents
+      WHERE projectId = ? AND status != 'archived' AND (title LIKE ? OR content LIKE ? OR summary LIKE ? OR tags LIKE ?)
+      ORDER BY _score DESC, updatedAt DESC
+      LIMIT ?
+    `).all(like, like, projectId, like, like, like, like, limit) as any[];
+
+    return rows.map(r => this.mapKnowledgeRow(r));
+  }
+
+  getKnowledgeStats(projectId: string): any {
+    this.ensureInit();
+    const rows = this.db!.prepare('SELECT * FROM knowledge_documents WHERE projectId = ?').all(projectId) as any[];
+
+    const byType: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+    const byModule: Record<string, number> = {};
+    const bySource: Record<string, number> = {};
+
+    for (const row of rows) {
+      byType[row.type] = (byType[row.type] || 0) + 1;
+      byStatus[row.status] = (byStatus[row.status] || 0) + 1;
+      if (row.module) byModule[row.module] = (byModule[row.module] || 0) + 1;
+      bySource[row.source || 'manual'] = (bySource[row.source || 'manual'] || 0) + 1;
+    }
+
+    // Recent and needs review
+    const recentlyUpdated = rows
+      .sort((a: any, b: any) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 5)
+      .map((r: any) => this.mapKnowledgeRow(r));
+
+    const needsReview = rows
+      .filter((r: any) => r.status === 'review')
+      .map((r: any) => this.mapKnowledgeRow(r));
+
+    return {
+      totalDocuments: rows.length,
+      byType,
+      byStatus,
+      bySource,
+      byModule,
+      recentlyUpdated,
+      needsReview,
+    };
+  }
+
+  private mapKnowledgeRow(row: any): any {
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      slug: row.slug,
+      title: row.title,
+      type: row.type,
+      status: row.status,
+      content: row.content,
+      summary: row.summary || undefined,
+      module: row.module || undefined,
+      tags: JSON.parse(row.tags || '[]'),
+      category: row.category || undefined,
+      owner: row.owner || undefined,
+      reviewDate: row.reviewDate || undefined,
+      related: JSON.parse(row.related || '[]'),
+      dependsOn: JSON.parse(row.dependsOn || '[]'),
+      covers: JSON.parse(row.covers || '[]'),
+      source: row.source || 'manual',
+      sourcePath: row.sourcePath || undefined,
+      wordCount: row.wordCount,
+      readingTime: row.readingTime,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      // Compatibility fields for KnowledgeDocument interface
+      absolutePath: row.sourcePath || '',
+      _score: row._score || undefined,
+    };
+  }
+
   close(): void {
     if (this.db) {
+      this.stmtCache.clear();
       this.db.close();
       this.db = null;
       this.initialized = false;
@@ -4202,26 +4611,42 @@ export class SidStackDB {
   getDbPath(): string {
     return this.dbPath;
   }
+
+  getImpactValidationsBatch(analysisIds: string[]): Record<string, any[]> {
+    this.ensureInit();
+    if (analysisIds.length === 0) return {};
+
+    const placeholders = analysisIds.map(() => '?').join(',');
+    const rows = this.db!.prepare(
+      `SELECT * FROM impact_validations WHERE analysisId IN (${placeholders}) ORDER BY createdAt ASC`
+    ).all(...analysisIds) as any[];
+
+    const result: Record<string, any[]> = {};
+    for (const id of analysisIds) {
+      result[id] = [];
+    }
+    for (const row of rows) {
+      if (result[row.analysisId]) {
+        result[row.analysisId].push(row);
+      }
+    }
+    return result;
+  }
 }
 
 // Singleton instance
 let dbInstance: SidStackDB | null = null;
 let initPromise: Promise<void> | null = null;
 
-export async function getDB(projectPath?: string): Promise<SidStackDB> {
+export async function getDB(customDbPath?: string): Promise<SidStackDB> {
   if (!dbInstance) {
-    dbInstance = new SidStackDB(projectPath);
+    dbInstance = new SidStackDB(customDbPath);
     initPromise = dbInstance.init().catch((err) => {
       // Reset singleton so next call retries instead of caching rejected promise
       dbInstance = null;
       initPromise = null;
       throw err;
     });
-  } else if (projectPath) {
-    const requestedPath = path.join(projectPath, '.sidstack', 'sidstack.db');
-    if (dbInstance.getDbPath() !== requestedPath) {
-      console.warn(`[SidStackDB] WARNING: getDB() called with projectPath="${projectPath}" but singleton already initialized at "${dbInstance.getDbPath()}". Ignoring projectPath.`);
-    }
   }
   await initPromise;
 

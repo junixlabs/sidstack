@@ -1,0 +1,12 @@
+# Serve static SPA + proxy /api to API Server
+:5174 {
+	root * /srv
+
+	# SPA fallback: serve index.html for client-side routing
+	try_files {path} /index.html
+
+	file_server
+
+	# Proxy API calls to backend
+	reverse_proxy /api/* {$API_UPSTREAM:api-server:19432}
+}

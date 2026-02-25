@@ -5,7 +5,7 @@
  * Shows 4 sections: Project OKRs, Capability Goals, Work Pipeline, Action Items.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Target,
   List,
@@ -24,7 +24,8 @@ import { useProjectHubStore } from '@/stores/projectHubStore';
 import { CreateTaskDialog } from './CreateTaskDialog';
 import type { HubViewMode, ProjectGoalsDomain, ProjectGoalsSubGoal } from '@/stores/projectHubStore';
 
-const API_BASE = 'http://localhost:19432';
+import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
+const API_BASE = getApiBaseUrl();
 
 // ============================================================================
 // Types
@@ -87,10 +88,7 @@ export function ProjectOverview() {
   const viewMode = useProjectHubStore((s) => s.viewMode);
   const setViewMode = useProjectHubStore((s) => s.setViewMode);
 
-  const projectId = useMemo(
-    () => projectPath.split('/').pop() || 'default',
-    [projectPath],
-  );
+  const projectId = useProjectHubStore((s) => s.projectId);
 
   const [data, setData] = useState<OverviewData | null>(null);
   const [okrData, setOkrData] = useState<OKRData | null>(null);
@@ -104,16 +102,16 @@ export function ProjectOverview() {
 
     const fetchData = async () => {
       const [tasksResult, ticketsResult, impactResult, okrResult] = await Promise.allSettled([
-        fetch(`${API_BASE}/api/tasks?projectId=${encodeURIComponent(projectId)}`).then((r) =>
+        apiFetch(`${API_BASE}/api/tasks?projectId=${encodeURIComponent(projectId)}`).then((r) =>
           r.ok ? r.json() : null,
         ),
-        fetch(`${API_BASE}/api/tickets?projectId=${encodeURIComponent(projectId)}`).then((r) =>
+        apiFetch(`${API_BASE}/api/tickets?projectId=${encodeURIComponent(projectId)}`).then((r) =>
           r.ok ? r.json() : null,
         ),
-        fetch(`${API_BASE}/api/impact/list/${encodeURIComponent(projectId)}`).then((r) =>
+        apiFetch(`${API_BASE}/api/impact/list/${encodeURIComponent(projectId)}`).then((r) =>
           r.ok ? r.json() : null,
         ),
-        fetch(`${API_BASE}/api/projects/okrs?path=${encodeURIComponent(projectPath)}`).then((r) =>
+        apiFetch(`${API_BASE}/api/projects/okrs?path=${encodeURIComponent(projectPath)}`).then((r) =>
           r.ok ? r.json() : null,
         ),
       ]);

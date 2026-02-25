@@ -55,8 +55,9 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 3. tell Vite to ignore watching non-source directories
+      // Prevents git worktrees created inside project from triggering reloads
+      ignored: ["**/src-tauri/**", "**/agent-*/**", "**/implement-*/**", "**/dist/**", "**/packages/**"],
     },
   },
 }));

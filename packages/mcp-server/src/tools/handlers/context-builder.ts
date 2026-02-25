@@ -3,25 +3,13 @@
  *
  * Tools for building unified context from the Entity Reference Graph.
  * Provides single-call context assembly for AI agents.
+ *
+ * Uses API client instead of direct database access.
  */
 
-import { getDB } from '@sidstack/shared';
-import type {
-  SidStackDB,
-  EntityType,
-  ContextFormat,
-  ContextSection,
-} from '@sidstack/shared';
-import { buildEntityContext } from '@sidstack/shared';
+import { createApiClient } from '@sidstack/shared';
 
-let db: SidStackDB | null = null;
-
-async function getDatabase(): Promise<SidStackDB> {
-  if (!db) {
-    db = await getDB();
-  }
-  return db;
-}
+const apiClient = createApiClient();
 
 // =============================================================================
 // Tool Definitions
@@ -37,7 +25,7 @@ export const contextBuilderTools = [
         entityType: {
           type: 'string',
           description: 'The type of entity to build context for',
-          enum: ['task', 'session', 'knowledge', 'capability', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill'],
+          enum: ['task', 'session', 'knowledge', 'impact', 'ticket', 'incident', 'lesson', 'rule', 'skill'],
         },
         entityId: { type: 'string', description: 'The entity ID' },
         format: {
@@ -51,12 +39,12 @@ export const contextBuilderTools = [
           description: 'Which related sections to include (default: all)',
           items: {
             type: 'string',
-            enum: ['capability', 'knowledge', 'impact', 'governance', 'history', 'references'],
+            enum: ['knowledge', 'impact', 'governance', 'history', 'references'],
           },
         },
         maxTokens: {
           type: 'number',
-          description: 'Maximum token budget for the response. Priority-based truncation: capability > knowledge > governance > history > references.',
+          description: 'Maximum token budget for the response. Priority-based truncation: knowledge > governance > history > references.',
           default: 8000,
         },
         depth: {
@@ -70,7 +58,7 @@ export const contextBuilderTools = [
   },
   {
     name: 'task_start_with_context',
-    description: 'Get complete context for starting work on a task. Returns the task with all related entities: capability, knowledge, impact analysis, governance rules, and session history. This is the recommended way for an agent to begin implementing a task.',
+    description: 'Get complete context for starting work on a task. Returns the task with all related entities: knowledge, impact analysis, governance rules, and session history. This is the recommended way for an agent to begin implementing a task.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -130,36 +118,16 @@ export async function handleEntityContext(args: {
   maxTokens?: number;
   depth?: number;
 }) {
-  const database = await getDatabase();
-
-  const result = buildEntityContext(database, {
-    entityType: args.entityType as EntityType,
-    entityId: args.entityId,
-    format: (args.format as ContextFormat) || 'claude',
-    sections: args.sections as ContextSection[] | undefined,
-    maxTokens: args.maxTokens || 8000,
+  const query: Record<string, string | number | boolean | undefined> = {
+    format: args.format || 'claude',
     depth: args.depth || 1,
-  });
-
-  // For claude format, return the formatted text directly
-  if (args.format === 'claude' || !args.format) {
-    return {
-      success: true,
-      context: result.formatted || JSON.stringify(result, null, 2),
-      entity: result.entity,
-      relatedCounts: {
-        tasks: result.related.tasks.length,
-        sessions: result.related.sessions.length,
-        knowledge: result.related.knowledge.length,
-        impact: result.related.impact.length,
-        rules: result.related.governance.rules.length,
-        skills: result.related.governance.skills.length,
-        tickets: result.related.tickets.length,
-        incidents: result.related.incidents.length,
-        lessons: result.related.lessons.length,
-      },
-    };
+    maxTokens: args.maxTokens || 8000,
+  };
+  if (args.sections) {
+    query.sections = args.sections.join(',');
   }
+
+  const result = await apiClient.context.getEntityContext(args.entityType, args.entityId, query);
 
   return {
     success: true,
@@ -172,47 +140,16 @@ export async function handleTaskStartWithContext(args: {
   format?: string;
   maxTokens?: number;
 }) {
-  const database = await getDatabase();
-
-  // Verify task exists
-  const task = database.getTask(args.taskId);
-  if (!task) {
-    return {
-      success: false,
-      error: `Task ${args.taskId} not found`,
-    };
-  }
-
-  // Build full context
-  const result = buildEntityContext(database, {
-    entityType: 'task',
-    entityId: args.taskId,
-    format: (args.format as ContextFormat) || 'claude',
-    sections: ['capability', 'knowledge', 'impact', 'governance', 'history', 'references'],
+  const query: Record<string, string | number | boolean | undefined> = {
+    format: args.format || 'claude',
     maxTokens: args.maxTokens || 8000,
-    depth: 1,
-  });
+  };
+
+  const result = await apiClient.context.getStartContext(args.taskId, query);
 
   return {
     success: true,
-    task: {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      priority: task.priority,
-      progress: task.progress,
-      taskType: task.taskType,
-    },
-    context: result.formatted || JSON.stringify(result, null, 2),
-    relatedCounts: {
-      sessions: result.related.sessions.length,
-      knowledge: result.related.knowledge.length,
-      impact: result.related.impact.length,
-      rules: result.related.governance.rules.length,
-      skills: result.related.governance.skills.length,
-      tickets: result.related.tickets.length,
-    },
+    ...result,
   };
 }
 
@@ -223,101 +160,15 @@ export async function handleTaskCompleteWithContext(args: {
   lessonsLearned?: string[];
   notes?: string;
 }) {
-  const database = await getDatabase();
-
-  // Verify task exists
-  const task = database.getTask(args.taskId);
-  if (!task) {
-    return {
-      success: false,
-      error: `Task ${args.taskId} not found`,
-    };
-  }
-
-  const refsCreated: string[] = [];
-
-  // Update task status to completed
-  database.updateTask(args.taskId, {
-    status: 'completed',
-    progress: 100,
-    notes: args.notes || task.notes,
+  const result = await apiClient.context.completeContext(args.taskId, {
+    sessionId: args.sessionId,
+    knowledgeCreated: args.knowledgeCreated,
+    lessonsLearned: args.lessonsLearned,
+    notes: args.notes,
   });
-
-  // Link session to task
-  if (args.sessionId) {
-    try {
-      database.createEntityReference({
-        sourceType: 'task',
-        sourceId: args.taskId,
-        targetType: 'session',
-        targetId: args.sessionId,
-        relationship: 'implemented_by',
-        createdBy: 'system',
-      });
-      refsCreated.push(`task -> session (implemented_by)`);
-    } catch { /* duplicate reference, ok */ }
-  }
-
-  // Link knowledge created
-  if (args.knowledgeCreated) {
-    for (const knowledgeId of args.knowledgeCreated) {
-      // Session creates knowledge
-      if (args.sessionId) {
-        try {
-          database.createEntityReference({
-            sourceType: 'session',
-            sourceId: args.sessionId,
-            targetType: 'knowledge',
-            targetId: knowledgeId,
-            relationship: 'creates',
-            createdBy: 'system',
-          });
-          refsCreated.push(`session -> knowledge:${knowledgeId} (creates)`);
-        } catch { /* duplicate */ }
-      }
-      // Task requires this knowledge context
-      try {
-        database.createEntityReference({
-          sourceType: 'task',
-          sourceId: args.taskId,
-          targetType: 'knowledge',
-          targetId: knowledgeId,
-          relationship: 'requires_context',
-          createdBy: 'system',
-        });
-        refsCreated.push(`task -> knowledge:${knowledgeId} (requires_context)`);
-      } catch { /* duplicate */ }
-    }
-  }
-
-  // Link lessons learned
-  if (args.lessonsLearned) {
-    for (const lessonId of args.lessonsLearned) {
-      if (args.sessionId) {
-        try {
-          database.createEntityReference({
-            sourceType: 'session',
-            sourceId: args.sessionId,
-            targetType: 'lesson',
-            targetId: lessonId,
-            relationship: 'creates',
-            createdBy: 'system',
-          });
-          refsCreated.push(`session -> lesson:${lessonId} (creates)`);
-        } catch { /* duplicate */ }
-      }
-    }
-  }
 
   return {
     success: true,
-    task: {
-      id: task.id,
-      title: task.title,
-      status: 'completed',
-      progress: 100,
-    },
-    referencesCreated: refsCreated,
-    summary: `Task completed. ${refsCreated.length} entity references created.`,
+    ...result,
   };
 }

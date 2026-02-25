@@ -7,6 +7,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { TYPE_TO_FOLDER } from '@sidstack/shared';
+
 import { resolveTemplatesDir } from './resolve-paths.js';
 
 // =============================================================================
@@ -29,31 +31,37 @@ export interface TemplateInfo {
 }
 
 // Template metadata
-const TEMPLATE_METADATA: Record<string, { description: string; requiredVariables: string[]; variables: string[] }> = {
-  'business-logic': {
-    description: 'Document business rules, state machines, and workflows',
+
+const TEMPLATE_METADATA: Record<string, { description: string; requiredVariables: string[]; variables: string[]; category: string }> = {
+  'guide': {
+    description: 'How-to guide, onboarding doc, or workflow description',
     requiredVariables: ['title'],
-    variables: ['title', 'module', 'date', 'source_file', 'function_name'],
+    variables: ['title', 'module', 'date'],
+    category: '00-context',
   },
-  'api-endpoint': {
-    description: 'Document REST API endpoints with request/response schemas',
+  'spec': {
+    description: 'Project spec, feature proposal, or change request',
     requiredVariables: ['title'],
-    variables: ['title', 'module', 'method', 'path', 'date', 'base_url', 'source_file', 'service_file', 'validation_file'],
+    variables: ['title', 'module', 'date'],
+    category: '07-projects',
   },
-  'design-pattern': {
-    description: 'Document design patterns implemented in the codebase',
+  'decision': {
+    description: 'Architecture Decision Record (ADR)',
     requiredVariables: ['title'],
-    variables: ['title', 'module', 'pattern_name', 'date'],
+    variables: ['title', 'module', 'date'],
+    category: '02-decisions',
   },
-  'database-table': {
-    description: 'Document database tables/collections with schemas and queries',
+  'reference': {
+    description: 'API reference, schema docs, or technical reference',
     requiredVariables: ['title'],
-    variables: ['title', 'module', 'table_name', 'database_type', 'date'],
+    variables: ['title', 'module', 'date'],
+    category: '01-architecture',
   },
-  'module': {
-    description: 'Document a module with its API, dependencies, and governance',
+  'pattern': {
+    description: 'Design pattern or reusable architectural pattern',
     requiredVariables: ['title'],
-    variables: ['title', 'module_id', 'owner', 'date', 'source_path'],
+    variables: ['title', 'module', 'date'],
+    category: '01-architecture',
   },
 };
 
@@ -204,4 +212,8 @@ export function applyKnowledgeTemplate(name: string, variables: Record<string, s
 
 export function getTemplateMissingVariables(name: string, providedVars: Record<string, string>, requiredOnly?: boolean): string[] {
   return loader.getMissingVariables(name, providedVars, requiredOnly);
+}
+
+export function getTemplateCategoryFolder(templateType: string): string {
+  return (TYPE_TO_FOLDER as Record<string, string>)[templateType] || templateType;
 }

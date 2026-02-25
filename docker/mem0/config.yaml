@@ -1,0 +1,23 @@
+version: v1.1
+
+# LLM and embeddings routed through LiteLLM proxy
+# Change LLM_MODEL / EMBED_MODEL env vars to switch providers
+# See litellm-config.yaml for available model_name entries
+
+llm:
+  provider: litellm
+  config:
+    model: gemini-flash
+    temperature: 0.1
+    max_tokens: 1000
+
+embedder:
+  provider: openai
+  config:
+    model: gemini-embedding
+
+vector_store:
+  provider: qdrant
+  config:
+    host: qdrant
+    port: 6333

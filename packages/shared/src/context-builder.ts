@@ -21,7 +21,6 @@ import type { SidStackDB } from './database';
 export type ContextFormat = 'claude' | 'json' | 'compact';
 
 export type ContextSection =
-  | 'capability'
   | 'knowledge'
   | 'impact'
   | 'governance'
@@ -65,7 +64,6 @@ export interface EntitySummary {
 
 // Section priority for token budgeting (higher = more important)
 const SECTION_PRIORITY: Record<ContextSection, number> = {
-  capability: 6,
   knowledge: 5,
   governance: 4,
   impact: 3,
@@ -130,8 +128,7 @@ function loadEntitySummary(
       return { type, id, title: `Impact Analysis (${impact.changeType})`, status: impact.status, relationship };
     }
     case 'knowledge':
-    case 'capability':
-      // Knowledge and capabilities are file-based, return placeholder summary
+      // Knowledge is file-based, return placeholder summary
       return { type, id, title: id, relationship };
     default:
       return null;
@@ -242,7 +239,6 @@ function categorizeReferences(
         related.sessions.push(summary);
         break;
       case 'knowledge':
-      case 'capability':
         related.knowledge.push(summary);
         break;
       case 'impact':

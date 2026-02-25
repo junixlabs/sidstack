@@ -3,6 +3,10 @@
 export * from './types';
 export * from './constants';
 export * from './errors';
+
+// API Client (for MCP server and other consumers to call API server via HTTP)
+export { SidStackApiClient, createApiClient, ApiClientError } from './api-client';
+export type { ApiClientOptions } from './api-client';
 export * from './spec-graph';
 
 // Impact Analysis System
@@ -12,11 +16,9 @@ export * from './impact';
 export * from './governance';
 export * from './task-validation';
 
-// External Session Launcher
-export * from './external-session';
+// Quality Gate Runner
+export * from './quality-gate-runner';
 
-// Claude Session Manager
-export * from './session-manager';
 
 // Session Context Builder
 export * from './session-context-builder';
@@ -31,20 +33,8 @@ export {
   type EntitySummary,
 } from './context-builder';
 
-// Capability Registry (Project Intelligence Hub)
+// Capability Types (used by Project Hub frontend)
 export * from './capability-types';
-export {
-  getCapabilitiesPath,
-  capabilitiesExist,
-  ensureCapabilitiesDir,
-  loadAllCapabilities,
-  loadCapability,
-  resolveHierarchy,
-  queryCapabilities,
-  getCapabilityStats,
-  writeCapability,
-  deleteCapability,
-} from './capability-registry';
 
 // Knowledge System (new unified system)
 // Re-export types (functions are exported from ./knowledge subpath to avoid naming conflicts)
@@ -68,10 +58,83 @@ export type {
 } from './knowledge';
 
 // Re-export service factory and config constants
-export { createKnowledgeService, DOCUMENT_TYPE_CONFIG, DOCUMENT_STATUS_CONFIG } from './knowledge';
+export {
+  createKnowledgeService,
+  DOCUMENT_TYPE_CONFIG,
+  DOCUMENT_STATUS_CONFIG,
+  FOLDER_CONFIG,
+  ALL_DOCUMENT_TYPES,
+  ALL_FOLDER_NAMES,
+  FOLDER_TO_DEFAULT_TYPE,
+  TYPE_TO_FOLDER,
+  DEFAULT_FOLDERS,
+  type FolderConfig,
+} from './knowledge';
 
 // Project Settings
 export * from './project-settings';
+
+// Workspace Detection
+export {
+  detectWorkspace,
+  isInsideWorkspace,
+  getWorkspaceRoot,
+  getProjectId,
+  getProjectIdSafe,
+  loadWorkspaceConfig,
+  saveWorkspaceConfig,
+  getSidstackPath,
+  getSidstackLocalPath,
+  ensureSidstackLocal,
+  getConfigPath,
+  listWorktrees,
+  isWorktree,
+  getWorktreeStatus,
+  updateWorktreeStatus,
+  // Agent Desk aliases
+  listAgentDesks,
+  getAgentDeskStatus,
+  updateAgentDeskStatus,
+  // Desk path helpers
+  DESKS_DIR_NAME,
+  getDesksPath,
+  getDeskPath,
+  type WorkspaceInfo,
+  type WorkspaceConfig,
+  type DetectWorkspaceOptions,
+  type WorktreeStatus,
+  type AgentDeskInfo,
+} from './workspace-detector';
+
+// Test Results (file-based E2E result storage)
+export {
+  createTestResult,
+  getTestResult,
+  listTestResults,
+  type TestResult,
+  type CreateTestResultInput,
+  type ListTestResultsFilters,
+} from './test-results';
+
+// Traceability Matrix (spec → task → test coverage)
+export {
+  buildTraceabilityMatrix,
+  type TraceabilityMatrix,
+  type TraceabilityMatrixEntry,
+  type TraceabilityTaskEntry,
+  type TraceabilityCoverage,
+  type TraceabilitySummary,
+} from './traceability';
+
+// Memory System (mem0 semantic search)
+export { Mem0Client, createMem0Client, MEMORY_TTL_MS, computeExpiresAt, isMemoryExpired } from './memory/index.js';
+export type {
+  Mem0Config,
+  Mem0Memory,
+  Mem0AddRequest,
+  Mem0SearchRequest,
+  MemorySourceType,
+} from './memory/index.js';
 
 // Database exports (renamed to avoid conflicts with ./types)
 export {

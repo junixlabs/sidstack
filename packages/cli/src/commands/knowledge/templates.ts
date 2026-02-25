@@ -14,7 +14,7 @@ export default class KnowledgeTemplates extends Command {
   static examples = [
     '<%= config.bin %> knowledge templates',
     '<%= config.bin %> knowledge templates --json',
-    '<%= config.bin %> knowledge templates --show api-endpoint',
+    '<%= config.bin %> knowledge templates --show guide',
   ];
 
   static flags = {

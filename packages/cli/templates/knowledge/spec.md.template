@@ -1,0 +1,28 @@
+---
+id: {{title}}
+type: spec
+title: {{title}}
+module: {{module}}
+status: draft
+created: {{date}}
+tags: [spec, {{module}}]
+---
+
+# {{title}}
+
+## Problem
+
+What problem does this solve?
+
+## Proposed Solution
+
+Description of the solution approach.
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+## Related
+
+- Link to related documents

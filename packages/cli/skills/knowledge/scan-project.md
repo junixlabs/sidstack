@@ -6,6 +6,7 @@ status: active
 owner: all
 tags: [knowledge, scan, bootstrap, init]
 created: 2026-02-01
+updated: 2026-02-08
 ---
 
 # AI-Powered Knowledge Scan
@@ -36,61 +37,76 @@ You are scanning this project to generate structured knowledge documentation. Yo
 4. **Be concise** - document what matters, skip trivial details
 5. **Use today's date** for `created` and `updated` fields
 
+### 9-Folder Structure
+
+Place documents in the appropriate category folder:
+
+| Folder | Purpose | Type |
+|--------|---------|------|
+| `00-context/` | Vision, glossary, onboarding | Living |
+| `01-architecture/` | System design, modules, patterns | Living |
+| `02-decisions/` | ADRs, technical decisions | Event |
+| `03-standards/` | Coding conventions, naming, testing | Living |
+| `04-data/` | Database schema, ownership, retention | Living |
+| `05-api/` | API contracts, schemas, versioning | Living |
+| `06-operations/` | Deployment, monitoring, rollback | Living |
+| `07-projects/` | Project-specific documentation | Event |
+| `08-incidents/` | Incident reports, root cause analysis | Event |
+
 ### What to Scan
 
 Explore in this order:
 
-#### Phase 1: Project Structure
+#### Phase 1: Project Context (00-context)
 - Read `package.json` (or `pyproject.toml`, `Cargo.toml`, etc.)
 - Read `README.md` if it exists
-- Read `tsconfig.json` / build config
-- Glob for source directories (`src/`, `lib/`, `packages/`)
 - Identify the tech stack, frameworks, and architecture
 
-**Output:** `.sidstack/knowledge/modules/project-structure.md`
+**Output:** `.sidstack/knowledge/00-context/project-overview.md`
 
-#### Phase 2: API Endpoints (if applicable)
+#### Phase 2: Architecture (01-architecture)
+- Read `tsconfig.json` / build config
+- Glob for source directories (`src/`, `lib/`, `packages/`)
+- Identify recurring patterns (adapters, factories, stores, hooks, etc.)
+- Document 2-3 most important patterns used in the codebase
+
+**Output:** `.sidstack/knowledge/01-architecture/system-design.md` and `{pattern}-pattern.md`
+
+#### Phase 3: API (05-api, if applicable)
 - Grep for route definitions (`Router`, `app.get`, `app.post`, `@Get`, `@Post`, etc.)
 - Read route files to understand endpoints
 - Document each API group (not every single endpoint - group by resource)
 
-**Output:** `.sidstack/knowledge/api/{resource}-api.md` for each major API group
+**Output:** `.sidstack/knowledge/05-api/{resource}-api.md` for each major API group
 
-#### Phase 3: Database Schema (if applicable)
+#### Phase 4: Data (04-data, if applicable)
 - Grep for CREATE TABLE, schema definitions, model definitions
 - Read migration files or schema files
 - Document tables with columns, types, relationships
 
-**Output:** `.sidstack/knowledge/database/{table}-table.md` for key tables
+**Output:** `.sidstack/knowledge/04-data/{table}-table.md` for key tables
 
-#### Phase 4: Business Logic
+#### Phase 5: Business Logic (00-context)
 - Identify core services, managers, or domain logic
 - Read main business logic files
 - Document workflows, state machines, key algorithms
 
-**Output:** `.sidstack/knowledge/business-logic/{feature}.md` for each major feature
-
-#### Phase 5: Design Patterns
-- Identify recurring patterns (adapters, factories, stores, hooks, etc.)
-- Document 2-3 most important patterns used in the codebase
-
-**Output:** `.sidstack/knowledge/patterns/{pattern}-pattern.md`
+**Output:** `.sidstack/knowledge/00-context/{feature}-workflow.md` for each major feature
 
 ### Document Templates
 
-#### Project Structure (`knowledge/modules/project-structure.md`)
+#### Project Overview (`00-context/project-overview.md`)
 
 ```markdown
 ---
-id: project-structure
-type: reference
+id: project-overview
+type: guide
 status: active
 tags: [overview, architecture]
 created: YYYY-MM-DD
-updated: YYYY-MM-DD
 ---
 
-# Project Structure
+# Project Overview
 
 ## Tech Stack
 
@@ -103,12 +119,10 @@ updated: YYYY-MM-DD
 
 ## Directory Layout
 
-```
 project/
 ├── src/          # Description
 ├── packages/     # Description
 └── ...
-```
 
 ## Key Entry Points
 
@@ -117,14 +131,12 @@ project/
 
 ## Development Commands
 
-```bash
 npm run dev    # Start dev server
 npm run build  # Production build
 npm run test   # Run tests
 ```
-```
 
-#### API Reference (`knowledge/api/{resource}-api.md`)
+#### API Reference (`05-api/{resource}-api.md`)
 
 ```markdown
 ---
@@ -134,7 +146,6 @@ module: {package-name}
 status: active
 tags: [api, {resource}]
 created: YYYY-MM-DD
-updated: YYYY-MM-DD
 ---
 
 # {Resource} API
@@ -159,7 +170,7 @@ Create a {resource}.
 - `path/to/routes.ts`
 ```
 
-#### Database Table (`knowledge/database/{table}-table.md`)
+#### Database Table (`04-data/{table}-table.md`)
 
 ```markdown
 ---
@@ -169,7 +180,6 @@ module: {package-name}
 status: active
 tags: [database, schema]
 created: YYYY-MM-DD
-updated: YYYY-MM-DD
 ---
 
 # {Table} Table
@@ -189,17 +199,16 @@ updated: YYYY-MM-DD
 - `path/to/schema.ts`
 ```
 
-#### Business Logic (`knowledge/business-logic/{feature}.md`)
+#### Business Logic (`00-context/{feature}-workflow.md`)
 
 ```markdown
 ---
 id: {feature-slug}
-type: reference
+type: guide
 module: {package-name}
 status: active
-tags: [business-logic, {feature}]
+tags: [workflow, {feature}]
 created: YYYY-MM-DD
-updated: YYYY-MM-DD
 ---
 
 # {Feature Name}
@@ -220,16 +229,15 @@ Brief description of what this does and why it exists.
 - `path/to/implementation.ts` - Main logic
 ```
 
-#### Design Pattern (`knowledge/patterns/{name}-pattern.md`)
+#### Design Pattern (`01-architecture/{name}-pattern.md`)
 
 ```markdown
 ---
 id: {name}-pattern
-type: reference
+type: pattern
 status: active
 tags: [pattern, {category}]
 created: YYYY-MM-DD
-updated: YYYY-MM-DD
 ---
 
 # {Pattern Name} Pattern
@@ -245,36 +253,15 @@ Brief description of the pattern.
 - `path/to/file2.ts` - Usage description
 ```
 
-### Index Files
-
-Create `_index.md` in each folder:
-
-```markdown
----
-id: {category}-index
-type: index
-status: active
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
----
-
-# {Category} Knowledge
-
-| Document | Description |
-|----------|-------------|
-| [doc-1](doc-1.md) | Brief description |
-| [doc-2](doc-2.md) | Brief description |
-```
-
 ### Rules
 
 1. **Don't over-document** - Focus on the 80% that matters. Skip trivial utils, config files, and boilerplate.
 2. **Be accurate** - Read the actual code before documenting. Don't guess.
 3. **Use relative paths** in Code Reference sections.
-4. **Skip empty categories** - If there's no database, don't create `knowledge/database/`.
+4. **Skip empty categories** - If there's no database, don't create `04-data/`.
 5. **Max 10-15 docs total** - Quality over quantity. A focused set is more useful than exhaustive coverage.
 6. **Frontmatter is mandatory** - Every doc must have the YAML frontmatter block.
-7. **Update _index.md** - Always create/update the index for each category you populate.
+7. **Update _README.md** - Each category folder should have a `_README.md` explaining its contents.
 
 ### Completion
 
@@ -282,6 +269,6 @@ After scanning, output a summary:
 ```
 Knowledge scan complete:
 - X documents created
-- Categories: api, database, business-logic, patterns, modules
+- Categories: 00-context, 01-architecture, 04-data, 05-api
 - Path: .sidstack/knowledge/
 ```

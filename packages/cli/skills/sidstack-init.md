@@ -138,13 +138,14 @@ Based on actual `import` statements, not assumptions.
 
 During analysis, identify content better suited as **knowledge documents**:
 
-| Type | Examples | Directory |
-|------|----------|-----------|
-| Business Logic | Domain rules, workflows, state machines | `business-logic/` |
-| API Docs | Endpoints, schemas, authentication | `api/` |
-| Patterns | Architecture decisions, conventions | `patterns/` |
-| Infrastructure | Deployment, CI/CD, Docker | `infrastructure/` |
-| Module Deep Dives | Complex module internals | `modules/` |
+| Category | Examples | Directory |
+|----------|----------|-----------|
+| Context | Vision, glossary, onboarding, workflows | `00-context/` |
+| Architecture | System design, modules, patterns | `01-architecture/` |
+| Standards | Coding conventions, naming, testing rules | `03-standards/` |
+| Data | Database schema, ownership, retention | `04-data/` |
+| API | Endpoints, schemas, versioning | `05-api/` |
+| Operations | Deployment, CI/CD, monitoring | `06-operations/` |
 
 **When you find such content**, ask user:
 > "I noticed [X] which might be better as a knowledge document. Create it?"

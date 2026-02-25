@@ -127,11 +127,20 @@ trainingRouter.get('/incidents', async (req, res) => {
     const db = await getDB();
 
     const sessionId = req.query.sessionId as string | undefined;
+    const projectPath = req.query.projectPath as string | undefined;
     const type = req.query.type as IncidentType | undefined;
     const severity = req.query.severity as IncidentSeverity | undefined;
     const status = req.query.status as IncidentStatus | undefined;
+    const taskId = req.query.taskId as string | undefined;
 
-    const incidents = db.listIncidents({ sessionId, type, severity, status });
+    let incidents = db.listIncidents({ sessionId, type, severity, status, taskId });
+
+    // When no sessionId filter, scope by projectPath via session lookup
+    if (!sessionId && projectPath) {
+      const sessions = db.listTrainingSessions(projectPath);
+      const sessionIds = new Set(sessions.map((s) => s.id));
+      incidents = incidents.filter((i) => sessionIds.has(i.sessionId));
+    }
 
     res.json({ success: true, incidents, total: incidents.length });
   } catch (error) {
@@ -256,9 +265,17 @@ trainingRouter.get('/lessons', async (req, res) => {
     const db = await getDB();
 
     const sessionId = req.query.sessionId as string | undefined;
+    const projectPath = req.query.projectPath as string | undefined;
     const status = req.query.status as LessonStatus | undefined;
 
-    const lessons = db.listLessons({ sessionId, status });
+    let lessons = db.listLessons({ sessionId, status });
+
+    // When no sessionId filter, scope by projectPath via session lookup
+    if (!sessionId && projectPath) {
+      const sessions = db.listTrainingSessions(projectPath);
+      const sessionIds = new Set(sessions.map((s) => s.id));
+      lessons = lessons.filter((l) => sessionIds.has(l.sessionId));
+    }
 
     res.json({ success: true, lessons, total: lessons.length });
   } catch (error) {
@@ -895,6 +912,83 @@ trainingRouter.get('/stats/:moduleId', async (req, res) => {
   } catch (error) {
     console.error('Failed to get training stats:', error);
     res.status(500).json({ error: 'Failed to get training stats' });
+  }
+});
+
+// Get project-wide aggregate training stats
+trainingRouter.get('/stats', async (req, res) => {
+  try {
+    const db = await getDB();
+    const projectPath = req.query.projectPath as string || '';
+
+    // Get all sessions for this project
+    const sessions = db.listTrainingSessions(projectPath);
+    const sessionIds = new Set(sessions.map((s) => s.id));
+
+    // Aggregate incidents across all sessions
+    const allIncidents = db.listIncidents({});
+    const projectIncidents = allIncidents.filter((i) => sessionIds.has(i.sessionId));
+
+    const incidentsByStatus: Record<string, number> = {};
+    const incidentsBySeverity: Record<string, number> = {};
+    projectIncidents.forEach((i) => {
+      incidentsByStatus[i.status] = (incidentsByStatus[i.status] || 0) + 1;
+      incidentsBySeverity[i.severity] = (incidentsBySeverity[i.severity] || 0) + 1;
+    });
+
+    // Aggregate lessons across all sessions
+    const allLessons = db.listLessons({});
+    const projectLessons = allLessons.filter((l) => sessionIds.has(l.sessionId));
+
+    const lessonsByStatus: Record<string, number> = {};
+    projectLessons.forEach((l) => {
+      lessonsByStatus[l.status] = (lessonsByStatus[l.status] || 0) + 1;
+    });
+
+    // Skills and rules are already project-scoped
+    const skills = db.listSkills({ projectPath });
+    const rules = db.listRules({ projectPath });
+
+    const activeSkills = skills.filter((s) => s.status === 'active');
+    const totalUsage = activeSkills.reduce((sum, s) => sum + s.usageCount, 0);
+    const avgSuccessRate = activeSkills.length > 0
+      ? Math.round(activeSkills.reduce((sum, s) => sum + s.successRate, 0) / activeSkills.length)
+      : 0;
+
+    const activeRules = rules.filter((r) => r.status === 'active');
+    const totalViolations = activeRules.reduce((sum, r) => sum + r.violationCount, 0);
+
+    res.json({
+      success: true,
+      stats: {
+        moduleId: 'all',
+        projectPath,
+        hasSession: sessions.length > 0,
+        incidents: {
+          total: projectIncidents.length,
+          byStatus: incidentsByStatus,
+          bySeverity: incidentsBySeverity,
+        },
+        lessons: {
+          total: projectLessons.length,
+          byStatus: lessonsByStatus,
+        },
+        skills: {
+          total: skills.length,
+          active: activeSkills.length,
+          totalUsage,
+          avgSuccessRate,
+        },
+        rules: {
+          total: rules.length,
+          active: activeRules.length,
+          totalViolations,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Failed to get aggregate training stats:', error);
+    res.status(500).json({ error: 'Failed to get aggregate training stats' });
   }
 });
 

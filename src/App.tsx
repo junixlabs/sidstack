@@ -1,11 +1,11 @@
 import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FileText } from "lucide-react";
 import { useEffect, useCallback, useState, useRef } from "react";
 import { Toaster } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Bot } from "lucide-react";
+
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { AppSidebar, sidebarItems, type SidebarItem } from "./components/AppSidebar";
 import { DocsDialog } from "./components/DocsDialog";
@@ -22,10 +22,15 @@ import { GettingStartedModal } from "./components/onboarding/GettingStartedModal
 import { WorkspaceProvider, type WorkspaceRef } from "./contexts/WorkspaceContext";
 import { useTray } from "./hooks/useTray";
 import { useDocumentVisibility } from "./hooks/useVisibility";
+import { useEventSync } from "./hooks/useEventSync";
+import { SidBotPanel } from "./components/sidbot";
 import { useAppStore } from "./stores/appStore";
+import { useNotificationStore } from "./stores/notificationStore";
 import { useOnboardingStore } from "./stores/onboardingStore";
 import { useProjectStore, migrateFromOldWorkspaceModel, needsMigration } from "./stores/projectStore";
-
+import { useSidBotStore } from "./stores/sidBotStore";
+import { ConnectionSetup } from "./components/ConnectionSetup";
+import { hasConnectionConfig } from "./lib/api-config";
 
 import "./index.css";
 
@@ -80,6 +85,8 @@ function loadWindowState(): WindowState | null {
 import { LAYOUT } from "@/constants/layout";
 
 function App() {
+  const [isConnected, setIsConnected] = useState(hasConnectionConfig());
+
   const {
     projectPath,
     addWorkspace,
@@ -97,9 +104,20 @@ function App() {
   // Performance: Track document visibility for animation/polling optimization
   useDocumentVisibility();
 
+  // Event-driven sync: SSE events trigger store invalidation
+  useEventSync();
+
+  // Connect SSE on mount, disconnect on unmount
+  useEffect(() => {
+    const { connectSse, disconnectSse } = useNotificationStore.getState();
+    connectSse();
+    return () => disconnectSse();
+  }, []);
+
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [activeSidebarItem, setActiveSidebarItem] = useState("project-hub");
   const [showDocs, setShowDocs] = useState(false);
+  const [docsInitialSection, setDocsInitialSection] = useState<string | undefined>();
   const { open: showShortcuts, setOpen: setShowShortcuts } = useKeyboardShortcutsDialog();
 
   // Onboarding store
@@ -145,18 +163,16 @@ function App() {
   // Note: Tauri config has "maximized": true, so window starts maximized by default
   // This effect only handles restoring non-maximized state if user previously resized
   useEffect(() => {
+    if (!(window as any).__TAURI__) return;
     const restoreWindowState = async () => {
       const savedState = loadWindowState();
-      const appWindow = getCurrentWindow();
-
       try {
+        const appWindow = getCurrentWindow();
         if (savedState && !savedState.isMaximized) {
-          // Only restore position/size if user explicitly un-maximized before
           await appWindow.unmaximize();
           await appWindow.setPosition(new LogicalPosition(savedState.x, savedState.y));
           await appWindow.setSize(new LogicalSize(savedState.width, savedState.height));
         }
-        // Otherwise: keep maximized (from Tauri config default)
       } catch {
         // Window state restore failed, keep maximized
       }
@@ -166,34 +182,34 @@ function App() {
 
   // Save window state on close
   useEffect(() => {
-    const saveAllBeforeClose = async () => {
+    if (!(window as any).__TAURI__) return;
+    try {
       const appWindow = getCurrentWindow();
-      try {
-        const isMaximized = await appWindow.isMaximized();
-        const position = await appWindow.outerPosition();
-        const size = await appWindow.outerSize();
-        saveWindowState({
-          x: position.x,
-          y: position.y,
-          width: size.width,
-          height: size.height,
-          isMaximized,
-        });
-      } catch {
-        // Window state save failed, ignore
-      }
-    };
+      const unlistenPromise = appWindow.onCloseRequested(async (event) => {
+        event.preventDefault();
+        try {
+          const isMaximized = await appWindow.isMaximized();
+          const position = await appWindow.outerPosition();
+          const size = await appWindow.outerSize();
+          saveWindowState({
+            x: position.x,
+            y: position.y,
+            width: size.width,
+            height: size.height,
+            isMaximized,
+          });
+        } catch {
+          // Window state save failed, ignore
+        }
+        await appWindow.close();
+      });
 
-    const appWindow = getCurrentWindow();
-    const unlistenPromise = appWindow.onCloseRequested(async (event) => {
-      event.preventDefault();
-      await saveAllBeforeClose();
-      await appWindow.close();
-    });
-
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-    };
+      return () => {
+        unlistenPromise.then((unlisten) => unlisten());
+      };
+    } catch {
+      // Not in Tauri context, skip
+    }
   }, []);
 
 
@@ -228,35 +244,19 @@ function App() {
     if (viewId === "training-room") completeMilestone("trainingRoomVisited");
   }, [completeMilestone]);
 
-  // Handle worktree click - open worktree status view
-  const handleWorktreeClick = useCallback((worktreePath: string, branch: string) => {
-    const ws = activeWorkspaceRef.current;
-    if (!ws) return;
-
-    // Generate a unique sidebarItemId for this worktree
-    const worktreeSidebarId = `worktree-${branch}`;
-
-    // Check if there's already a worktree-status block for this worktree
-    const existingBlockId = ws.findBlockBySidebarItemId(worktreeSidebarId);
-
-    if (existingBlockId) {
-      // View exists, just switch to it
-      ws.setActiveBlock(existingBlockId);
+  // Handle showing docs — block view when workspace is open, dialog for WelcomeScreen
+  const handleShowDocs = useCallback((section?: string) => {
+    if (openWorkspaces.length > 0) {
+      // Navigate to docs block view
+      sessionStorage.setItem("docs-pending-section", section || "user-guide");
+      window.dispatchEvent(new CustomEvent("docs-navigate", { detail: { section: section || "user-guide" } }));
+      setActiveSidebarItem("docs");
     } else {
-      // Create new block
-      const blockId = ws.addBlock({
-        viewType: "worktree-status",
-        title: `Git: ${branch}`,
-        worktreePath: worktreePath,
-        sidebarItemId: worktreeSidebarId,
-      });
-      ws.setActiveBlock(blockId);
+      // WelcomeScreen fallback: use dialog
+      setDocsInitialSection(section);
+      setShowDocs(true);
     }
-
-    // Switch the active sidebar item to show this worktree view
-    setActiveSidebarItem(worktreeSidebarId);
-    setStatusMessage(`Viewing git status for ${branch}`);
-  }, []);
+  }, [openWorkspaces.length]);
 
   // Handle open project dialog
   const handleOpenProject = useCallback(async () => {
@@ -278,9 +278,27 @@ function App() {
     }
   }, [addWorkspace, openProject]);
 
+  // SidBot navigation event listener
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.viewId) {
+        setActiveSidebarItem(detail.viewId);
+      }
+    };
+    window.addEventListener("sidbot-navigate", handler);
+    return () => window.removeEventListener("sidbot-navigate", handler);
+  }, []);
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + R: Refresh active view
+      if ((e.metaKey || e.ctrlKey) && e.key === "r") {
+        e.preventDefault();
+        window.dispatchEvent(new Event('sidstack:refresh'));
+      }
+
       // Cmd/Ctrl + O: Open project
       if ((e.metaKey || e.ctrlKey) && e.key === "o") {
         e.preventDefault();
@@ -299,8 +317,8 @@ function App() {
         }
       }
 
-      // Cmd/Ctrl + 1-5: Sidebar navigation
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key >= "1" && e.key <= "5") {
+      // Cmd/Ctrl + 1-6: Sidebar navigation
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key >= "1" && e.key <= "6") {
         e.preventDefault();
         const index = parseInt(e.key) - 1;
         const navigableItems = sidebarItems.filter(item => !item.separator);
@@ -337,11 +355,26 @@ function App() {
           switchWorkspace(openWorkspaces[newIndex]);
         }
       }
+
+      // Cmd/Ctrl + .: Toggle SidBot panel
+      if ((e.metaKey || e.ctrlKey) && e.key === ".") {
+        e.preventDefault();
+        useSidBotStore.getState().togglePanel();
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleSidebarItemClick, openWorkspaces, projectPath, switchWorkspace, handleOpenProject]);
+
+  // Show connection setup if not configured
+  if (!isConnected) {
+    return (
+      <div className="h-screen w-screen bg-[var(--surface-0)]">
+        <ConnectionSetup onConnected={() => setIsConnected(true)} />
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -364,20 +397,16 @@ function App() {
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Right: Action buttons */}
+          {/* Right: SidBot toggle */}
           <div className="flex items-center gap-0.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setShowDocs(true)}
-                >
-                  <FileText className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Documentation</TooltipContent>
-            </Tooltip>
+            <button
+              onClick={() => useSidBotStore.getState().togglePanel()}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] active:bg-[var(--surface-3)] transition-colors"
+              title="Toggle SidBot (Cmd+.)"
+              aria-label="Toggle SidBot"
+            >
+              <Bot size={16} />
+            </button>
           </div>
         </header>
 
@@ -390,7 +419,7 @@ function App() {
             /* Welcome Screen - shown when no workspace is open */
             <WelcomeScreen
               onOpenProject={handleOpenProject}
-              onShowDocs={() => setShowDocs(true)}
+              onShowDocs={handleShowDocs}
             />
           ) : (
             <>
@@ -398,7 +427,7 @@ function App() {
               <AppSidebar
                 activeItem={activeSidebarItem}
                 onItemClick={handleSidebarItemClick}
-                onWorktreeClick={handleWorktreeClick}
+                onShowDocs={handleShowDocs}
               />
 
               {/* Workspace Content Area */}
@@ -431,6 +460,9 @@ function App() {
                   );
                 })}
               </div>
+
+              {/* SidBot Right Panel */}
+              <SidBotPanel />
             </>
           )}
         </main>
@@ -454,7 +486,7 @@ function App() {
         <GovernancePrompt />
 
         {/* ===== DOCUMENTATION DIALOG ===== */}
-        <DocsDialog open={showDocs} onOpenChange={setShowDocs} />
+        <DocsDialog open={showDocs} onOpenChange={setShowDocs} initialSection={docsInitialSection} />
 
         {/* ===== KEYBOARD SHORTCUTS DIALOG ===== */}
         <KeyboardShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />

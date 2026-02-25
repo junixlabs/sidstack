@@ -1,0 +1,32 @@
+---
+id: {{title}}
+type: pattern
+title: {{title}}
+module: {{module}}
+status: draft
+created: {{date}}
+tags: [pattern, {{module}}]
+---
+
+# {{title}}
+
+## Problem
+
+What recurring problem does this pattern solve?
+
+## Solution
+
+Description of the pattern and how it works.
+
+## When to Use
+
+- Condition 1
+- Condition 2
+
+## Example
+
+Code or usage example.
+
+## Related
+
+- Link to related documents

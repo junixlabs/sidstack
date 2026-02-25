@@ -5,6 +5,7 @@
  */
 
 import type { DocumentFrontmatter, DocumentType, DocumentStatus } from './types';
+import { DOCUMENT_TYPE_CONFIG } from './types';
 
 // =============================================================================
 // Frontmatter Parsing
@@ -160,6 +161,7 @@ function normalizeFrontmatter(raw: Record<string, unknown>): DocumentFrontmatter
     dependsOn: Array.isArray(raw.dependsOn) || Array.isArray(raw.depends_on)
       ? (raw.dependsOn || raw.depends_on) as string[]
       : undefined,
+    covers: Array.isArray(raw.covers) ? raw.covers.filter(c => typeof c === 'string') : undefined,
     createdAt: typeof raw.createdAt === 'string' || typeof raw.created_at === 'string'
       ? (raw.createdAt || raw.created_at) as string
       : undefined,
@@ -207,6 +209,7 @@ export function serializeFrontmatter(frontmatter: DocumentFrontmatter, body: str
   writeField('reviewDate', frontmatter.reviewDate);
   writeField('related', frontmatter.related);
   writeField('dependsOn', frontmatter.dependsOn);
+  writeField('covers', frontmatter.covers);
   writeField('createdAt', frontmatter.createdAt);
   writeField('updatedAt', frontmatter.updatedAt);
 
@@ -233,6 +236,7 @@ export function generateDocumentFrontmatter(input: {
   owner?: string;
   related?: string[];
   dependsOn?: string[];
+  covers?: string[];
 }): DocumentFrontmatter {
   const now = new Date().toISOString();
   return {
@@ -245,6 +249,7 @@ export function generateDocumentFrontmatter(input: {
     owner: input.owner,
     related: input.related,
     dependsOn: input.dependsOn,
+    covers: input.covers,
     createdAt: now,
     updatedAt: now,
   };
@@ -316,13 +321,7 @@ export function estimateReadingTime(wordCount: number): number {
 // Type Guards
 // =============================================================================
 
-const VALID_DOCUMENT_TYPES: DocumentType[] = [
-  'spec', 'decision', 'proposal',
-  'guide', 'reference',
-  'template', 'checklist', 'pattern',
-  'skill', 'principle', 'rule',
-  'module', 'index',
-];
+const VALID_DOCUMENT_TYPES = Object.keys(DOCUMENT_TYPE_CONFIG) as DocumentType[];
 
 // Legacy types that map to 'guide'
 const LEGACY_TYPE_MAP: Record<string, DocumentType> = {
