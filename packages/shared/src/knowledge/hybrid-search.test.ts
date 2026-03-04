@@ -4,7 +4,7 @@
  * Tests RRF fusion, graph enrichment, and RAG context building
  * by mocking both SidMemoClient and SidStackApiClient.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { hybridSearch, buildRAGContext } from './hybrid-search';
 import { makeMockSidMemoClient, makeMockApiClient } from './__test-utils';
 

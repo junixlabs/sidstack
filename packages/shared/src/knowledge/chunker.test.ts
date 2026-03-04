@@ -5,7 +5,7 @@
  * No mocks needed — tests markdown-aware semantic chunking logic.
  */
 import { describe, it, expect } from 'vitest';
-import { chunkDocument, type KnowledgeChunk } from './chunker';
+import { chunkDocument } from './chunker';
 import { makeTestDoc, repeat } from './__test-utils';
 
 // =============================================================================
