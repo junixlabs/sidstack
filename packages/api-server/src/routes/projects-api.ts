@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getDB, ProjectSettings, DEFAULT_PROJECT_SETTINGS, mergeWithDefaults, validateSettings, getSettingsPath } from '@sidstack/shared';
+import { getRepository, detectWorkspace, ProjectSettings, DEFAULT_PROJECT_SETTINGS, mergeWithDefaults, validateSettings, getSettingsPath } from '@sidstack/shared';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -158,8 +158,24 @@ projectsApiRouter.delete('/settings', async (req, res) => {
 });
 
 // ============================================================================
-// Project OKRs (read from .sidstack/project-okrs.json)
+// Project OKRs (stored as knowledge documents with type: "okr")
 // ============================================================================
+
+/**
+ * Resolve projectId from a project path.
+ */
+async function resolveProjectIdFromPath(projectPath: string): Promise<string> {
+  try {
+    const workspace = detectWorkspace(projectPath);
+    if (workspace?.projectId) return workspace.projectId;
+  } catch {
+    // Fall through to DB lookup
+  }
+  const repo = await getRepository();
+  const project = await repo.projects.getByPath(projectPath);
+  if (project?.id) return project.id;
+  throw new Error(`Cannot resolve projectId from path: ${projectPath}`);
+}
 
 // GET /api/projects/okrs?path=<projectPath>
 projectsApiRouter.get('/okrs', async (req, res) => {
@@ -168,14 +184,20 @@ projectsApiRouter.get('/okrs', async (req, res) => {
     if (!projectPath) {
       return res.status(400).json({ error: 'Project path is required' });
     }
-    const okrsPath = path.join(projectPath, '.sidstack', 'project-okrs.json');
-    const content = await fs.readFile(okrsPath, 'utf-8');
-    const okrs = JSON.parse(content);
-    res.json({ success: true, okrs });
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
+
+    const projectId = await resolveProjectIdFromPath(projectPath);
+    const repo = await getRepository();
+    const result = await repo.knowledge.list(projectId, { type: 'okr', limit: 1 });
+    const docs = result.documents || [];
+
+    if (docs.length === 0) {
       return res.json({ success: true, okrs: null });
     }
+
+    const doc = await repo.knowledge.get(docs[0].id);
+    const okrs = doc?.content ? JSON.parse(doc.content) : null;
+    res.json({ success: true, okrs });
+  } catch (error) {
     console.error('[okrs:get] Error:', error);
     res.status(500).json({ error: 'Failed to read project OKRs' });
   }
@@ -188,9 +210,31 @@ projectsApiRouter.put('/okrs', async (req, res) => {
     if (!projectPath) {
       return res.status(400).json({ error: 'Project path is required' });
     }
-    await ensureSidstackDir(projectPath);
-    const okrsPath = path.join(projectPath, '.sidstack', 'project-okrs.json');
-    await fs.writeFile(okrsPath, JSON.stringify(req.body, null, 2), 'utf-8');
+
+    const projectId = await resolveProjectIdFromPath(projectPath);
+    const repo = await getRepository();
+    const result = await repo.knowledge.list(projectId, { type: 'okr', limit: 1 });
+    const docs = result.documents || [];
+
+    const content = JSON.stringify(req.body, null, 2);
+    const title = req.body.title || `OKRs ${req.body.year || ''}`.trim();
+
+    if (docs.length > 0) {
+      await repo.knowledge.update(docs[0].id, { content });
+    } else {
+      await repo.knowledge.create({
+        projectId,
+        title,
+        type: 'okr',
+        status: 'active',
+        content,
+        slug: 'project-okrs',
+        source: 'manual',
+        sourcePath: '',
+        tags: req.body.year ? [String(req.body.year)] : [],
+      });
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('[okrs:put] Error:', error);
@@ -205,14 +249,14 @@ projectsApiRouter.put('/okrs', async (req, res) => {
 // Get project by path
 projectsApiRouter.get('/by-path', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const path = req.query.path as string;
 
     if (!path) {
       return res.status(400).json({ error: 'Path query parameter is required' });
     }
 
-    const project = db.getProjectByPath(path);
+    const project = await repo.projects.getByPath(path);
 
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
@@ -231,8 +275,8 @@ projectsApiRouter.get('/by-path', async (req, res) => {
 // List projects
 projectsApiRouter.get('/', async (req, res) => {
   try {
-    const db = await getDB();
-    const projects = db.listProjects();
+    const repo = await getRepository();
+    const projects = await repo.projects.list();
     res.json({ projects });
   } catch (error) {
     res.status(500).json({ error: 'Failed to list projects' });
@@ -242,7 +286,7 @@ projectsApiRouter.get('/', async (req, res) => {
 // Create project
 projectsApiRouter.post('/', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id, name, path, status = 'active' } = req.body;
 
     if (!id || !name || !path) {
@@ -250,12 +294,12 @@ projectsApiRouter.post('/', async (req, res) => {
     }
 
     // Check if project exists
-    const existing = db.getProject(id);
+    const existing = await repo.projects.get(id);
     if (existing) {
       return res.status(409).json({ error: 'Project already exists' });
     }
 
-    const project = db.createProject({ id, name, path, status });
+    const project = await repo.projects.create({ id, name, path, status });
     res.status(201).json({ project });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create project' });
@@ -269,15 +313,15 @@ projectsApiRouter.post('/', async (req, res) => {
 // Get project by ID
 projectsApiRouter.get('/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const project = db.getProject(req.params.id);
+    const repo = await getRepository();
+    const project = await repo.projects.get(req.params.id);
 
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
     // Get project tasks
-    const result = db.listTasks(req.params.id, { fields: 'standard' });
+    const result = await repo.tasks.list(req.params.id, { fields: 'standard' });
 
     res.json({ project, tasks: result.tasks });
   } catch (error) {

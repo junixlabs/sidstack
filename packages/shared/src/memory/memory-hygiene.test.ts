@@ -2,11 +2,11 @@
  * Memory Hygiene Tests
  *
  * Unit tests for TTL expiry helpers, conflict detection (addSmart),
- * and the Mem0Client update/addSmart methods.
+ * and the SidMemoClient update/addSmart methods.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { computeExpiresAt, isMemoryExpired, MEMORY_TTL_MS } from './types';
-import type { Mem0Memory } from './types';
+import type { Mem0Memory, SidMemoMemory, SidMemoSearchResult } from './types';
 
 // ============================================================
 // TTL Helpers
@@ -75,6 +75,18 @@ describe('isMemoryExpired', () => {
     };
     expect(isMemoryExpired(mem)).toBe(true);
   });
+
+  it('works with SidMemoMemory (metadata_ field)', () => {
+    const past = new Date(Date.now() - 86400000).toISOString();
+    const mem: SidMemoMemory = {
+      id: '1',
+      content: 'test',
+      metadata_: { expiresAt: past },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    expect(isMemoryExpired(mem)).toBe(true);
+  });
 });
 
 describe('MEMORY_TTL_MS', () => {
@@ -94,23 +106,36 @@ describe('MEMORY_TTL_MS', () => {
 });
 
 // ============================================================
-// Mem0Client.addSmart (mock-based)
+// SidMemoClient.addSmart (mock-based)
 // ============================================================
 
-describe('Mem0Client.addSmart', () => {
-  // We test through the actual class but mock fetch
-  let client: InstanceType<typeof import('./client').Mem0Client>;
+const makeMockMemory = (overrides: Partial<SidMemoMemory> = {}): SidMemoMemory => ({
+  id: 'new-1',
+  content: 'test content',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  ...overrides,
+});
+
+const makeMockSearchResult = (overrides: Partial<SidMemoSearchResult> = {}): SidMemoSearchResult => ({
+  id: 'result-1',
+  content: 'test content',
+  ...overrides,
+});
+
+describe('SidMemoClient.addSmart', () => {
+  let client: InstanceType<typeof import('./client').SidMemoClient>;
 
   beforeEach(async () => {
-    const { Mem0Client } = await import('./client.js');
-    client = new Mem0Client({ baseUrl: 'http://localhost:9999' });
+    const { SidMemoClient } = await import('./client.js');
+    client = new SidMemoClient({ baseUrl: 'http://localhost:9999', apiKey: 'test' });
 
     // Mark as available
     (client as any).available = true;
   });
 
   it('adds without conflict search when no sourceType in metadata', async () => {
-    const addSpy = vi.spyOn(client, 'add').mockResolvedValue({ id: 'new-1' });
+    const addSpy = vi.spyOn(client, 'add').mockResolvedValue(makeMockMemory());
     const searchSpy = vi.spyOn(client, 'search').mockResolvedValue([]);
 
     const result = await client.addSmart('some content', 'proj-1');
@@ -121,16 +146,16 @@ describe('Mem0Client.addSmart', () => {
   });
 
   it('searches and replaces conflicting memory with same sourceType', async () => {
-    const conflicting: Mem0Memory = {
+    const conflicting = makeMockSearchResult({
       id: 'old-1',
-      memory: 'old content',
+      content: 'old content',
       score: 0.92,
-      metadata: { sourceType: 'task_completion' },
-    };
+      metadata_: { sourceType: 'task_completion' },
+    });
 
     vi.spyOn(client, 'search').mockResolvedValue([conflicting]);
-    const deleteSpy = vi.spyOn(client, 'delete').mockResolvedValue(true);
-    vi.spyOn(client, 'add').mockResolvedValue({ id: 'new-1' });
+    const deleteSpy = vi.spyOn(client, 'delete').mockResolvedValue(undefined);
+    vi.spyOn(client, 'add').mockResolvedValue(makeMockMemory());
 
     const result = await client.addSmart('updated content', 'proj-1', {
       sourceType: 'task_completion',
@@ -141,16 +166,16 @@ describe('Mem0Client.addSmart', () => {
   });
 
   it('does NOT replace memory below threshold', async () => {
-    const similar: Mem0Memory = {
+    const similar = makeMockSearchResult({
       id: 'similar-1',
-      memory: 'similar but different',
+      content: 'similar but different',
       score: 0.70,
-      metadata: { sourceType: 'task_completion' },
-    };
+      metadata_: { sourceType: 'task_completion' },
+    });
 
     vi.spyOn(client, 'search').mockResolvedValue([similar]);
-    const deleteSpy = vi.spyOn(client, 'delete').mockResolvedValue(true);
-    vi.spyOn(client, 'add').mockResolvedValue({ id: 'new-1' });
+    const deleteSpy = vi.spyOn(client, 'delete').mockResolvedValue(undefined);
+    vi.spyOn(client, 'add').mockResolvedValue(makeMockMemory());
 
     const result = await client.addSmart('new content', 'proj-1', {
       sourceType: 'task_completion',
@@ -161,16 +186,16 @@ describe('Mem0Client.addSmart', () => {
   });
 
   it('does NOT replace memory with different sourceType', async () => {
-    const different: Mem0Memory = {
+    const different = makeMockSearchResult({
       id: 'diff-1',
-      memory: 'same topic',
+      content: 'same topic',
       score: 0.95,
-      metadata: { sourceType: 'lesson' },
-    };
+      metadata_: { sourceType: 'lesson' },
+    });
 
     vi.spyOn(client, 'search').mockResolvedValue([different]);
-    const deleteSpy = vi.spyOn(client, 'delete').mockResolvedValue(true);
-    vi.spyOn(client, 'add').mockResolvedValue({ id: 'new-1' });
+    const deleteSpy = vi.spyOn(client, 'delete').mockResolvedValue(undefined);
+    vi.spyOn(client, 'add').mockResolvedValue(makeMockMemory());
 
     const result = await client.addSmart('new content', 'proj-1', {
       sourceType: 'task_completion',
@@ -182,7 +207,7 @@ describe('Mem0Client.addSmart', () => {
 
   it('stamps expiresAt for task_completion', async () => {
     vi.spyOn(client, 'search').mockResolvedValue([]);
-    const addSpy = vi.spyOn(client, 'add').mockResolvedValue({ id: 'new-1' });
+    const addSpy = vi.spyOn(client, 'add').mockResolvedValue(makeMockMemory());
 
     await client.addSmart('task done', 'proj-1', {
       sourceType: 'task_completion',
@@ -197,7 +222,7 @@ describe('Mem0Client.addSmart', () => {
 
   it('does NOT stamp expiresAt for manual/lesson/knowledge_doc', async () => {
     vi.spyOn(client, 'search').mockResolvedValue([]);
-    const addSpy = vi.spyOn(client, 'add').mockResolvedValue({ id: 'new-1' });
+    const addSpy = vi.spyOn(client, 'add').mockResolvedValue(makeMockMemory());
 
     await client.addSmart('user note', 'proj-1', { sourceType: 'manual' });
 
@@ -206,16 +231,16 @@ describe('Mem0Client.addSmart', () => {
   });
 
   it('respects custom conflictThreshold', async () => {
-    const borderline: Mem0Memory = {
+    const borderline = makeMockSearchResult({
       id: 'border-1',
-      memory: 'borderline similar',
+      content: 'borderline similar',
       score: 0.80,
-      metadata: { sourceType: 'task_completion' },
-    };
+      metadata_: { sourceType: 'task_completion' },
+    });
 
     vi.spyOn(client, 'search').mockResolvedValue([borderline]);
-    const deleteSpy = vi.spyOn(client, 'delete').mockResolvedValue(true);
-    vi.spyOn(client, 'add').mockResolvedValue({ id: 'new-1' });
+    const deleteSpy = vi.spyOn(client, 'delete').mockResolvedValue(undefined);
+    vi.spyOn(client, 'add').mockResolvedValue(makeMockMemory());
 
     // Default threshold 0.85 → no replace
     const r1 = await client.addSmart('new', 'proj-1', { sourceType: 'task_completion' });
@@ -229,7 +254,7 @@ describe('Mem0Client.addSmart', () => {
 
   it('continues adding even if search fails', async () => {
     vi.spyOn(client, 'search').mockRejectedValue(new Error('network error'));
-    const addSpy = vi.spyOn(client, 'add').mockResolvedValue({ id: 'new-1' });
+    const addSpy = vi.spyOn(client, 'add').mockResolvedValue(makeMockMemory({ id: 'new-1' }));
 
     const result = await client.addSmart('content', 'proj-1', {
       sourceType: 'task_completion',
@@ -237,6 +262,6 @@ describe('Mem0Client.addSmart', () => {
 
     expect(addSpy).toHaveBeenCalled();
     expect(result.replaced).toEqual([]);
-    expect(result.result).toEqual({ id: 'new-1' });
+    expect(result.result.id).toBe('new-1');
   });
 });

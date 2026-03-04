@@ -8,7 +8,7 @@ Welcome to SidStack's documentation. SidStack is an AI-Powered Project Intellige
 
 - **[QUICK_START.md](QUICK_START.md)** - Get from zero to productive
 - **[GETTING_STARTED.md](GETTING_STARTED.md)** - Detailed setup guide with governance
-- **[CLAUDE_CODE_INTEGRATION.md](CLAUDE_CODE_INTEGRATION.md)** - MCP tools reference
+- **[CLAUDE_CODE_INTEGRATION.md](CLAUDE_CODE_INTEGRATION.md)** - MCP tools reference (49 tools)
 - **[API_REFERENCE.md](API_REFERENCE.md)** - REST API documentation
 
 ---
@@ -21,13 +21,18 @@ Welcome to SidStack's documentation. SidStack is an AI-Powered Project Intellige
 
 ## Current Sprint
 
-- **[ROADMAP_Q1_2026.md](ROADMAP_Q1_2026.md)** - Active development plan and priorities
+- **[ROADMAP_Q1_2026.md](ROADMAP_Q1_2026.md)** - Development plan and priorities
 
 ---
 
 ## Feature Guides
 
-- **[IMPACT_ANALYSIS.md](IMPACT_ANALYSIS.md)** - Change impact analyzer documentation
+- **[Knowledge Browser](guides/knowledge-browser.md)** - 9-category knowledge system
+- **[Project Hub](guides/project-hub.md)** - Central dashboard navigation
+- **[Task Management](guides/task-management.md)** - Task lifecycle and governance
+- **[Ticket Queue](guides/ticket-queue.md)** - External ticket intake
+- **[Training Room](guides/training-room.md)** - Incident-lesson-skill-rule pipeline
+- **[Impact Analysis](IMPACT_ANALYSIS.md)** - Change impact analyzer
 - **[DEMO_SCENARIOS.md](DEMO_SCENARIOS.md)** - Step-by-step demo scenarios
 
 ---
@@ -52,12 +57,12 @@ Welcome to SidStack's documentation. SidStack is an AI-Powered Project Intellige
 | QUICK_START.md | Current | 2026-02 |
 | GETTING_STARTED.md | Current | 2026-02 |
 | CLAUDE_CODE_INTEGRATION.md | Current | 2026-02 |
-| API_REFERENCE.md | Current | 2026-01 |
-| PRODUCT_STRATEGY.md | Current | 2026-02 |
-| ROADMAP_Q1_2026.md | Current | 2026-01 |
+| API_REFERENCE.md | Current | 2026-02 |
+| PRODUCT_STRATEGY.md | Needs Review | 2026-01 |
+| ROADMAP_Q1_2026.md | Needs Review | 2026-02 |
 | IMPACT_ANALYSIS.md | Current | 2026-01 |
 | DEMO_SCENARIOS.md | Current | 2026-02 |
-| TECHNICAL_DEBT.md | Current | 2026-01 |
+| TECHNICAL_DEBT.md | Current | 2026-02 |
 | ADR-002 | Accepted | 2025-11 |
 | ADR-004 | Accepted | 2025-11 |
 
@@ -72,9 +77,11 @@ Welcome to SidStack's documentation. SidStack is an AI-Powered Project Intellige
 | CLI | Oclif (TypeScript) |
 | MCP Server | TypeScript (@modelcontextprotocol/sdk) |
 | API Server | Express.js |
+| Bot Server | Express.js + Gemini |
 | Database | SQLite (better-sqlite3) |
 | State | Zustand (React) |
 | Styling | Tailwind CSS |
+| Memory | mem0 (optional, via Docker) |
 | Deployment | Docker Compose + Caddy (auto TLS) |
 
 ---

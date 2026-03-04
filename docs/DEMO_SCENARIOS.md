@@ -10,7 +10,7 @@ Step-by-step scenarios showcasing SidStack's key features.
 
 ### Steps
 
-1. **Open Task Manager** (`⌘2`)
+1. **Open Task Manager** (`Cmd+2`)
 2. **Create task** via API or MCP:
    ```bash
    curl -X POST http://localhost:19432/api/tasks \
@@ -18,17 +18,13 @@ Step-by-step scenarios showcasing SidStack's key features.
      -d '{"title": "Add user avatar upload", "projectId": "demo", "priority": "high", "taskType": "feature"}'
    ```
 3. **View in Kanban** - task appears in "Todo" column
-4. **Switch views** - toggle between Kanban, Tree, and List views
-5. **Launch Claude session** from task context menu:
-   ```
-   Right-click task → "Launch Claude Session"
-   ```
-6. **Track progress** - session status updates in Sessions view
-7. **Complete task** - move to "Done" column or update via API
+4. **Switch views** - toggle between Kanban, List, and Timeline views
+5. **Track progress** - update status via MCP or API
+6. **Complete task** - move to "Done" column or update via API
 
 ### What to highlight
-- Three view modes (Kanban, Tree, List)
-- Task-to-session integration
+- Three view modes (Kanban, List, Timeline)
+- Task governance and quality gates
 - Real-time status tracking
 
 ---
@@ -53,16 +49,17 @@ Step-by-step scenarios showcasing SidStack's key features.
        "externalId": "JIRA-456"
      }'
    ```
-2. **Open Ticket Queue** (`⌘4`)
+2. **Open Ticket Queue** (`Cmd+4`)
 3. **Review ticket** - click to see details, description, external ID
 4. **Change status** to "reviewing" then "approved"
 5. **Convert to task** - click "Convert to Task" button
-6. **Verify** - task appears in Task Manager (`⌘2`)
+6. **Verify** - task appears in Task Manager (`Cmd+2`)
 
 ### What to highlight
 - External ticket intake via API
 - Review workflow (new → reviewing → approved)
 - One-click conversion to task
+- Auto-complete ticket when linked task completes
 
 ---
 
@@ -72,47 +69,48 @@ Step-by-step scenarios showcasing SidStack's key features.
 
 ### Steps
 
-1. **Open Project Hub** (`⌘1`)
-2. **View project stats** - module count, active tasks, sessions, knowledge documents
-3. **Browse recent activity** - latest actions across all features
+1. **Open Project Hub** (`Cmd+1`)
+2. **View project stats** - module count, active tasks, knowledge documents
+3. **Check OKR progress** - objectives and key results
 4. **Click quick actions** - jump to any feature:
    - Task Manager - create and track tasks
    - Knowledge Browser - browse project documentation
    - Ticket Queue - manage external tickets
    - Training Room - view lessons learned
-   - Sessions - manage Claude Code sessions
-5. **Check workspace status** - see Worktree Status in sidebar
-6. **Switch features** - use sidebar navigation or keyboard shortcuts
+   - Agent Desk - manage agent workspaces
+5. **Switch features** - use sidebar navigation or keyboard shortcuts
 
 ### What to highlight
 - Central dashboard with unified view
 - Quick access to all features
-- Real-time project stats and activity
+- OKR progress tracking
 
 ---
 
-## Scenario 4: Claude Session Management
+## Scenario 4: Agent Desk (Workspace Isolation)
 
-**Goal**: Launch, track, and manage Claude Code sessions.
+**Goal**: Set up isolated agent workspaces using git worktrees.
 
 ### Steps
 
-1. **Open Task Manager** (`⌘2`)
-2. **Launch new session**:
-   - Click "Launch Session" button
-   - Select workspace path
-   - Enter prompt: "Fix the Safari login bug"
-   - Optionally link to a task
-   - Choose terminal (iTerm, Terminal.app, Warp, etc.)
-3. **Observe session launch** - new terminal window opens with Claude Code
-4. **Track session** - status shows "active" with duration timer
-5. **View session details** - click session card for event timeline
-6. **Resume session** - click "Resume" to continue previous work
+1. **Create workspace** via CLI:
+   ```bash
+   npx @sidstack/cli new my-project
+   ```
+2. **Add agent desks**:
+   ```bash
+   npx @sidstack/cli desk add worker-1 -b agent/worker-1 --role worker
+   npx @sidstack/cli desk add reviewer-1 -b agent/reviewer-1 --role reviewer
+   ```
+3. **Open Agent Desk view** in the desktop app
+4. **Acquire a desk** - MCP tool assigns a desk to an agent
+5. **View desk status** - see which agent is working on which desk
+6. **Release desk** when work is complete
 
 ### What to highlight
-- External terminal launch (real terminal, not embedded)
-- Session tracking with status and duration
-- Task-linked sessions for traceability
+- Isolated workspaces per agent via git worktrees
+- Shared `.sidstack/` knowledge across all desks
+- MCP tools for desk management (acquire/release)
 
 ---
 
@@ -122,33 +120,19 @@ Step-by-step scenarios showcasing SidStack's key features.
 
 ### Steps
 
-1. **Open Training Room** (`⌘5`)
-2. **Create training session**:
-   ```bash
-   curl -X POST http://localhost:19432/api/training/sessions/api-server \
-     -H "Content-Type: application/json" \
-     -d '{"projectPath": "/path/to/project"}'
+1. **Open Training Room** (`Cmd+5`)
+2. **Record an incident** via MCP:
    ```
-3. **Record an incident**:
-   ```bash
-   curl -X POST http://localhost:19432/api/training/incidents \
-     -H "Content-Type: application/json" \
-     -d '{
-       "sessionId": "<session-id>",
-       "title": "SQL injection in search endpoint",
-       "description": "User input was concatenated into SQL query without parameterization",
-       "type": "mistake",
-       "severity": "high"
-     }'
+   Create an incident report: SQL injection found in search endpoint
    ```
-4. **View incidents** in Training Room UI
-5. **Create lesson** from incident:
+3. **View incidents** in Training Room UI
+4. **Create lesson** from incident:
    - What went wrong
    - Root cause
    - Prevention steps
-6. **Create skill** from lesson:
+5. **Create skill** from lesson:
    - Reusable pattern for future agents
-7. **Create rule** for enforcement:
+6. **Create rule** for enforcement:
    - Auto-detect similar issues
 
 ### What to highlight
@@ -164,19 +148,16 @@ Step-by-step scenarios showcasing SidStack's key features.
 
 ### Steps
 
-1. **Open Knowledge Browser** (`⌘3`)
-2. **Browse by type** - filter by:
-   - Business Logic
-   - API Endpoints
-   - Design Patterns
-   - Database Schemas
-   - Module docs
+1. **Open Knowledge Browser** (`Cmd+3`)
+2. **Browse by category** - 9 categories:
+   - Context, Architecture, Decisions, Standards
+   - Data, API, Operations, Projects, Incidents
 3. **Search** - full-text search across all documents
 4. **View document** - markdown rendering with metadata
 5. **Filter by module** - see knowledge scoped to specific module
 
 ### What to highlight
-- Unified knowledge from multiple sources
+- 9-category knowledge organization
 - Type and module filtering
 - Searchable project documentation
 
@@ -194,13 +175,11 @@ Step-by-step scenarios showcasing SidStack's key features.
      -H "Content-Type: application/json" \
      -d '{"title": "Refactor authentication to use OAuth2", "projectId": "demo", "priority": "high", "taskType": "refactor"}'
    ```
-2. **Run impact analysis**:
-   ```bash
-   curl -X POST http://localhost:19432/api/impact/analyze \
-     -H "Content-Type: application/json" \
-     -d '{"taskId": "<task-id>", "projectPath": "/path/to/project"}'
+2. **Run impact analysis** via MCP:
    ```
-3. **View results** in Impact Analysis view:
+   Analyze the impact of refactoring to OAuth2
+   ```
+3. **View results**:
    - **Scope** - affected modules, files, dependencies
    - **Risks** - severity-rated risks with mitigation
    - **Validations** - checklist of tests and manual checks
@@ -239,7 +218,7 @@ Step-by-step scenarios showcasing SidStack's key features.
    ```
 5. **Observe agent behavior**:
    - Agent reads principles before starting
-   - Follows capability skill (implement/feature.md)
+   - Follows capability skill (sidstack-dev workflow)
    - Creates task, tracks progress
    - Runs quality gates before completing
 
@@ -254,11 +233,11 @@ Step-by-step scenarios showcasing SidStack's key features.
 
 For a quick overview, run these scenarios in order:
 
-1. **Project Hub** (30s) - Open `⌘1`, show stats and quick actions
-2. **Task Manager** (30s) - Open `⌘2`, show Kanban view, create a task
-3. **Session Launch** (30s) - Launch a Claude session from task
-4. **Ticket Queue** (30s) - Open `⌘4`, show ticket → task conversion
-5. **Knowledge Browser** (30s) - Open `⌘3`, search and browse docs
-6. **Training Room** (30s) - Open `⌘5`, show incident/lesson pipeline
+1. **Project Hub** (30s) - Open `Cmd+1`, show stats and quick actions
+2. **Task Manager** (30s) - Open `Cmd+2`, show Kanban view, create a task
+3. **Knowledge Browser** (30s) - Open `Cmd+3`, search and browse docs
+4. **Ticket Queue** (30s) - Open `Cmd+4`, show ticket → task conversion
+5. **Training Room** (30s) - Open `Cmd+5`, show incident/lesson pipeline
+6. **Agent Desk** (30s) - Show desk list, acquire/release flow
 7. **CLI Governance** (60s) - Run `sidstack governance show` + spawn agent
 8. **Impact Analysis** (60s) - Show risk analysis for a refactor task

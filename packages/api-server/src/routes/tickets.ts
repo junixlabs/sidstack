@@ -6,7 +6,7 @@
  */
 
 import { Router } from 'express';
-import { getDB } from '@sidstack/shared';
+import { getRepository } from '@sidstack/shared';
 import type {
   TicketStatus,
   TicketType,
@@ -24,7 +24,7 @@ export const ticketsRouter: Router = Router();
 // Create a new ticket
 ticketsRouter.post('/', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       projectId,
       externalId,
@@ -47,7 +47,7 @@ ticketsRouter.post('/', async (req, res) => {
 
     // Check if ticket with same externalId already exists
     if (externalId) {
-      const existing = db.getTicketByExternalId(externalId, projectId);
+      const existing = await repo.tickets.getByExternalId(externalId, projectId);
       if (existing) {
         return res.status(409).json({
           error: 'Ticket with this externalId already exists',
@@ -57,17 +57,14 @@ ticketsRouter.post('/', async (req, res) => {
     }
 
     // Ensure project exists
-    let project = db.getProject(projectId);
+    const project = await repo.projects.get(projectId);
     if (!project) {
-      project = db.createProject({
-        id: projectId,
-        name: projectId,
-        path: process.cwd(),
-        status: 'active',
+      return res.status(400).json({
+        error: `Project "${projectId}" not found. Register it first via sidstack init or the projects API.`,
       });
     }
 
-    const ticket = db.createTicket({
+    const ticket = await repo.tickets.create({
       projectId,
       externalId,
       source: source as TicketSource,
@@ -112,7 +109,7 @@ ticketsRouter.post('/', async (req, res) => {
 // List tickets with filters
 ticketsRouter.get('/', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
 
     const projectId = (req.query.projectId as string) || 'default';
     const status = req.query.status as TicketStatus | TicketStatus[] | undefined;
@@ -121,7 +118,7 @@ ticketsRouter.get('/', async (req, res) => {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
 
-    const tickets = db.listTickets(projectId, { status, type, priority, limit, offset });
+    const tickets = await repo.tickets.list(projectId, { status, type, priority, limit, offset });
 
     // Parse JSON fields for response
     const parsed = tickets.map((t) => ({
@@ -132,7 +129,7 @@ ticketsRouter.get('/', async (req, res) => {
       externalUrls: JSON.parse(t.externalUrls),
     }));
 
-    const total = db.countTickets(projectId);
+    const total = await repo.tickets.count(projectId);
 
     res.json({ success: true, tickets: parsed, total });
   } catch (error) {
@@ -144,8 +141,8 @@ ticketsRouter.get('/', async (req, res) => {
 // Get ticket by ID
 ticketsRouter.get('/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const ticket = db.getTicket(req.params.id);
+    const repo = await getRepository();
+    const ticket = await repo.tickets.get(req.params.id);
 
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
@@ -170,7 +167,7 @@ ticketsRouter.get('/:id', async (req, res) => {
 // Update ticket
 ticketsRouter.patch('/:id', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       title,
       description,
@@ -201,7 +198,7 @@ ticketsRouter.patch('/:id', async (req, res) => {
     if (sessionId !== undefined) updates.sessionId = sessionId;
     if (assignee !== undefined) updates.assignee = assignee;
 
-    const ticket = db.updateTicket(req.params.id, updates);
+    const ticket = await repo.tickets.update(req.params.id, updates);
 
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
@@ -235,14 +232,14 @@ ticketsRouter.patch('/:id', async (req, res) => {
 // Delete ticket
 ticketsRouter.delete('/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const ticket = db.getTicket(req.params.id);
+    const repo = await getRepository();
+    const ticket = await repo.tickets.get(req.params.id);
 
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    db.deleteTicket(req.params.id);
+    await repo.tickets.delete(req.params.id);
     res.json({ success: true, message: 'Ticket deleted' });
   } catch (error) {
     console.error('Failed to delete ticket:', error);
@@ -257,8 +254,8 @@ ticketsRouter.delete('/:id', async (req, res) => {
 // Convert ticket to task
 ticketsRouter.post('/:id/convert-to-task', async (req, res) => {
   try {
-    const db = await getDB();
-    const ticket = db.getTicket(req.params.id);
+    const repo = await getRepository();
+    const ticket = await repo.tickets.get(req.params.id);
 
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
@@ -266,7 +263,7 @@ ticketsRouter.post('/:id/convert-to-task', async (req, res) => {
 
     // Check if already converted
     if (ticket.taskId) {
-      const existingTask = db.getTask(ticket.taskId);
+      const existingTask = await repo.tasks.get(ticket.taskId);
       if (existingTask) {
         return res.status(409).json({
           error: 'Ticket already converted to task',
@@ -285,7 +282,7 @@ ticketsRouter.post('/:id/convert-to-task', async (req, res) => {
     };
 
     // Create task from ticket
-    const task = db.createTask({
+    const task = await repo.tasks.create({
       projectId: ticket.projectId,
       title: `[${taskTypeMap[ticket.type as TicketType].toUpperCase()}] ${ticket.title}`,
       description: `From ticket: ${ticket.externalId || ticket.id}\n\n${ticket.description}`,
@@ -296,7 +293,7 @@ ticketsRouter.post('/:id/convert-to-task', async (req, res) => {
     });
 
     // Link ticket to task
-    db.updateTicket(ticket.id, {
+    await repo.tickets.update(ticket.id, {
       taskId: task.id,
       status: 'approved',
     });
@@ -315,4 +312,3 @@ ticketsRouter.post('/:id/convert-to-task', async (req, res) => {
     res.status(500).json({ error: 'Failed to convert ticket to task' });
   }
 });
-

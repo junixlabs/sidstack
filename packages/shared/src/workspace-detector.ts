@@ -83,7 +83,7 @@ export interface DetectWorkspaceOptions {
 const SIDSTACK_DIR = '.sidstack';
 const SIDSTACK_LOCAL_DIR = '.sidstack-local';
 const CONFIG_FILE = 'config.json';
-const DESKS_DIR = 'desks';
+const DESKS_DIR = '.desks';
 const DEFAULT_MAX_DEPTH = 20;
 
 // In-memory cache for detectWorkspace() results to avoid repeated filesystem walks

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import {
-  getDB,
+  getRepository,
   type TaskType,
   resolveGovernance,
   inferTaskType,
@@ -19,9 +19,9 @@ export const tasksRouter: Router = Router();
 // List tasks — unified endpoint with fields param
 tasksRouter.get('/', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const projectId = (req.query.projectId as string) || 'default';
-    const result = db.listTasks(projectId, {
+    const result = await repo.tasks.list(projectId, {
       preset: req.query.preset as any,
       status: req.query.status ? (req.query.status as string).split(',') : undefined,
       taskType: req.query.taskType ? (req.query.taskType as string).split(',') : undefined,
@@ -43,8 +43,8 @@ tasksRouter.get('/', async (req, res) => {
 // Get task by ID
 tasksRouter.get('/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const task = db.getTask(req.params.id);
+    const repo = await getRepository();
+    const task = await repo.tasks.get(req.params.id);
 
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
@@ -59,7 +59,7 @@ tasksRouter.get('/:id', async (req, res) => {
 // Create task with governance
 tasksRouter.post('/', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       title,
       description,
@@ -121,17 +121,14 @@ tasksRouter.post('/', async (req, res) => {
     const criteriaValid = !governance.requiredCriteria || acceptanceCriteria.length > 0;
 
     // Ensure project exists
-    let project = db.getProject(projectId);
+    const project = await repo.projects.get(projectId);
     if (!project) {
-      project = db.createProject({
-        id: projectId,
-        name: projectId,
-        path: process.cwd(),
-        status: 'active',
+      return res.status(400).json({
+        error: `Project "${projectId}" not found. Register it first via sidstack init or the projects API.`,
       });
     }
 
-    const task = db.createTask({
+    const task = await repo.tasks.create({
       projectId,
       title: normalizedTitle,
       description: description || '',
@@ -183,11 +180,11 @@ tasksRouter.post('/', async (req, res) => {
 // Update task
 tasksRouter.patch('/:id', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { status, progress, notes, moduleId, assignedAgent, branch, solutionPlan, planStatus, planReviewNotes, implementSummary } = req.body;
     const taskId = req.params.id;
 
-    const currentTask = db.getTask(taskId);
+    const currentTask = await repo.tasks.get(taskId);
     if (!currentTask) {
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -226,7 +223,7 @@ tasksRouter.patch('/:id', async (req, res) => {
 
     // Validate subtasks when completing a task
     if (status === 'completed') {
-      const subtasks = db.getSubtasks(taskId);
+      const subtasks = await repo.tasks.getSubtasks(taskId);
       if (subtasks.length > 0) {
         const subtaskValidation = validateSubtasksForCompletion(
           subtasks.map(s => ({
@@ -275,7 +272,7 @@ tasksRouter.patch('/:id', async (req, res) => {
     }
     if (planReviewNotes !== undefined) updates.planReviewNotes = planReviewNotes;
 
-    const task = db.updateTask(taskId, updates as any);
+    const task = await repo.tasks.update(taskId, updates as any);
 
     if (task) {
       emitSseEvent({
@@ -297,17 +294,18 @@ tasksRouter.patch('/:id', async (req, res) => {
 // Create subtasks (breakdown)
 tasksRouter.post('/:id/breakdown', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const parentTaskId = req.params.id;
     const { subtasks } = req.body;
 
-    const parentTask = db.getTask(parentTaskId);
+    const parentTask = await repo.tasks.get(parentTaskId);
     if (!parentTask) {
       return res.status(404).json({ error: 'Parent task not found' });
     }
 
-    const createdSubtasks = (subtasks as any[]).map((st) => {
-      return db.createTask({
+    const createdSubtasks = [];
+    for (const st of subtasks as any[]) {
+      const created = await repo.tasks.create({
         projectId: parentTask.projectId,
         parentTaskId,
         title: st.title,
@@ -316,7 +314,8 @@ tasksRouter.post('/:id/breakdown', async (req, res) => {
         priority: st.priority || 'medium',
         createdBy: 'orchestrator',
       });
-    });
+      createdSubtasks.push(created);
+    }
 
     res.status(201).json({ parentTaskId, subtasks: createdSubtasks });
   } catch (error) {
@@ -327,15 +326,15 @@ tasksRouter.post('/:id/breakdown', async (req, res) => {
 // Get task progress history
 tasksRouter.get('/:id/progress', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const taskId = req.params.id;
 
-    const task = db.getTask(taskId);
+    const task = await repo.tasks.get(taskId);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
-    const history = db.getTaskProgressHistory(taskId);
+    const history = await repo.tasks.getProgressHistory(taskId);
     res.json({ task, progressHistory: history });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get task progress' });
@@ -345,10 +344,10 @@ tasksRouter.get('/:id/progress', async (req, res) => {
 // Get task governance info
 tasksRouter.get('/:id/governance', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const taskId = req.params.id;
 
-    const task = db.getTask(taskId);
+    const task = await repo.tasks.get(taskId);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -373,16 +372,16 @@ tasksRouter.get('/:id/governance', async (req, res) => {
 // Check task completion requirements
 tasksRouter.post('/:id/check', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const taskId = req.params.id;
 
-    const task = db.getTask(taskId);
+    const task = await repo.tasks.get(taskId);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
     // Get progress history for this task
-    const progressHistory = db.getTaskProgressHistory(taskId);
+    const progressHistory = await repo.tasks.getProgressHistory(taskId);
     const progressEntries: ProgressLogEntry[] = progressHistory.map(p => ({
       id: p.id,
       taskId: p.taskId,
@@ -419,17 +418,17 @@ tasksRouter.post('/:id/check', async (req, res) => {
 // Complete task with validation
 tasksRouter.post('/:id/complete', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const taskId = req.params.id;
     const { force = false, reason, agentId } = req.body;
 
-    const task = db.getTask(taskId);
+    const task = await repo.tasks.get(taskId);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
     // Get progress history
-    const progressHistory = db.getTaskProgressHistory(taskId);
+    const progressHistory = await repo.tasks.getProgressHistory(taskId);
     const progressEntries: ProgressLogEntry[] = progressHistory.map(p => ({
       id: p.id,
       taskId: p.taskId,
@@ -479,7 +478,7 @@ tasksRouter.post('/:id/complete', async (req, res) => {
         reason,
         agentId
       );
-      const dbViolation = db.logGovernanceViolation({
+      const dbViolation = await repo.tasks.logViolation({
         taskId: violation.taskId,
         violationType: violation.violationType,
         blockers: JSON.stringify(violation.blockers),
@@ -493,7 +492,7 @@ tasksRouter.post('/:id/complete', async (req, res) => {
     }
 
     // Update task to completed
-    const updatedTask = db.updateTask(taskId, {
+    const updatedTask = await repo.tasks.update(taskId, {
       status: 'completed',
       progress: 100,
       validation: JSON.stringify({
@@ -508,9 +507,9 @@ tasksRouter.post('/:id/complete', async (req, res) => {
     // Auto-complete linked ticket if this task was created from a ticket
     let linkedTicketCompleted: string | undefined;
     try {
-      const linkedTicket = db.getTicketByTaskId(taskId);
+      const linkedTicket = await repo.tickets.getByTaskId(taskId);
       if (linkedTicket && linkedTicket.status !== 'completed' && linkedTicket.status !== 'rejected') {
-        db.updateTicket(linkedTicket.id, { status: 'completed' });
+        await repo.tickets.update(linkedTicket.id, { status: 'completed' });
         linkedTicketCompleted = linkedTicket.id;
       }
     } catch {

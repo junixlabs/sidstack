@@ -11,7 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-// Set up temp directory BEFORE importing app (which triggers getDB on first request)
+// Set up temp directory BEFORE importing app (which triggers DB init on first request)
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sidstack-test-'));
 const sidstackDir = path.join(tmpDir, '.sidstack');
 fs.mkdirSync(sidstackDir, { recursive: true });

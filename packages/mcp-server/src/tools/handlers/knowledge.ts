@@ -15,12 +15,11 @@ import {
   createApiClient,
   ALL_DOCUMENT_TYPES,
   type DocumentType,
-  type Mem0Memory,
   // Workspace detection
   detectWorkspace,
 } from '@sidstack/shared';
 import { validateProjectPath } from './validate-path.js';
-import { getMem0ClientIfAvailable } from './memory.js';
+import { getSidMemoClientIfAvailable, getKnowledgeIndexer } from './memory.js';
 import * as path from 'path';
 
 // =============================================================================
@@ -168,13 +167,17 @@ export const knowledgeTools = [
   },
   {
     name: 'knowledge_context',
-    description: 'Build session context for Claude from linked entities (task, module, spec, ticket). Returns formatted markdown ready for injection.',
+    description: 'Build session context for Claude from linked entities (task, module, spec, ticket) and/or semantic query. When query is provided, returns chunk-level RAG context with Knowledge Graph enrichment. Returns formatted markdown ready for injection.',
     inputSchema: {
       type: 'object',
       properties: {
         projectPath: {
           type: 'string',
           description: 'Path to the project directory',
+        },
+        query: {
+          type: 'string',
+          description: 'Semantic query for RAG context (searches knowledge chunks via vector similarity)',
         },
         taskId: {
           type: 'string',
@@ -203,7 +206,7 @@ export const knowledgeTools = [
   },
   {
     name: 'knowledge_modules',
-    description: 'List all modules with their knowledge document counts and types.',
+    description: 'List all modules with enriched details: document counts by type, health score, dependencies, last updated. Modules are knowledge documents of type "module" — use knowledge_create with type "module" to define new modules.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -216,8 +219,26 @@ export const knowledgeTools = [
     },
   },
   {
+    name: 'knowledge_module_overview',
+    description: 'Get full overview for a module: definition, all documents grouped by type, dependencies (dependsOn/dependedBy/related), and health score with coverage gaps. Use this to understand a module before working on it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: {
+          type: 'string',
+          description: 'Path to the project directory',
+        },
+        moduleId: {
+          type: 'string',
+          description: 'Module ID (matches the module field value on knowledge documents)',
+        },
+      },
+      required: ['projectPath', 'moduleId'],
+    },
+  },
+  {
     name: 'knowledge_create',
-    description: 'Create a new knowledge document. Writes a markdown file with YAML frontmatter to .sidstack/knowledge/.',
+    description: 'Create a new knowledge document in the database. Returns the created document with ID.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -281,7 +302,7 @@ export const knowledgeTools = [
   },
   {
     name: 'knowledge_update',
-    description: 'Update an existing knowledge document. Merges updates into frontmatter and optionally replaces content.',
+    description: 'Update an existing knowledge document in the database. Merges provided fields into the existing document.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -340,7 +361,7 @@ export const knowledgeTools = [
   },
   {
     name: 'knowledge_delete',
-    description: 'Delete (archive) a knowledge document. By default moves to .sidstack/.archive/.',
+    description: 'Delete or archive a knowledge document in the database. Defaults to archive (soft delete).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -530,19 +551,18 @@ export async function handleKnowledgeSearch(args: {
       results = results.filter((d: any) => args.type!.includes(d.type));
     }
 
-    // Semantic search via mem0 (non-blocking, graceful degradation)
-    let semanticMatches: Array<{ memory: string; score?: number; metadata?: Record<string, unknown> }> = [];
+    // Semantic search via SidMemo (non-blocking, graceful degradation)
+    let semanticMatches: Array<{ content: string; score?: number; metadata?: Record<string, unknown> }> = [];
     try {
-      const mem0Client = await getMem0ClientIfAvailable();
-      if (mem0Client) {
-        // Derive projectId from workspace path
+      const sidmemoClient = await getSidMemoClientIfAvailable();
+      if (sidmemoClient) {
         const workspacePath = resolveWorkspacePath(args.projectPath);
         const projectId = path.basename(workspacePath);
-        const memories = await mem0Client.search(args.query, projectId, args.limit || 10);
+        const memories = await sidmemoClient.search(args.query, projectId, args.limit || 10, { sourceType: 'knowledge_chunk' });
         semanticMatches = memories.map(m => ({
-          memory: m.memory,
+          content: m.content,
           score: m.score,
-          metadata: m.metadata,
+          metadata: m.metadata_ as Record<string, unknown> | undefined,
         }));
       }
     } catch {
@@ -585,6 +605,7 @@ export async function handleKnowledgeSearch(args: {
 
 export async function handleKnowledgeContext(args: {
   projectPath: string;
+  query?: string;
   taskId?: string;
   moduleId?: string;
   specId?: string;
@@ -604,36 +625,36 @@ export async function handleKnowledgeContext(args: {
 
     const contextResult = await apiClient.knowledge.context(query);
 
-    // Semantic memory overlay via mem0 (non-blocking, graceful degradation)
+    // Semantic memory overlay via SidMemo (non-blocking, graceful degradation)
     let semanticSection = '';
     try {
-      const mem0Client = await getMem0ClientIfAvailable();
-      if (mem0Client) {
+      const sidmemoClient = await getSidMemoClientIfAvailable();
+      if (sidmemoClient) {
         const projectId = path.basename(resolveWorkspacePath(args.projectPath));
 
         // Build semantic query from context result, not just IDs
         const ctxText = typeof contextResult === 'string'
           ? contextResult
           : (contextResult.context || contextResult.prompt || '');
-        const searchQuery = ctxText
-          ? ctxText.substring(0, 200)
-          : (args.taskId || args.moduleId || args.specId || 'project context');
+        const searchQuery = args.query
+          || (ctxText ? ctxText.substring(0, 200) : '')
+          || args.taskId || args.moduleId || args.specId || 'project context';
 
         // Single search, partition client-side
-        const allMemories = await mem0Client.search(searchQuery, projectId, 10).catch(() => [] as Mem0Memory[]);
-        const memories = allMemories.filter(m => m.metadata?.sourceType !== 'validation_failure').slice(0, 5);
-        const failures = allMemories.filter(m => m.metadata?.sourceType === 'validation_failure').slice(0, 5);
+        const allMemories = await sidmemoClient.search(searchQuery, projectId, 10).catch(() => []);
+        const memories = allMemories.filter((m: any) => m.metadata_?.sourceType !== 'validation_failure').slice(0, 5);
+        const failures = allMemories.filter((m: any) => m.metadata_?.sourceType === 'validation_failure').slice(0, 5);
 
         if (memories.length > 0) {
-          semanticSection += '\n\n## Semantic Memories\n';
+          semanticSection += '\n\n## Relevant Knowledge\n';
           for (const m of memories) {
-            semanticSection += `- ${m.memory}\n`;
+            semanticSection += `- ${m.content}\n`;
           }
         }
         if (failures.length > 0) {
           semanticSection += '\n\n## Past Validation Failures\n';
           for (const f of failures) {
-            semanticSection += `- ${f.memory}\n`;
+            semanticSection += `- ${f.content}\n`;
           }
         }
       }
@@ -676,14 +697,22 @@ export async function handleKnowledgeModules(args: {
       projectPath: args.projectPath,
     });
 
-    // The API returns an array of { id, documentCount }
+    // API now returns enriched modules with details
     const moduleList = Array.isArray(modules) ? modules : [];
 
     return {
       success: true,
       modules: moduleList.map((m: any) => ({
         name: m.id || m.name,
+        title: m.title || m.id || m.name,
+        summary: m.summary,
         documentCount: m.documentCount || 0,
+        byType: m.byType || {},
+        healthScore: m.healthScore ?? 0,
+        lastUpdated: m.lastUpdated || '',
+        dependsOn: m.dependsOn || [],
+        related: m.related || [],
+        hasModuleDoc: m.hasModuleDoc ?? false,
       })),
       totalModules: moduleList.length,
       totalDocuments: moduleList.reduce((sum: number, m: any) => sum + (m.documentCount || 0), 0),
@@ -695,6 +724,38 @@ export async function handleKnowledgeModules(args: {
       modules: [],
       totalModules: 0,
       totalDocuments: 0,
+    };
+  }
+}
+
+export async function handleKnowledgeModuleOverview(args: {
+  projectPath: string;
+  moduleId: string;
+}) {
+  try {
+    validateProjectPath(args.projectPath);
+
+    if (!args.moduleId) {
+      return { success: false, error: 'moduleId is required' };
+    }
+
+    const overview = await apiClient.knowledge.moduleOverview({
+      projectPath: args.projectPath,
+      moduleId: args.moduleId,
+    });
+
+    if (!overview) {
+      return { success: false, error: `Module "${args.moduleId}" not found` };
+    }
+
+    return {
+      success: true,
+      ...overview,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get module overview',
     };
   }
 }
@@ -731,25 +792,12 @@ export async function handleKnowledgeCreate(args: {
       covers: args.covers,
     });
 
-    // Write-through: index new doc to mem0 (non-blocking)
+    // Write-through: index to SidMemo via chunker (non-blocking)
     try {
-      const mem0Client = await getMem0ClientIfAvailable();
-      if (mem0Client) {
+      const indexer = await getKnowledgeIndexer();
+      if (indexer) {
         const projectId = path.basename(resolveWorkspacePath(args.projectPath));
-        const memContent = [
-          `Title: ${args.title}`,
-          `Type: ${args.type}`,
-          args.module ? `Module: ${args.module}` : '',
-          args.tags?.length ? `Tags: ${args.tags.join(', ')}` : '',
-          '',
-          args.content,
-        ].filter(Boolean).join('\n');
-        await mem0Client.addSmart(memContent, projectId, {
-          sourceType: 'knowledge_doc',
-          docId: doc.id,
-          docType: args.type,
-          module: args.module,
-        });
+        indexer.indexDocument(doc, projectId).catch(() => {});
       }
     } catch {
       // Non-blocking: doc created successfully
@@ -804,34 +852,13 @@ export async function handleKnowledgeUpdate(args: {
       projectPath: args.projectPath,
     });
 
-    // Write-through: re-index to mem0 if content or title changed (non-blocking)
+    // Write-through: reindex to SidMemo if content or title changed (non-blocking)
     if (args.content || args.title) {
       try {
-        const mem0Client = await getMem0ClientIfAvailable();
-        if (mem0Client) {
+        const indexer = await getKnowledgeIndexer();
+        if (indexer) {
           const projectId = path.basename(resolveWorkspacePath(args.projectPath));
-          // Remove old memories for this doc
-          const existing = await mem0Client.search(args.docId, projectId, 10, { docId: args.docId }).catch(() => [] as Mem0Memory[]);
-          for (const mem of existing) {
-            await mem0Client.delete(mem.id, projectId).catch(() => {});
-          }
-          // Re-index with updated content
-          if (args.content) {
-            const memContent = [
-              `Title: ${args.title || doc.title}`,
-              `Type: ${doc.type}`,
-              args.module ? `Module: ${args.module}` : '',
-              args.tags?.length ? `Tags: ${args.tags.join(', ')}` : '',
-              '',
-              args.content,
-            ].filter(Boolean).join('\n');
-            await mem0Client.addSmart(memContent, projectId, {
-              sourceType: 'knowledge_doc',
-              docId: args.docId,
-              docType: doc.type,
-              module: args.module,
-            });
-          }
+          indexer.reindexDocument(doc, projectId).catch(() => {});
         }
       } catch {
         // Non-blocking: doc updated successfully
@@ -871,15 +898,12 @@ export async function handleKnowledgeDelete(args: {
       archive: String(archive),
     });
 
-    // Write-through: remove from mem0 (non-blocking)
+    // Write-through: remove from SidMemo (non-blocking)
     try {
-      const mem0Client = await getMem0ClientIfAvailable();
-      if (mem0Client) {
+      const indexer = await getKnowledgeIndexer();
+      if (indexer) {
         const projectId = path.basename(resolveWorkspacePath(args.projectPath));
-        const existing = await mem0Client.search(args.docId, projectId, 10, { docId: args.docId }).catch(() => [] as Mem0Memory[]);
-        for (const mem of existing) {
-          await mem0Client.delete(mem.id, projectId).catch(() => {});
-        }
+        indexer.removeDocument(args.docId, projectId).catch(() => {});
       }
     } catch {
       // Non-blocking: doc deleted/archived successfully

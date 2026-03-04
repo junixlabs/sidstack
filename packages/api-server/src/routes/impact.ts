@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  getDB,
+  getRepository,
   changeParser,
   scopeDetector,
   riskAssessor,
@@ -19,6 +19,7 @@ import {
   type GateBlocker,
   type GateWarning,
   type ParsedOperation,
+  type ImpactValidation,
 } from '@sidstack/shared';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -28,50 +29,24 @@ const execAsync = promisify(exec);
 export const impactRouter: Router = Router();
 
 // =============================================================================
-// Database Validation to ValidationItem Converter
+// ImpactValidation → ValidationItem Converter
 // =============================================================================
 
-interface DbValidation {
-  id: string;
-  analysisId: string;
-  title: string;
-  description?: string;
-  category: string;
-  status: string;
-  isBlocking: number;
-  autoVerifiable: number;
-  verifyCommand?: string;
-  expectedPattern?: string;
-  riskId?: string;
-  dataFlowId?: string;
-  moduleId?: string;
-  resultJson?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-function convertDbValidation(dbVal: DbValidation | null): ValidationItem | null {
-  if (!dbVal) return null;
+function convertRepoValidation(v: ImpactValidation): ValidationItem {
   return {
-    id: dbVal.id,
-    title: dbVal.title,
-    description: dbVal.description || '',
-    category: dbVal.category as ValidationCategory,
-    status: dbVal.status as ValidationStatus,
-    isBlocking: dbVal.isBlocking === 1,
-    autoVerifiable: dbVal.autoVerifiable === 1,
-    verifyCommand: dbVal.verifyCommand,
-    expectedPattern: dbVal.expectedPattern,
-    riskId: dbVal.riskId,
-    dataFlowId: dbVal.dataFlowId,
-    moduleId: dbVal.moduleId,
+    id: v.id,
+    title: v.title,
+    description: v.description || '',
+    category: v.category as ValidationCategory,
+    status: v.status as ValidationStatus,
+    isBlocking: v.isBlocking,
+    autoVerifiable: v.autoVerifiable ?? false,
+    verifyCommand: v.verifyCommand,
+    expectedPattern: v.expectedPattern,
+    riskId: v.riskId,
+    dataFlowId: v.dataFlowId,
+    moduleId: v.moduleId,
   };
-}
-
-function convertDbValidations(dbVals: (DbValidation | null)[]): ValidationItem[] {
-  return dbVals
-    .map(convertDbValidation)
-    .filter((v): v is ValidationItem => v !== null);
 }
 
 // =============================================================================
@@ -79,7 +54,7 @@ function convertDbValidations(dbVals: (DbValidation | null)[]): ValidationItem[]
 // =============================================================================
 
 /**
- * Build full ImpactAnalysis object from database record
+ * Build full ImpactAnalysis object from repository record + validations
  */
 function buildAnalysisFromRecord(
   record: {
@@ -94,7 +69,6 @@ function buildAnalysisFromRecord(
     scopeJson?: string;
     dataFlowsJson?: string;
     risksJson?: string;
-    validationsJson?: string;
     gateJson?: string;
     error?: string;
     createdAt: number;
@@ -145,7 +119,7 @@ function buildAnalysisFromRecord(
 }
 
 // =============================================================================
-// Impact Routes (4.1)
+// Impact Routes
 // =============================================================================
 
 /**
@@ -154,7 +128,7 @@ function buildAnalysisFromRecord(
  */
 impactRouter.post('/analyze', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const input: ChangeInput = req.body;
 
     if (!input.description) {
@@ -166,7 +140,7 @@ impactRouter.post('/analyze', async (req, res) => {
     }
 
     // Create initial analysis record
-    const { id } = db.createImpactAnalysis({
+    const { id } = await repo.impact.create({
       projectId: input.projectId,
       taskId: input.taskId,
       specId: input.specId,
@@ -181,7 +155,7 @@ impactRouter.post('/analyze', async (req, res) => {
       // Step 2: Detect scope
       const scope = scopeDetector.detect(input, parsed);
 
-      // Step 3: Analyze data flows (mock data flows for now - would integrate with ERD)
+      // Step 3: Analyze data flows
       const mockDataFlows: ImpactDataFlow[] = [];
       const impactFlows = impactDataFlowAnalyzer.analyzeForImpact(
         mockDataFlows.map(f => ({
@@ -206,7 +180,7 @@ impactRouter.post('/analyze', async (req, res) => {
       const gate = gateController.evaluate(risks, validationItems);
 
       // Update analysis with results
-      db.updateImpactAnalysis(id, {
+      await repo.impact.update(id, {
         status: 'completed',
         parsedJson: JSON.stringify(parsed),
         scopeJson: JSON.stringify(scope),
@@ -217,7 +191,7 @@ impactRouter.post('/analyze', async (req, res) => {
 
       // Create validation records
       for (const validation of validationItems) {
-        db.createImpactValidation({
+        await repo.impact.createValidation({
           analysisId: id,
           title: validation.title,
           description: validation.description,
@@ -233,19 +207,19 @@ impactRouter.post('/analyze', async (req, res) => {
       }
 
       // Fetch the complete analysis
-      const record = db.getImpactAnalysis(id);
-      const validations = db.getImpactValidations(id);
+      const record = await repo.impact.get(id);
+      const validations = await repo.impact.getValidations(id);
 
       if (!record) {
         return res.status(500).json({ error: 'Failed to retrieve analysis' });
       }
 
-      const analysis = buildAnalysisFromRecord(record, convertDbValidations(validations as DbValidation[]));
+      const analysis = buildAnalysisFromRecord(record, validations.map(convertRepoValidation));
 
       res.status(201).json({ success: true, analysis });
     } catch (analyzeError) {
       // Update with error
-      db.updateImpactAnalysis(id, {
+      await repo.impact.update(id, {
         status: 'failed',
         error: String(analyzeError),
       });
@@ -264,16 +238,16 @@ impactRouter.post('/analyze', async (req, res) => {
  */
 impactRouter.get('/:id', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id } = req.params;
 
-    const record = db.getImpactAnalysis(id);
+    const record = await repo.impact.get(id);
     if (!record) {
       return res.status(404).json({ error: 'Analysis not found' });
     }
 
-    const validations = db.getImpactValidations(id);
-    const analysis = buildAnalysisFromRecord(record, convertDbValidations(validations as DbValidation[]));
+    const validations = await repo.impact.getValidations(id);
+    const analysis = buildAnalysisFromRecord(record, validations.map(convertRepoValidation));
 
     res.json({ success: true, analysis });
   } catch (error) {
@@ -288,16 +262,16 @@ impactRouter.get('/:id', async (req, res) => {
  */
 impactRouter.get('/by-task/:taskId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { taskId } = req.params;
 
-    const record = db.getImpactAnalysisByTask(taskId);
+    const record = await repo.impact.getByTask(taskId);
     if (!record) {
       return res.status(404).json({ error: 'Analysis not found for task' });
     }
 
-    const validations = db.getImpactValidations(record.id);
-    const analysis = buildAnalysisFromRecord(record, convertDbValidations(validations as DbValidation[]));
+    const validations = await repo.impact.getValidations(record.id);
+    const analysis = buildAnalysisFromRecord(record, validations.map(convertRepoValidation));
 
     res.json({ success: true, analysis });
   } catch (error) {
@@ -312,16 +286,16 @@ impactRouter.get('/by-task/:taskId', async (req, res) => {
  */
 impactRouter.get('/by-spec/:specId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { specId } = req.params;
 
-    const record = db.getImpactAnalysisBySpec(specId);
+    const record = await repo.impact.getBySpec(specId);
     if (!record) {
       return res.status(404).json({ error: 'Analysis not found for spec' });
     }
 
-    const validations = db.getImpactValidations(record.id);
-    const analysis = buildAnalysisFromRecord(record, convertDbValidations(validations as DbValidation[]));
+    const validations = await repo.impact.getValidations(record.id);
+    const analysis = buildAnalysisFromRecord(record, validations.map(convertRepoValidation));
 
     res.json({ success: true, analysis });
   } catch (error) {
@@ -331,23 +305,24 @@ impactRouter.get('/by-spec/:specId', async (req, res) => {
 });
 
 /**
- * GET /api/impact/list
+ * GET /api/impact/list/:projectId
  * List impact analyses for a project
  */
 impactRouter.get('/list/:projectId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { projectId } = req.params;
     const status = req.query.status as string | undefined;
     const limit = parseInt(req.query.limit as string) || 50;
 
-    const records = db.listImpactAnalyses(projectId, { status, limit });
+    const records = await repo.impact.list(projectId, { status, limit });
 
-    const analyses = records.map(record => {
-      if (!record) return null;
-      const validations = db.getImpactValidations(record.id);
-      return buildAnalysisFromRecord(record, convertDbValidations(validations as DbValidation[]));
-    }).filter(Boolean);
+    const analyses = [];
+    for (const record of records) {
+      if (!record) continue;
+      const validations = await repo.impact.getValidations(record.id);
+      analyses.push(buildAnalysisFromRecord(record, validations.map(convertRepoValidation)));
+    }
 
     res.json({ success: true, analyses, total: analyses.length });
   } catch (error) {
@@ -357,7 +332,7 @@ impactRouter.get('/list/:projectId', async (req, res) => {
 });
 
 // =============================================================================
-// Validation Routes (4.2)
+// Validation Routes
 // =============================================================================
 
 /**
@@ -366,11 +341,12 @@ impactRouter.get('/list/:projectId', async (req, res) => {
  */
 impactRouter.get('/:id/validations', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id } = req.params;
 
-    const validations = db.getImpactValidations(id);
-    const stats = validationGenerator.getStatistics(convertDbValidations(validations as DbValidation[]));
+    const validations = await repo.impact.getValidations(id);
+    const converted = validations.map(convertRepoValidation);
+    const stats = validationGenerator.getStatistics(converted);
 
     res.json({ success: true, validations, stats });
   } catch (error) {
@@ -385,11 +361,11 @@ impactRouter.get('/:id/validations', async (req, res) => {
  */
 impactRouter.post('/:id/validations/:vid/run', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id, vid } = req.params;
     const { cwd } = req.body;
 
-    const validation = db.getImpactValidation(vid);
+    const validation = await repo.impact.getValidation(vid);
     if (!validation) {
       return res.status(404).json({ error: 'Validation not found' });
     }
@@ -430,21 +406,21 @@ impactRouter.post('/:id/validations/:vid/run', async (req, res) => {
     const newStatus = passed ? 'passed' : 'failed';
 
     // Update validation
-    db.updateImpactValidation(vid, {
+    await repo.impact.updateValidation(vid, {
       status: newStatus,
       resultJson: JSON.stringify({ output, runAt: Date.now() }),
     });
 
     // Re-evaluate gate
-    const analysis = db.getImpactAnalysis(id);
+    const analysis = await repo.impact.get(id);
     if (analysis) {
-      const validations = convertDbValidations(db.getImpactValidations(id) as DbValidation[]);
+      const validations = (await repo.impact.getValidations(id)).map(convertRepoValidation);
       const risks = analysis.risksJson ? JSON.parse(analysis.risksJson) : [];
       const existingGate = analysis.gateJson ? JSON.parse(analysis.gateJson) : undefined;
 
       const newGate = gateController.evaluate(risks, validations, existingGate?.approval);
 
-      db.updateImpactAnalysis(id, {
+      await repo.impact.update(id, {
         gateJson: JSON.stringify(newGate),
       });
     }
@@ -469,7 +445,7 @@ impactRouter.post('/:id/validations/:vid/run', async (req, res) => {
  */
 impactRouter.put('/:id/validations/:vid', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id, vid } = req.params;
     const { status, notes } = req.body;
 
@@ -479,7 +455,7 @@ impactRouter.put('/:id/validations/:vid', async (req, res) => {
       });
     }
 
-    const success = db.updateImpactValidation(vid, {
+    const success = await repo.impact.updateValidation(vid, {
       status,
       resultJson: notes ? JSON.stringify({ notes, runAt: Date.now() }) : undefined,
     });
@@ -489,15 +465,15 @@ impactRouter.put('/:id/validations/:vid', async (req, res) => {
     }
 
     // Re-evaluate gate
-    const analysis = db.getImpactAnalysis(id);
+    const analysis = await repo.impact.get(id);
     if (analysis) {
-      const validations = convertDbValidations(db.getImpactValidations(id) as DbValidation[]);
+      const validations = (await repo.impact.getValidations(id)).map(convertRepoValidation);
       const risks = analysis.risksJson ? JSON.parse(analysis.risksJson) : [];
       const existingGate = analysis.gateJson ? JSON.parse(analysis.gateJson) : undefined;
 
       const newGate = gateController.evaluate(risks, validations, existingGate?.approval);
 
-      db.updateImpactAnalysis(id, {
+      await repo.impact.update(id, {
         gateJson: JSON.stringify(newGate),
       });
     }
@@ -510,7 +486,7 @@ impactRouter.put('/:id/validations/:vid', async (req, res) => {
 });
 
 // =============================================================================
-// Gate Routes (4.3)
+// Gate Routes
 // =============================================================================
 
 /**
@@ -519,10 +495,10 @@ impactRouter.put('/:id/validations/:vid', async (req, res) => {
  */
 impactRouter.get('/:id/gate', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id } = req.params;
 
-    const analysis = db.getImpactAnalysis(id);
+    const analysis = await repo.impact.get(id);
     if (!analysis) {
       return res.status(404).json({ error: 'Analysis not found' });
     }
@@ -555,7 +531,7 @@ impactRouter.get('/:id/gate', async (req, res) => {
  */
 impactRouter.post('/:id/gate/approve', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id } = req.params;
     const { approver, reason, blockerIds } = req.body;
 
@@ -565,7 +541,7 @@ impactRouter.post('/:id/gate/approve', async (req, res) => {
       });
     }
 
-    const analysis = db.getImpactAnalysis(id);
+    const analysis = await repo.impact.get(id);
     if (!analysis) {
       return res.status(404).json({ error: 'Analysis not found' });
     }
@@ -584,15 +560,15 @@ impactRouter.post('/:id/gate/approve', async (req, res) => {
     );
 
     // Save approval record
-    db.createGateApproval({
+    await repo.impact.createGateApproval({
       analysisId: id,
-      approver,
+      gate: JSON.stringify(blockerIds),
+      approvedBy: approver,
       reason,
-      approvedBlockersJson: JSON.stringify(blockerIds),
     });
 
     // Update analysis
-    db.updateImpactAnalysis(id, {
+    await repo.impact.update(id, {
       gateJson: JSON.stringify(newGate),
     });
 
@@ -614,7 +590,7 @@ impactRouter.post('/:id/gate/approve', async (req, res) => {
  */
 impactRouter.post('/:id/gate/resolve', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id } = req.params;
     const { riskId, mitigationNotes } = req.body;
 
@@ -624,7 +600,7 @@ impactRouter.post('/:id/gate/resolve', async (req, res) => {
       });
     }
 
-    const analysis = db.getImpactAnalysis(id);
+    const analysis = await repo.impact.get(id);
     if (!analysis) {
       return res.status(404).json({ error: 'Analysis not found' });
     }
@@ -641,13 +617,13 @@ impactRouter.post('/:id/gate/resolve', async (req, res) => {
     );
 
     // Re-evaluate gate
-    const validations = convertDbValidations(db.getImpactValidations(id) as DbValidation[]);
+    const validations = (await repo.impact.getValidations(id)).map(convertRepoValidation);
     const existingGate = analysis.gateJson ? JSON.parse(analysis.gateJson) : undefined;
 
     const newGate = gateController.evaluate(updatedRisks, validations, existingGate?.approval);
 
     // Update analysis
-    db.updateImpactAnalysis(id, {
+    await repo.impact.update(id, {
       risksJson: JSON.stringify(updatedRisks),
       gateJson: JSON.stringify(newGate),
     });
@@ -665,7 +641,7 @@ impactRouter.post('/:id/gate/resolve', async (req, res) => {
 });
 
 // =============================================================================
-// Export Routes (4.4)
+// Export Routes
 // =============================================================================
 
 /**
@@ -674,15 +650,15 @@ impactRouter.post('/:id/gate/resolve', async (req, res) => {
  */
 impactRouter.get('/:id/export/claude', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id } = req.params;
 
-    const record = db.getImpactAnalysis(id);
+    const record = await repo.impact.get(id);
     if (!record) {
       return res.status(404).json({ error: 'Analysis not found' });
     }
 
-    const validations = convertDbValidations(db.getImpactValidations(id) as DbValidation[]);
+    const validations = (await repo.impact.getValidations(id)).map(convertRepoValidation);
     const analysis = buildAnalysisFromRecord(record, validations);
 
     // Generate Claude context markdown
@@ -701,15 +677,15 @@ impactRouter.get('/:id/export/claude', async (req, res) => {
  */
 impactRouter.get('/:id/export/report', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id } = req.params;
 
-    const record = db.getImpactAnalysis(id);
+    const record = await repo.impact.get(id);
     if (!record) {
       return res.status(404).json({ error: 'Analysis not found' });
     }
 
-    const validations = convertDbValidations(db.getImpactValidations(id) as DbValidation[]);
+    const validations = (await repo.impact.getValidations(id)).map(convertRepoValidation);
     const analysis = buildAnalysisFromRecord(record, validations);
 
     // Generate report markdown
@@ -726,9 +702,6 @@ impactRouter.get('/:id/export/report', async (req, res) => {
 // Export Helpers
 // =============================================================================
 
-/**
- * Generate Claude context markdown for implementing with guardrails
- */
 function generateClaudeContext(analysis: ImpactAnalysis): string {
   const lines: string[] = [];
 
@@ -738,7 +711,6 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
   lines.push(`> Analysis ID: ${analysis.id}`);
   lines.push('');
 
-  // Gate Status
   lines.push(`## Gate Status: ${analysis.gate.status.toUpperCase()}`);
   lines.push('');
 
@@ -747,7 +719,6 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
     lines.push('');
   }
 
-  // Scope
   lines.push('## Scope');
   lines.push('');
   lines.push('### Primary Modules');
@@ -766,7 +737,6 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
   }
   lines.push('');
 
-  // Risks
   lines.push('## Risks to Watch');
   lines.push('');
   const criticalRisks = analysis.risks.filter((r: IdentifiedRisk) => r.severity === 'critical' || r.severity === 'high');
@@ -782,7 +752,6 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
   }
   lines.push('');
 
-  // Validation Checklist
   lines.push('## Required Validations');
   lines.push('');
   const blockingValidations = analysis.validations.filter((v: ValidationItem) => v.isBlocking);
@@ -799,7 +768,6 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
   }
   lines.push('');
 
-  // Rules for Claude
   lines.push('## Implementation Rules');
   lines.push('');
   lines.push('1. **Check scope** - Only modify files within the identified scope');
@@ -813,9 +781,6 @@ function generateClaudeContext(analysis: ImpactAnalysis): string {
   return lines.join('\n');
 }
 
-/**
- * Generate detailed report markdown
- */
 function generateReport(analysis: ImpactAnalysis): string {
   const lines: string[] = [];
 
@@ -828,7 +793,6 @@ function generateReport(analysis: ImpactAnalysis): string {
   lines.push(`**Updated:** ${new Date(analysis.updatedAt).toISOString()}`);
   lines.push('');
 
-  // Input
   lines.push('## Change Description');
   lines.push('');
   lines.push('```');
@@ -846,7 +810,6 @@ function generateReport(analysis: ImpactAnalysis): string {
   }
   lines.push('');
 
-  // Parsed
   lines.push('## Parsed Information');
   lines.push('');
   lines.push(`**Inferred Type:** ${analysis.parsed.changeType}`);
@@ -859,7 +822,6 @@ function generateReport(analysis: ImpactAnalysis): string {
   analysis.parsed.operations.forEach((o: ParsedOperation) => lines.push(`- ${o.type}: ${o.target}`));
   lines.push('');
 
-  // Scope
   lines.push('## Scope Analysis');
   lines.push('');
   lines.push('### Primary Modules');
@@ -880,7 +842,6 @@ function generateReport(analysis: ImpactAnalysis): string {
   analysis.scope.affectedEntities.forEach((e: string) => lines.push(`- ${e}`));
   lines.push('');
 
-  // Risks
   lines.push('## Risk Assessment');
   lines.push('');
   lines.push(`| Severity | Name | Category | Blocking |`);
@@ -890,16 +851,14 @@ function generateReport(analysis: ImpactAnalysis): string {
   });
   lines.push('');
 
-  // Validations
   lines.push('## Validation Checklist');
   lines.push('');
   const stats = validationGenerator.getStatistics(analysis.validations);
   lines.push(`**Total:** ${stats.total} | **Passed:** ${stats.passed} | **Failed:** ${stats.failed} | **Pending:** ${stats.pending}`);
   lines.push('');
   analysis.validations.forEach((v: ValidationItem) => {
-    const statusIcon = v.status === 'passed' ? '✅' : v.status === 'failed' ? '❌' : '⏳';
     const blockingTag = v.isBlocking ? ' [BLOCKING]' : '';
-    lines.push(`- ${statusIcon} **${v.title}**${blockingTag}`);
+    lines.push(`- **${v.title}**${blockingTag}`);
     lines.push(`  - Category: ${v.category}`);
     lines.push(`  - Status: ${v.status}`);
     if (v.verifyCommand) {
@@ -908,7 +867,6 @@ function generateReport(analysis: ImpactAnalysis): string {
   });
   lines.push('');
 
-  // Gate
   lines.push('## Implementation Gate');
   lines.push('');
   lines.push(`**Status:** ${analysis.gate.status.toUpperCase()}`);

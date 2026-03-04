@@ -5,13 +5,11 @@ The Project Hub is your central dashboard for navigating all SidStack features.
 ## Overview
 
 When you open a project, the Project Hub shows:
-- **Project stats** - Module count, active tasks, sessions, knowledge documents
-- **Recent activity** - Latest actions across tasks, sessions, and knowledge
+- **Project stats** - Module count, active tasks, knowledge documents
+- **OKR progress** - Objectives and key results tracking
 - **Quick actions** - Jump to any feature from the sidebar
 
 ## Sidebar Navigation
-
-The sidebar provides access to all 9 features:
 
 | Item | Shortcut | Description |
 |------|----------|-------------|
@@ -20,16 +18,16 @@ The sidebar provides access to all 9 features:
 | Knowledge | Cmd+3 | Browse project knowledge |
 | Ticket Queue | Cmd+4 | Manage external tickets |
 | Training Room | Cmd+5 | Lessons learned system |
-| Sessions | - | Manage Claude sessions |
-| Governance | - | View quality rules |
-| Impact Analysis | - | Assess change risks |
-| Worktree Status | - | Git worktree status |
+| Agent Desk | - | Manage isolated agent workspaces |
+| Traceability | - | Spec-task-test coverage matrix |
+| Docs | - | Built-in documentation viewer |
+| Settings | Cmd+, | Project configuration |
 
 ## Workspaces
 
 SidStack supports multiple workspaces (projects). Switch between them using the workspace selector at the top of the sidebar.
 
-Each workspace maintains independent state for tasks, sessions, and knowledge.
+Each workspace maintains independent state for tasks, knowledge, and tickets.
 
 ## Keyboard Shortcuts
 

@@ -11,7 +11,7 @@ import {
   saveWorkspaceConfig,
   ensureSidstackLocal,
   updateWorktreeStatus,
-  getDB,
+  getRepository,
   type WorkspaceConfig,
 } from '@sidstack/shared';
 import { runInitWizard, type SetupMode } from '../lib/init-prompts.js';
@@ -435,12 +435,12 @@ export default class Init extends Command {
 
   private async createStarterTasks(projectId: string, projectName: string, projectPath: string): Promise<number> {
     try {
-      const db = await getDB();
+      const repo = await getRepository();
 
       // Ensure project exists in DB
-      const existingProject = db.getProject(projectId);
+      const existingProject = await repo.projects.get(projectId);
       if (!existingProject) {
-        db.createProject({
+        await repo.projects.create({
           id: projectId,
           name: projectName,
           path: projectPath,
@@ -662,7 +662,7 @@ This demonstrates the Training Room feature for the project.`,
       ];
 
       for (const task of tasks) {
-        db.createTask({
+        await repo.tasks.create({
           projectId,
           title: task.title,
           description: task.description,

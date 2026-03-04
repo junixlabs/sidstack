@@ -14,6 +14,8 @@ Self-review + UAT report generation for human review.
 
 ### Feature Completeness
 - [ ] All acceptance criteria met (re-read from task)
+- [ ] **Plan compliance**: implementation follows the approved `solutionPlan` approach
+- [ ] **Scope compliance**: only files listed in the plan were changed (or deviations documented)
 - [ ] Test plan scenarios passed
 - [ ] No debug code left (console.log, TODO)
 

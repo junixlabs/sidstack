@@ -2,10 +2,11 @@
  * Unified Context API Routes
  *
  * Manages links between tasks, specs, and knowledge documents.
+ * All DB access via getRepository() (supports SQLite and PostgreSQL).
  */
 
 import { Router } from 'express';
-import { getDB, TaskSpecLink, TaskKnowledgeLink, SpecType, LinkType, buildEntityContext } from '@sidstack/shared';
+import { getRepository, buildEntityContext, TaskSpecLink, TaskKnowledgeLink, SpecType, LinkType } from '@sidstack/shared';
 import type { EntityType, ContextFormat, ContextSection } from '@sidstack/shared';
 
 export const contextRouter: Router = Router();
@@ -17,7 +18,7 @@ export const contextRouter: Router = Router();
 // Create spec link
 contextRouter.post('/links/spec', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { taskId, specPath, specType, linkType, linkReason } = req.body;
 
     if (!taskId || !specPath || !specType) {
@@ -29,7 +30,7 @@ contextRouter.post('/links/spec', async (req, res) => {
       return res.status(400).json({ error: 'specType must be one of: change, spec, module' });
     }
 
-    const link = db.createTaskSpecLink({
+    const link = await repo.tasks.createSpecLink({
       taskId,
       specPath,
       specType,
@@ -49,8 +50,8 @@ contextRouter.post('/links/spec', async (req, res) => {
 // Delete spec link
 contextRouter.delete('/links/spec/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const deleted = db.deleteTaskSpecLink(req.params.id);
+    const repo = await getRepository();
+    const deleted = await repo.tasks.deleteSpecLink(req.params.id);
 
     if (!deleted) {
       return res.status(404).json({ error: 'Link not found' });
@@ -65,8 +66,8 @@ contextRouter.delete('/links/spec/:id', async (req, res) => {
 // Get specs for task
 contextRouter.get('/task/:taskId/specs', async (req, res) => {
   try {
-    const db = await getDB();
-    const links = db.getTaskSpecLinks(req.params.taskId);
+    const repo = await getRepository();
+    const links = await repo.tasks.getSpecLinks(req.params.taskId);
     res.json({ links });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get spec links' });
@@ -76,14 +77,14 @@ contextRouter.get('/task/:taskId/specs', async (req, res) => {
 // Get tasks for spec
 contextRouter.get('/spec/tasks', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const specPath = req.query.specPath as string;
 
     if (!specPath) {
       return res.status(400).json({ error: 'specPath query parameter is required' });
     }
 
-    const taskIds = db.getSpecTaskIds(specPath);
+    const taskIds = await repo.tasks.getTaskIdsBySpec(specPath);
     res.json({ taskIds });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get tasks for spec' });
@@ -97,14 +98,14 @@ contextRouter.get('/spec/tasks', async (req, res) => {
 // Create knowledge link
 contextRouter.post('/links/knowledge', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { taskId, knowledgePath, linkType, linkReason } = req.body;
 
     if (!taskId || !knowledgePath) {
       return res.status(400).json({ error: 'taskId and knowledgePath are required' });
     }
 
-    const link = db.createTaskKnowledgeLink({
+    const link = await repo.tasks.createKnowledgeLink({
       taskId,
       knowledgePath,
       linkType: linkType || 'manual',
@@ -123,8 +124,8 @@ contextRouter.post('/links/knowledge', async (req, res) => {
 // Delete knowledge link
 contextRouter.delete('/links/knowledge/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const deleted = db.deleteTaskKnowledgeLink(req.params.id);
+    const repo = await getRepository();
+    const deleted = await repo.tasks.deleteKnowledgeLink(req.params.id);
 
     if (!deleted) {
       return res.status(404).json({ error: 'Link not found' });
@@ -139,8 +140,8 @@ contextRouter.delete('/links/knowledge/:id', async (req, res) => {
 // Get knowledge for task
 contextRouter.get('/task/:taskId/knowledge', async (req, res) => {
   try {
-    const db = await getDB();
-    const links = db.getTaskKnowledgeLinks(req.params.taskId);
+    const repo = await getRepository();
+    const links = await repo.tasks.getKnowledgeLinks(req.params.taskId);
     res.json({ links });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get knowledge links' });
@@ -150,14 +151,14 @@ contextRouter.get('/task/:taskId/knowledge', async (req, res) => {
 // Get tasks for knowledge
 contextRouter.get('/knowledge/tasks', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const knowledgePath = req.query.knowledgePath as string;
 
     if (!knowledgePath) {
       return res.status(400).json({ error: 'knowledgePath query parameter is required' });
     }
 
-    const taskIds = db.getKnowledgeTaskIds(knowledgePath);
+    const taskIds = await repo.tasks.getTaskIdsByKnowledge(knowledgePath);
     res.json({ taskIds });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get tasks for knowledge' });
@@ -171,7 +172,7 @@ contextRouter.get('/knowledge/tasks', async (req, res) => {
 // Build entity context
 contextRouter.get('/entity/:entityType/:entityId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { entityType, entityId } = req.params;
     const format = (req.query.format as string) || 'claude';
     const depth = parseInt(req.query.depth as string) || 1;
@@ -180,7 +181,7 @@ contextRouter.get('/entity/:entityType/:entityId', async (req, res) => {
       ? (req.query.sections as string).split(',') as ContextSection[]
       : undefined;
 
-    const result = buildEntityContext(db, {
+    const result = await buildEntityContext(repo, {
       entityType: entityType as EntityType,
       entityId,
       format: format as ContextFormat,
@@ -214,17 +215,17 @@ contextRouter.get('/entity/:entityType/:entityId', async (req, res) => {
 // Task start context
 contextRouter.get('/task/:taskId/start-context', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { taskId } = req.params;
     const format = (req.query.format as string) || 'claude';
     const maxTokens = parseInt(req.query.maxTokens as string) || 8000;
 
-    const task = db.getTask(taskId);
+    const task = await repo.tasks.get(taskId);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
-    const result = buildEntityContext(db, {
+    const result = await buildEntityContext(repo, {
       entityType: 'task',
       entityId: taskId,
       format: format as ContextFormat,
@@ -262,22 +263,22 @@ contextRouter.get('/task/:taskId/start-context', async (req, res) => {
 // Task complete with context
 contextRouter.post('/task/:taskId/complete-context', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { taskId } = req.params;
     const { sessionId, knowledgeCreated, lessonsLearned, notes } = req.body;
 
-    const task = db.getTask(taskId);
+    const task = await repo.tasks.get(taskId);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
     const refsCreated: string[] = [];
 
-    db.updateTask(taskId, { status: 'completed', progress: 100, notes: notes || task.notes });
+    await repo.tasks.update(taskId, { status: 'completed', progress: 100, notes: notes || task.notes });
 
     if (sessionId) {
       try {
-        db.createEntityReference({
+        await repo.entityLinks.create({
           sourceType: 'task', sourceId: taskId,
           targetType: 'session', targetId: sessionId,
           relationship: 'implemented_by', createdBy: 'system',
@@ -290,7 +291,7 @@ contextRouter.post('/task/:taskId/complete-context', async (req, res) => {
       for (const knowledgeId of knowledgeCreated) {
         if (sessionId) {
           try {
-            db.createEntityReference({
+            await repo.entityLinks.create({
               sourceType: 'session', sourceId: sessionId,
               targetType: 'knowledge', targetId: knowledgeId,
               relationship: 'creates', createdBy: 'system',
@@ -299,7 +300,7 @@ contextRouter.post('/task/:taskId/complete-context', async (req, res) => {
           } catch { /* duplicate */ }
         }
         try {
-          db.createEntityReference({
+          await repo.entityLinks.create({
             sourceType: 'task', sourceId: taskId,
             targetType: 'knowledge', targetId: knowledgeId,
             relationship: 'requires_context', createdBy: 'system',
@@ -312,7 +313,7 @@ contextRouter.post('/task/:taskId/complete-context', async (req, res) => {
     if (lessonsLearned && sessionId) {
       for (const lessonId of lessonsLearned) {
         try {
-          db.createEntityReference({
+          await repo.entityLinks.create({
             sourceType: 'session', sourceId: sessionId,
             targetType: 'lesson', targetId: lessonId,
             relationship: 'creates', createdBy: 'system',
@@ -340,20 +341,20 @@ contextRouter.post('/task/:taskId/complete-context', async (req, res) => {
 // Get full context for task
 contextRouter.get('/task/:taskId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const taskId = req.params.taskId;
 
     // Get task info
-    const task = db.getTask(taskId);
+    const task = await repo.tasks.get(taskId);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
     // Get unified context
-    const context = db.getUnifiedContext(taskId);
+    const context = await repo.tasks.getUnifiedContext(taskId);
 
-    // Get recent activity (optional)
-    const recentActivity = db.getRecentWorkEntries(taskId, 10);
+    // Get recent activity
+    const recentActivity = await repo.workHistory.getRecentEntries(taskId, 10);
 
     res.json({
       task,
@@ -374,7 +375,7 @@ contextRouter.get('/task/:taskId', async (req, res) => {
 // Dismiss suggestion
 contextRouter.post('/suggestions/dismiss', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { taskId, suggestedPath, suggestionType } = req.body;
 
     if (!taskId || !suggestedPath || !suggestionType) {
@@ -385,7 +386,7 @@ contextRouter.post('/suggestions/dismiss', async (req, res) => {
       return res.status(400).json({ error: 'suggestionType must be spec or knowledge' });
     }
 
-    const dismissed = db.dismissSuggestion(taskId, suggestedPath, suggestionType);
+    const dismissed = await repo.tasks.dismissSuggestion(taskId, suggestedPath, suggestionType);
     res.json({ dismissed });
   } catch (error) {
     res.status(500).json({ error: 'Failed to dismiss suggestion' });
@@ -395,7 +396,7 @@ contextRouter.post('/suggestions/dismiss', async (req, res) => {
 // Check if suggestion is dismissed
 contextRouter.get('/suggestions/dismissed', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const taskId = req.query.taskId as string;
     const suggestedPath = req.query.suggestedPath as string;
 
@@ -403,7 +404,7 @@ contextRouter.get('/suggestions/dismissed', async (req, res) => {
       return res.status(400).json({ error: 'taskId and suggestedPath query parameters are required' });
     }
 
-    const isDismissed = db.isDismissed(taskId, suggestedPath);
+    const isDismissed = await repo.tasks.isDismissed(taskId, suggestedPath);
     res.json({ isDismissed });
   } catch (error) {
     res.status(500).json({ error: 'Failed to check dismissed status' });

@@ -96,7 +96,7 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
   const { projectPath } = useAppStore();
   const { isActive, isWorkspaceReady, sidstackProjectId } = useWorkspaceContext();
   const fallbackId = projectPath?.split("/").pop() || "default";
-  const projectId = isWorkspaceReady ? (sidstackProjectId || fallbackId) : fallbackId;
+  const projectId = sidstackProjectId || fallbackId;
 
   const {
     isLoading,
@@ -138,10 +138,12 @@ export const TicketQueueBlockView = memo(function TicketQueueBlockView(
     }
   }, []);
 
-  // Fetch tickets on mount
+  // Fetch tickets on mount (wait for workspace to resolve correct projectId)
   useEffect(() => {
-    fetchTickets(projectId);
-  }, [projectId, fetchTickets]);
+    if (isWorkspaceReady) {
+      fetchTickets(projectId);
+    }
+  }, [projectId, fetchTickets, isWorkspaceReady]);
 
   // Refresh handler
   const handleRefresh = useCallback(() => {

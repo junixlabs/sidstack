@@ -5,11 +5,10 @@
  * - okr_list: Read current OKRs with progress summary
  * - okr_update: Update progress for one or more Key Results
  *
- * Data stored in .sidstack/project-okrs.json (filesystem, no DB).
+ * OKRs are stored as knowledge documents (type: "okr") in the database.
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { createApiClient } from '@sidstack/shared';
 import { validateProjectPath } from './validate-path';
 
 // =============================================================================
@@ -113,26 +112,31 @@ export const okrTools = [
 // Helpers
 // =============================================================================
 
-function getOkrPath(projectPath: string): string {
-  return path.join(projectPath, '.sidstack', 'project-okrs.json');
-}
-
-async function readOkrs(projectPath: string): Promise<OKRData | null> {
-  try {
-    const content = await fs.readFile(getOkrPath(projectPath), 'utf-8');
-    return JSON.parse(content);
-  } catch {
-    return null;
-  }
-}
-
-async function writeOkrs(projectPath: string, data: OKRData): Promise<void> {
-  await fs.writeFile(getOkrPath(projectPath), JSON.stringify(data, null, 2), 'utf-8');
-}
-
 function computeProgress(krs: OKRKeyResult[]): number {
   if (krs.length === 0) return 0;
   return Math.round(krs.reduce((sum, kr) => sum + kr.progress, 0) / krs.length);
+}
+
+/**
+ * Fetch the OKR knowledge document for a project.
+ * Returns { docId, data } or null if not found.
+ */
+async function fetchOkrDoc(projectPath: string): Promise<{ docId: string; data: OKRData } | null> {
+  const apiClient = createApiClient();
+  const response = await apiClient.knowledge.list({
+    projectPath,
+    type: 'okr',
+    limit: '1',
+  });
+
+  const documents = response.documents || [];
+  if (documents.length === 0) return null;
+
+  const doc = await apiClient.knowledge.get(documents[0].id, { projectPath });
+  if (!doc || !doc.content) return null;
+
+  const data: OKRData = JSON.parse(doc.content);
+  return { docId: doc.id, data };
 }
 
 // =============================================================================
@@ -144,14 +148,17 @@ export async function handleOkrList(args: {
   quarter?: string;
 }): Promise<Record<string, unknown>> {
   validateProjectPath(args.projectPath);
-  const data = await readOkrs(args.projectPath);
 
-  if (!data) {
+  const result = await fetchOkrDoc(args.projectPath);
+
+  if (!result) {
     return {
       success: false,
-      error: 'No OKRs found. Create .sidstack/project-okrs.json to define project goals.',
+      error: "No OKRs found. Use knowledge_create with type 'okr' to define project goals.",
     };
   }
+
+  const { data } = result;
 
   const quarters = args.quarter
     ? data.quarters.filter((q) => q.id === args.quarter)
@@ -206,14 +213,17 @@ export async function handleOkrUpdate(args: {
   reason?: string;
 }): Promise<Record<string, unknown>> {
   validateProjectPath(args.projectPath);
-  const data = await readOkrs(args.projectPath);
 
-  if (!data) {
+  const result = await fetchOkrDoc(args.projectPath);
+
+  if (!result) {
     return {
       success: false,
-      error: 'No OKRs found. Create .sidstack/project-okrs.json first.',
+      error: "No OKRs found. Use knowledge_create with type 'okr' to define project goals.",
     };
   }
+
+  const { docId, data } = result;
 
   // Build a lookup of all KRs for fast access
   const krMap = new Map<string, { kr: OKRKeyResult; objId: string; quarterId: string }>();
@@ -256,8 +266,12 @@ export async function handleOkrUpdate(args: {
     };
   }
 
-  // Write back
-  await writeOkrs(args.projectPath, data);
+  // Persist updated data back to knowledge document
+  const apiClient = createApiClient();
+  await apiClient.knowledge.update(docId, {
+    content: JSON.stringify(data, null, 2),
+    projectPath: args.projectPath,
+  });
 
   // Compute new overall progress
   const allKRs = data.quarters.flatMap((q) =>

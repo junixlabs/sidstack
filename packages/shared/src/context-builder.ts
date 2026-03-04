@@ -4,6 +4,8 @@
  * Builds complete context for any SidStack entity by traversing
  * the Entity Reference Graph. Supports multiple output formats
  * and priority-based token budgeting.
+ *
+ * Uses IRepository for async DB access (supports both SQLite and PostgreSQL).
  */
 
 import type {
@@ -12,7 +14,7 @@ import type {
   EntityReferenceRelationship,
 } from './database';
 
-import type { SidStackDB } from './database';
+import type { IRepository } from './repository/types';
 
 // ============================================================================
 // Types
@@ -75,20 +77,20 @@ const SECTION_PRIORITY: Record<ContextSection, number> = {
 // Entity Loaders
 // ============================================================================
 
-function loadEntitySummary(
-  db: SidStackDB,
+async function loadEntitySummary(
+  repo: IRepository,
   type: EntityType,
   id: string,
   relationship?: EntityReferenceRelationship,
-): EntitySummary | null {
+): Promise<EntitySummary | null> {
   switch (type) {
     case 'task': {
-      const task = db.getTask(id);
+      const task = await repo.tasks.get(id);
       if (!task) return null;
       return { type, id, title: task.title, status: task.status, relationship };
     }
     case 'session': {
-      const session = db.getClaudeSession(id);
+      const session = await repo.sessions.get(id);
       if (!session) return null;
       return {
         type, id,
@@ -98,32 +100,32 @@ function loadEntitySummary(
       };
     }
     case 'ticket': {
-      const ticket = db.getTicket(id);
+      const ticket = await repo.tickets.get(id);
       if (!ticket) return null;
       return { type, id, title: ticket.title, status: ticket.status, relationship };
     }
     case 'incident': {
-      const incident = db.getIncident(id);
+      const incident = await repo.training.getIncident(id);
       if (!incident) return null;
       return { type, id, title: incident.title, status: incident.status, relationship };
     }
     case 'lesson': {
-      const lesson = db.getLesson(id);
+      const lesson = await repo.training.getLesson(id);
       if (!lesson) return null;
       return { type, id, title: lesson.title, status: lesson.status, relationship };
     }
     case 'skill': {
-      const skill = db.getSkill(id);
+      const skill = await repo.training.getSkill(id);
       if (!skill) return null;
       return { type, id, title: skill.name, status: skill.status, relationship };
     }
     case 'rule': {
-      const rule = db.getRule(id);
+      const rule = await repo.training.getRule(id);
       if (!rule) return null;
       return { type, id, title: rule.name, status: rule.status, relationship };
     }
     case 'impact': {
-      const impact = db.getImpactAnalysis(id);
+      const impact = await repo.impact.get(id);
       if (!impact) return null;
       return { type, id, title: `Impact Analysis (${impact.changeType})`, status: impact.status, relationship };
     }
@@ -139,15 +141,15 @@ function loadEntitySummary(
 // Context Builder Core
 // ============================================================================
 
-export function buildEntityContext(
-  db: SidStackDB,
+export async function buildEntityContext(
+  repo: IRepository,
   options: EntityContextOptions,
-): EntityContextResult {
+): Promise<EntityContextResult> {
   const { entityType, entityId, format = 'json', depth = 1 } = options;
   const sections = options.sections || ['knowledge', 'impact', 'governance', 'history', 'references'];
 
   // Load primary entity
-  const entity = loadEntitySummary(db, entityType, entityId);
+  const entity = await loadEntitySummary(repo, entityType, entityId);
   if (!entity) {
     return {
       entity: { type: entityType, id: entityId, title: `Unknown ${entityType}` },
@@ -159,8 +161,8 @@ export function buildEntityContext(
 
   // Get all references (with depth traversal)
   const references = depth > 1
-    ? db.getRelatedEntities(entityType, entityId, depth)
-    : db.queryEntityReferences({
+    ? await repo.entityLinks.getRelatedEntities(entityType, entityId, depth)
+    : await repo.entityLinks.query({
         entityType,
         entityId,
         direction: 'both',
@@ -168,11 +170,11 @@ export function buildEntityContext(
       });
 
   // Categorize references into related groups
-  const related = categorizeReferences(db, references, entityType, entityId);
+  const related = await categorizeReferences(repo, references, entityType, entityId);
 
   // Load additional context based on entity type
   if (entityType === 'task') {
-    enrichTaskContext(db, entityId, related);
+    await enrichTaskContext(repo, entityId, related);
   }
 
   const result: EntityContextResult = {
@@ -184,7 +186,7 @@ export function buildEntityContext(
 
   // Format output
   if (format === 'claude') {
-    result.formatted = formatClaudeContext(db, entity, related, references, sections, options.maxTokens);
+    result.formatted = await formatClaudeContext(repo, entity, related, references, sections, options.maxTokens);
   } else if (format === 'compact') {
     result.formatted = formatCompactContext(entity, related);
   }
@@ -209,12 +211,12 @@ function emptyRelated(): EntityContextResult['related'] {
   };
 }
 
-function categorizeReferences(
-  db: SidStackDB,
+async function categorizeReferences(
+  repo: IRepository,
   references: EntityReference[],
   primaryType: EntityType,
   primaryId: string,
-): EntityContextResult['related'] {
+): Promise<EntityContextResult['related']> {
   const related = emptyRelated();
   const seen = new Set<string>();
 
@@ -228,7 +230,7 @@ function categorizeReferences(
     if (seen.has(key)) continue;
     seen.add(key);
 
-    const summary = loadEntitySummary(db, otherType, otherId, ref.relationship);
+    const summary = await loadEntitySummary(repo, otherType, otherId, ref.relationship);
     if (!summary) continue;
 
     switch (otherType) {
@@ -269,14 +271,14 @@ function categorizeReferences(
  * Enrich task context with direct FK relationships that may not be
  * in entity_references yet (e.g., impact analysis by task ID).
  */
-function enrichTaskContext(
-  db: SidStackDB,
+async function enrichTaskContext(
+  repo: IRepository,
   taskId: string,
   related: EntityContextResult['related'],
-): void {
+): Promise<void> {
   // Check for impact analysis directly by task FK
   if (related.impact.length === 0) {
-    const impact = db.getImpactAnalysisByTask(taskId);
+    const impact = await repo.impact.getByTask(taskId);
     if (impact) {
       related.impact.push({
         type: 'impact',
@@ -292,18 +294,18 @@ function enrichTaskContext(
 // Claude Format
 // ============================================================================
 
-function formatClaudeContext(
-  db: SidStackDB,
+async function formatClaudeContext(
+  repo: IRepository,
   entity: EntitySummary,
   related: EntityContextResult['related'],
   references: EntityReference[],
   sections: ContextSection[],
   maxTokens?: number,
-): string {
+): Promise<string> {
   const parts: Array<{ section: ContextSection; content: string; priority: number }> = [];
 
   // Entity header (always included)
-  const header = formatEntityHeader(db, entity);
+  const header = await formatEntityHeader(repo, entity);
 
   // Build sections by priority
   if (sections.includes('knowledge') && related.knowledge.length > 0) {
@@ -315,7 +317,7 @@ function formatClaudeContext(
   }
 
   if (sections.includes('impact') && related.impact.length > 0) {
-    const impactContent = formatImpactSection(db, related.impact);
+    const impactContent = await formatImpactSection(repo, related.impact);
     parts.push({
       section: 'impact',
       priority: SECTION_PRIORITY.impact,
@@ -324,7 +326,7 @@ function formatClaudeContext(
   }
 
   if (sections.includes('governance')) {
-    const govContent = formatGovernanceSection(db, related.governance);
+    const govContent = await formatGovernanceSection(repo, related.governance);
     if (govContent) {
       parts.push({
         section: 'governance',
@@ -374,7 +376,7 @@ function formatClaudeContext(
   return includedParts.join('\n\n---\n\n');
 }
 
-function formatEntityHeader(db: SidStackDB, entity: EntitySummary): string {
+async function formatEntityHeader(repo: IRepository, entity: EntitySummary): Promise<string> {
   const lines: string[] = [];
   lines.push(`# Entity Context: ${entity.title}`);
   lines.push(`**Type:** ${entity.type} | **ID:** ${entity.id}`);
@@ -382,7 +384,7 @@ function formatEntityHeader(db: SidStackDB, entity: EntitySummary): string {
 
   // Add full entity details for known types
   if (entity.type === 'task') {
-    const task = db.getTask(entity.id);
+    const task = await repo.tasks.get(entity.id);
     if (task) {
       if (task.description) lines.push(`\n## Description\n${task.description}`);
       if (task.acceptanceCriteria) {
@@ -412,10 +414,10 @@ function formatRelatedSection(title: string, items: EntitySummary[]): string {
   return lines.join('\n');
 }
 
-function formatImpactSection(db: SidStackDB, impacts: EntitySummary[]): string {
+async function formatImpactSection(repo: IRepository, impacts: EntitySummary[]): Promise<string> {
   const lines = ['## Impact Analysis'];
   for (const imp of impacts) {
-    const analysis = db.getImpactAnalysis(imp.id);
+    const analysis = await repo.impact.get(imp.id);
     if (!analysis) continue;
     lines.push(`**Status:** ${analysis.status} | **Change Type:** ${analysis.changeType}`);
     if (analysis.gateJson) {
@@ -445,10 +447,10 @@ function formatImpactSection(db: SidStackDB, impacts: EntitySummary[]): string {
   return lines.join('\n');
 }
 
-function formatGovernanceSection(
-  db: SidStackDB,
+async function formatGovernanceSection(
+  repo: IRepository,
   governance: { rules: EntitySummary[]; skills: EntitySummary[] },
-): string | null {
+): Promise<string | null> {
   if (governance.rules.length === 0 && governance.skills.length === 0) return null;
 
   const lines = ['## Governance'];
@@ -456,7 +458,7 @@ function formatGovernanceSection(
   if (governance.rules.length > 0) {
     lines.push('### Rules');
     for (const r of governance.rules) {
-      const rule = db.getRule(r.id);
+      const rule = await repo.training.getRule(r.id);
       if (!rule) continue;
       lines.push(`- **[${rule.level.toUpperCase()}]** ${rule.name}: ${rule.content.slice(0, 200)}`);
     }
@@ -465,7 +467,7 @@ function formatGovernanceSection(
   if (governance.skills.length > 0) {
     lines.push('### Skills');
     for (const s of governance.skills) {
-      const skill = db.getSkill(s.id);
+      const skill = await repo.training.getSkill(s.id);
       if (!skill) continue;
       lines.push(`- **${skill.name}** (${skill.type}): ${skill.description || skill.content.slice(0, 150)}`);
     }

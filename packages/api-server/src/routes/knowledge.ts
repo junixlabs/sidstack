@@ -2,15 +2,17 @@
  * SidStack Knowledge API Routes
  *
  * REST API for the unified knowledge system.
- * Uses SidStackDB knowledge methods from @sidstack/shared for all operations.
+ * Uses async repository pattern from @sidstack/shared for all operations.
  */
 
 import { Router, type Request } from 'express';
 import {
-  getDB,
+  getRepository,
   detectWorkspace,
   DOCUMENT_TYPE_CONFIG,
   FOLDER_CONFIG,
+  TYPE_GROUPS,
+  getTypeGroup,
   type DocumentType,
   type DocumentStatus,
   type KnowledgeTreeNode,
@@ -46,8 +48,8 @@ async function resolveProjectId(req: Request): Promise<string> {
   }
 
   // Fallback: look up project by path in the database
-  const db = await getDB();
-  const project = db.getProjectByPath(projectPath);
+  const repo = await getRepository();
+  const project = await repo.projects.getByPath(projectPath);
   if (project?.id) return project.id;
 
   throw new Error(`Cannot resolve projectId from path: ${projectPath}`);
@@ -89,7 +91,7 @@ function slugify(title: string): string {
 knowledgeRouter.get('/', async (req, res) => {
   try {
     const projectId = await resolveProjectId(req);
-    const db = await getDB();
+    const repo = await getRepository();
 
     const options: {
       type?: string | string[];
@@ -141,7 +143,7 @@ knowledgeRouter.get('/', async (req, res) => {
       options.sortOrder = req.query.sortOrder as string;
     }
 
-    const result = db.listKnowledgeDocuments(projectId, options);
+    const result = await repo.knowledge.list(projectId, options);
 
     res.json(result);
   } catch (error) {
@@ -159,9 +161,9 @@ knowledgeRouter.get('/', async (req, res) => {
  */
 knowledgeRouter.get('/doc/:id', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id } = req.params;
-    const document = db.getKnowledgeDocument(id);
+    const document = await repo.knowledge.get(id);
 
     if (!document) {
       return res.status(404).json({ error: 'Document not found' });
@@ -184,7 +186,7 @@ knowledgeRouter.get('/doc/:id', async (req, res) => {
 knowledgeRouter.get('/search', async (req, res) => {
   try {
     const projectId = await resolveProjectId(req);
-    const db = await getDB();
+    const repo = await getRepository();
 
     const query = req.query.q as string;
     if (!query) {
@@ -193,7 +195,7 @@ knowledgeRouter.get('/search', async (req, res) => {
 
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
 
-    const documents = db.searchKnowledgeDocuments(projectId, query, limit);
+    const documents = await repo.knowledge.search(projectId, query, limit);
 
     res.json({
       query,
@@ -216,8 +218,8 @@ knowledgeRouter.get('/search', async (req, res) => {
 knowledgeRouter.get('/stats', async (req, res) => {
   try {
     const projectId = await resolveProjectId(req);
-    const db = await getDB();
-    const stats = db.getKnowledgeStats(projectId);
+    const repo = await getRepository();
+    const stats = await repo.knowledge.getStats(projectId);
 
     res.json(stats);
   } catch (error) {
@@ -231,71 +233,134 @@ knowledgeRouter.get('/stats', async (req, res) => {
 
 /**
  * GET /api/knowledge/tree
- * Get tree structure for sidebar navigation
- * Groups documents by category (folder), then by type within each category.
+ * Get tree structure for sidebar navigation.
+ *
+ * Module-first organization:
+ *   Level 1: Module (or "Project-level" for docs without module)
+ *   Level 2: Type group (Guides, References, Decisions, Governance)
+ *   Level 3: Documents
+ *
+ * Query params:
+ *   ?view=folders — legacy folder-first view (backward compat)
  */
 knowledgeRouter.get('/tree', async (req, res) => {
   try {
     const projectId = await resolveProjectId(req);
-    const db = await getDB();
+    const repo = await getRepository();
+    const view = req.query.view as string | undefined;
 
-    // Get all documents for this project
-    const { documents } = db.listKnowledgeDocuments(projectId, { limit: 10000 });
+    const { documents } = await repo.knowledge.list(projectId, { limit: 10000 });
 
-    // Build tree: group by category, then by type
-    const categoryMap = new Map<string, typeof documents>();
-    for (const doc of documents) {
-      const category = doc.category || DOCUMENT_TYPE_CONFIG[doc.type as DocumentType]?.folder || 'uncategorized';
-      if (!categoryMap.has(category)) {
-        categoryMap.set(category, []);
+    // Legacy folder-first view
+    if (view === 'folders') {
+      const categoryMap = new Map<string, typeof documents>();
+      for (const doc of documents) {
+        const category = doc.category || DOCUMENT_TYPE_CONFIG[doc.type as DocumentType]?.folder || 'uncategorized';
+        if (!categoryMap.has(category)) categoryMap.set(category, []);
+        categoryMap.get(category)!.push(doc);
       }
-      categoryMap.get(category)!.push(doc);
+      const tree: KnowledgeTreeNode[] = [];
+      for (const folder of FOLDER_CONFIG) {
+        const docs = categoryMap.get(folder.name) || [];
+        categoryMap.delete(folder.name);
+        tree.push({
+          id: folder.name, name: folder.title, type: 'folder', path: folder.name,
+          children: docs.map(doc => ({
+            id: doc.id, name: doc.title, type: 'document' as const,
+            path: `${folder.name}/${doc.slug}`,
+            documentType: doc.type as DocumentType, status: doc.status as DocumentStatus,
+          })),
+          documentCount: docs.length,
+        });
+      }
+      for (const [category, docs] of categoryMap) {
+        tree.push({
+          id: category, name: category, type: 'folder', path: category,
+          children: docs.map(doc => ({
+            id: doc.id, name: doc.title, type: 'document' as const,
+            path: `${category}/${doc.slug}`,
+            documentType: doc.type as DocumentType, status: doc.status as DocumentStatus,
+          })),
+          documentCount: docs.length,
+        });
+      }
+      return res.json(tree);
     }
 
-    // Build tree nodes from FOLDER_CONFIG order
+    // Module-first tree (default)
+    const moduleMap = new Map<string, typeof documents>(); // moduleId → docs
+    const moduleDocs = new Map<string, any>(); // moduleId → module definition doc
+
+    for (const doc of documents) {
+      const moduleId = doc.module || '_project';
+
+      // Track module definition docs
+      if (doc.type === 'module') {
+        moduleDocs.set(doc.module || doc.id, doc);
+      }
+
+      if (!moduleMap.has(moduleId)) moduleMap.set(moduleId, []);
+      moduleMap.get(moduleId)!.push(doc);
+    }
+
     const tree: KnowledgeTreeNode[] = [];
 
-    for (const folder of FOLDER_CONFIG) {
-      const docs = categoryMap.get(folder.name) || [];
-      categoryMap.delete(folder.name);
+    // Sort: named modules first (alphabetical), then _project
+    const sortedModuleIds = [...moduleMap.keys()].sort((a, b) => {
+      if (a === '_project') return 1;
+      if (b === '_project') return -1;
+      return a.localeCompare(b);
+    });
 
-      const children: KnowledgeTreeNode[] = docs.map(doc => ({
-        id: doc.id,
-        name: doc.title,
-        type: 'document' as const,
-        path: `${folder.name}/${doc.slug}`,
-        documentType: doc.type as DocumentType,
-        status: doc.status as DocumentStatus,
-      }));
+    for (const moduleId of sortedModuleIds) {
+      const docs = moduleMap.get(moduleId)!;
+      const modDoc = moduleDocs.get(moduleId);
+      const moduleName = moduleId === '_project'
+        ? 'Project-level'
+        : (modDoc?.title || moduleId);
 
+      // Group docs by type group
+      const groupedDocs = new Map<string, typeof docs>();
+      for (const doc of docs) {
+        if (doc.type === 'module') continue; // Module def shown as module header
+        const group = getTypeGroup(doc.type as DocumentType) || 'references';
+        if (!groupedDocs.has(group)) groupedDocs.set(group, []);
+        groupedDocs.get(group)!.push(doc);
+      }
+
+      // Build type group children
+      const typeGroupNodes: KnowledgeTreeNode[] = [];
+      const groupOrder = ['guides', 'references', 'decisions', 'governance'];
+      for (const groupKey of groupOrder) {
+        const groupDocs = groupedDocs.get(groupKey);
+        if (!groupDocs || groupDocs.length === 0) continue;
+
+        const groupConfig = TYPE_GROUPS[groupKey];
+        typeGroupNodes.push({
+          id: `${moduleId}/${groupKey}`,
+          name: groupConfig.label,
+          type: 'folder',
+          path: `${moduleId}/${groupKey}`,
+          children: groupDocs.map(doc => ({
+            id: doc.id,
+            name: doc.title,
+            type: 'document' as const,
+            path: `${moduleId}/${groupKey}/${doc.slug}`,
+            documentType: doc.type as DocumentType,
+            status: doc.status as DocumentStatus,
+          })),
+          documentCount: groupDocs.length,
+        });
+      }
+
+      const totalDocs = docs.filter(d => d.type !== 'module').length;
       tree.push({
-        id: folder.name,
-        name: folder.title,
+        id: moduleId === '_project' ? '_project' : `module:${moduleId}`,
+        name: moduleName,
         type: 'folder',
-        path: folder.name,
-        children,
-        documentCount: docs.length,
-      });
-    }
-
-    // Add any remaining categories not in FOLDER_CONFIG
-    for (const [category, docs] of categoryMap) {
-      const children: KnowledgeTreeNode[] = docs.map(doc => ({
-        id: doc.id,
-        name: doc.title,
-        type: 'document' as const,
-        path: `${category}/${doc.slug}`,
-        documentType: doc.type as DocumentType,
-        status: doc.status as DocumentStatus,
-      }));
-
-      tree.push({
-        id: category,
-        name: category,
-        type: 'folder',
-        path: category,
-        children,
-        documentCount: docs.length,
+        path: moduleId,
+        children: typeGroupNodes,
+        documentCount: totalDocs,
       });
     }
 
@@ -316,7 +381,7 @@ knowledgeRouter.get('/tree', async (req, res) => {
 knowledgeRouter.get('/context', async (req, res) => {
   try {
     const projectId = await resolveProjectId(req);
-    const db = await getDB();
+    const repo = await getRepository();
 
     const options: BuildContextOptions = {};
 
@@ -349,7 +414,7 @@ knowledgeRouter.get('/context', async (req, res) => {
     if (options.documentIds && options.documentIds.length > 0) {
       // Fetch specific documents by ID
       for (const docId of options.documentIds) {
-        const doc = db.getKnowledgeDocument(docId);
+        const doc = await repo.knowledge.get(docId);
         if (doc) documents.push(doc);
       }
     } else {
@@ -361,7 +426,7 @@ knowledgeRouter.get('/context', async (req, res) => {
       if (options.moduleId) {
         queryOptions.module = options.moduleId;
       }
-      const result = db.listKnowledgeDocuments(projectId, queryOptions);
+      const result = await repo.knowledge.list(projectId, queryOptions);
       documents = result.documents;
     }
 
@@ -440,8 +505,8 @@ knowledgeRouter.get('/context', async (req, res) => {
 knowledgeRouter.get('/types', async (req, res) => {
   try {
     const projectId = await resolveProjectId(req);
-    const db = await getDB();
-    const stats = db.getKnowledgeStats(projectId);
+    const repo = await getRepository();
+    const stats = await repo.knowledge.getStats(projectId);
 
     const types = Object.entries(stats.byType).map(([type, count]) => ({
       type,
@@ -461,18 +526,13 @@ knowledgeRouter.get('/types', async (req, res) => {
 
 /**
  * GET /api/knowledge/modules
- * List modules with document counts
+ * List modules with enriched details: doc counts by type, health score, dependencies
  */
 knowledgeRouter.get('/modules', async (req, res) => {
   try {
     const projectId = await resolveProjectId(req);
-    const db = await getDB();
-    const stats = db.getKnowledgeStats(projectId);
-
-    const modules = Object.entries(stats.byModule).map(([module, count]) => ({
-      id: module,
-      documentCount: count,
-    }));
+    const repo = await getRepository();
+    const modules = await repo.knowledge.getModulesWithDetails(projectId);
 
     res.json(modules);
   } catch (error) {
@@ -485,13 +545,37 @@ knowledgeRouter.get('/modules', async (req, res) => {
 });
 
 /**
+ * GET /api/knowledge/modules/:moduleId/overview
+ * Full module overview: definition + all docs + dependencies + health
+ */
+knowledgeRouter.get('/modules/:moduleId/overview', async (req, res) => {
+  try {
+    const projectId = await resolveProjectId(req);
+    const repo = await getRepository();
+    const overview = await repo.knowledge.getModuleOverview(projectId, req.params.moduleId);
+
+    if (!overview) {
+      return res.status(404).json({ error: 'Module not found' });
+    }
+
+    res.json(overview);
+  } catch (error) {
+    console.error('Error getting module overview:', error);
+    res.status(500).json({
+      error: 'Failed to get module overview',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * POST /api/knowledge
  * Create a new knowledge document
  */
 knowledgeRouter.post('/', async (req, res) => {
   try {
     const projectId = await resolveProjectId(req);
-    const db = await getDB();
+    const repo = await getRepository();
 
     const { title, type, content, module, tags, status, owner, category, related, dependsOn, covers, summary } = req.body;
 
@@ -502,7 +586,7 @@ knowledgeRouter.post('/', async (req, res) => {
     const slug = slugify(title);
 
     // Check for duplicate slug
-    const existing = db.getKnowledgeDocumentBySlug(projectId, slug);
+    const existing = await repo.knowledge.getBySlug(projectId, slug);
     if (existing) {
       return res.status(409).json({
         error: 'Failed to create document',
@@ -510,7 +594,7 @@ knowledgeRouter.post('/', async (req, res) => {
       });
     }
 
-    const doc = db.createKnowledgeDocument({
+    const doc = await repo.knowledge.create({
       projectId,
       slug,
       title,
@@ -553,7 +637,7 @@ knowledgeRouter.post('/', async (req, res) => {
  */
 knowledgeRouter.put('/doc/:id', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id } = req.params;
     const { title, content, status, tags, module, owner, related, dependsOn, covers, summary, category } = req.body;
 
@@ -583,7 +667,7 @@ knowledgeRouter.put('/doc/:id', async (req, res) => {
     if (dependsOn !== undefined) updates.dependsOn = dependsOn;
     if (covers !== undefined) updates.covers = covers;
 
-    const doc = db.updateKnowledgeDocument(id, updates);
+    const doc = await repo.knowledge.update(id, updates);
 
     if (!doc) {
       return res.status(404).json({ error: 'Document not found' });
@@ -591,7 +675,7 @@ knowledgeRouter.put('/doc/:id', async (req, res) => {
 
     emitSseEvent({
       type: 'knowledge_updated',
-      projectId: doc.projectId,
+      projectId: (doc as any).projectId,
       entityId: doc.id,
       title: doc.title,
       summary: 'Knowledge document updated',
@@ -615,14 +699,14 @@ knowledgeRouter.put('/doc/:id', async (req, res) => {
  */
 knowledgeRouter.delete('/doc/:id', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { id } = req.params;
     const archive = req.query.archive !== 'false'; // default true
 
     // Get doc info before deleting for the event
-    const docBeforeDelete = db.getKnowledgeDocument(id);
+    const docBeforeDelete = await repo.knowledge.get(id);
 
-    const success = db.deleteKnowledgeDocument(id, archive);
+    const success = await repo.knowledge.delete(id, archive);
 
     if (!success) {
       return res.status(404).json({ error: 'Document not found' });
@@ -631,7 +715,7 @@ knowledgeRouter.delete('/doc/:id', async (req, res) => {
     if (docBeforeDelete) {
       emitSseEvent({
         type: 'knowledge_deleted',
-        projectId: docBeforeDelete.projectId,
+        projectId: (docBeforeDelete as any).projectId,
         entityId: id,
         title: docBeforeDelete.title,
         summary: archive ? 'Knowledge document archived' : 'Knowledge document deleted',
@@ -657,8 +741,8 @@ knowledgeRouter.delete('/doc/:id', async (req, res) => {
 knowledgeRouter.get('/health', async (req, res) => {
   try {
     const projectId = await resolveProjectId(req);
-    const db = await getDB();
-    const stats = db.getKnowledgeStats(projectId);
+    const repo = await getRepository();
+    const stats = await repo.knowledge.getStats(projectId);
 
     const issues: Array<{ severity: string; category: string; message: string }> = [];
 

@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.6.0] - 2026-03-04
+
+### Added
+- **Knowledge RAG Pipeline:** Full retrieval-augmented generation stack
+  - Markdown-aware semantic chunker (H2/H3 splits, preserves code blocks/tables/lists)
+  - Knowledge indexer with SidMemo vector store integration
+  - Hybrid search engine (keyword + vector fusion via Reciprocal Rank Fusion)
+  - RAG context builder with deduplication, token truncation, Knowledge Graph enrichment
+- **Agent Desk v2:** Persistent worktree-based desk model replacing acquire/release flow
+  - `desk_create`, `desk_checkout`, `desk_status`, `desk_health`, `desk_conflicts`, `desk_remove` MCP tools
+  - CLI commands: `desk create`, `desk checkout`, `desk status`, `desk health`, `desk conflicts`
+- **Repository Layer:** Database abstraction supporting SQLite and PostgreSQL
+  - `packages/shared/src/repository/` with IRepository interface, SQLite + Postgres implementations
+  - SQLite-to-PostgreSQL migration utilities
+- **Socket.IO Real-time Events:** WebSocket server for live task/event broadcasting
+- **Web UI Pages:** Dashboard, Activity, Kanban, Impact, Task Detail, Traceability, Training, Settings
+- **Skills:** `sidstack-knowledge` and `sidstack-plan` skill templates
+- **Docker:** PostgreSQL support, init-db scripts, deploy configs
+- **SidMemo Knowledge Graph APIs:** `getEntity()`, `listEntities()`, `getSubgraph()` on SidMemoClient
+- **Test Suite:** 70+ new tests across knowledge and memory modules
+  - Chunker unit tests (12), SidMemoClient unit tests (19), Indexer unit tests (10)
+  - Hybrid search + RAG context tests (17), E2E tests against live SidMemo API (8)
+  - Shared test utilities in `__test-utils.ts`
+
+### Changed
+- **Knowledge System:** Replaced adapter/service pattern with direct chunker → indexer → hybrid search pipeline
+- **Database:** Refactored to repository pattern with PostgreSQL option
+- **MCP Agent Desk:** Complete rewrite for Desk v2 (7 tools)
+- **MCP Knowledge Tools:** Updated with hybrid search and RAG context
+- **MCP Memory Tools:** Exposed Knowledge Graph APIs
+- **Desktop Stores:** Simplified `projectStore`, `knowledgeStore`, `taskStore`
+- **API Server:** Socket.IO integration, enhanced knowledge/task/ticket routes
+- **Docker Compose:** Full stack with PostgreSQL + Caddy reverse proxy
+- **Docs:** Updated API reference, getting started, quick start, roadmap
+
+### Removed
+- **Knowledge Adapters:** `packages/shared/src/knowledge/adapters.ts` (replaced by RAG pipeline)
+- **Knowledge Service:** `packages/shared/src/knowledge/service.ts` (replaced by repository + indexer)
+- **Agent Desk v1:** `desk acquire`, `desk add`, `desk init`, `desk release` CLI commands
+- **Desktop Dialogs:** `AcquireDeskDialog`, `PoolInitDialog`, `ReleaseDeskDialog`
+- **Session Manager Guide:** `docs/guides/session-manager.md`
+
+### Fixed
+- Schema consistency test updated with missing `okr` document type
+
 ## [0.5.0] - 2026-02-25
 
 ### Added

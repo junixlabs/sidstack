@@ -50,7 +50,7 @@ Connect to a remote SidStack server using streamable-http transport:
 }
 ```
 
-Set `SIDSTACK_API_URL` and `SIDSTACK_API_KEY` in `.env` if your project also calls the REST API directly. See [Quick Start - Option C](QUICK_START.md#option-c-remote-server-shared--team) for full setup.
+Set `SIDSTACK_API_URL` and `SIDSTACK_API_KEY` in `.env` if your project also calls the REST API directly. See [Quick Start - Option C](QUICK_START.md#option-c-docker-server-full-stack) for full setup.
 
 ### Verify Connection
 
@@ -61,7 +61,7 @@ List my SidStack tasks
 
 Claude should use the `task_list` MCP tool.
 
-## Available MCP Tools (32)
+## Available MCP Tools (49)
 
 ### Knowledge (9)
 
@@ -124,11 +124,48 @@ Claude should use the `task_list` MCP tool.
 | `okr_list` | List objectives and key results |
 | `okr_update` | Update key result progress |
 
-### Sessions (1)
+### Test Results (3)
 
 | Tool | Description |
 |------|-------------|
-| `session_launch` | Launch Claude session with context |
+| `test_result_create` | Persist test execution results |
+| `test_result_list` | List test results with filtering |
+| `test_result_get` | Get detailed test result |
+
+### Agent Desk (5)
+
+| Tool | Description |
+|------|-------------|
+| `desk_list` | List all agent desks |
+| `desk_status` | Get desk status and current task |
+| `desk_acquire` | Acquire a desk for an agent |
+| `desk_release` | Release a desk |
+| `desk_pool_init` | Initialize desk pool |
+
+### Memory (6)
+
+| Tool | Description |
+|------|-------------|
+| `memory_add` | Add a memory entry (via mem0) |
+| `memory_search` | Semantic search across memories |
+| `memory_list` | List memory entries |
+| `memory_delete` | Delete a memory entry |
+| `memory_index_knowledge` | Index knowledge docs into memory |
+| `memory_cleanup` | Clean up stale memory entries |
+
+### Traceability (1)
+
+| Tool | Description |
+|------|-------------|
+| `traceability_matrix` | Generate spec-task-test coverage matrix |
+
+### Entity References (3)
+
+| Tool | Description |
+|------|-------------|
+| `entity_link` | Link entities (task↔knowledge, etc.) |
+| `entity_references` | Get references for an entity |
+| `entity_context` | Build context from linked entities |
 
 ## Governance for Agents
 

@@ -1,6 +1,6 @@
 {
   "name": "@sidstack/shared",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Shared types and utilities for SidStack",
   "license": "MIT",
   "publishConfig": {
@@ -34,8 +34,10 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@types/pg": "^8.16.0",
     "better-sqlite3": "^11.0.0",
-    "js-yaml": "^4.1.1"
+    "js-yaml": "^4.1.1",
+    "pg": "^8.19.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",

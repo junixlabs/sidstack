@@ -47,13 +47,15 @@ Targeted code change + verification in one step.
 
 ### Pre-check
 Verify plan approval: `mcp__sidstack__task_get({ taskId })` → check `planStatus === 'approved'`
-- If not approved: **STOP**. Tell user the solutionPlan needs approval before fix can proceed.
-- If approved: `mcp__sidstack__task_update({ taskId, status: "in_progress" })` then proceed.
+- If not approved: **STOP**. Tell user to run `/sidstack-plan [task-id]` and approve the plan first.
+- If approved: read `solutionPlan` — this is the **contract** for the fix. Then `mcp__sidstack__task_update({ taskId, status: "in_progress" })` and proceed.
 
 ### Fix Rules
 - Create branch: `git checkout -b fix/<name>`
+- **Follow the approved solutionPlan** — fix approach and affected files as described
 - Change ONLY what's necessary to fix the bug
 - Do NOT refactor surrounding code
+- If you discover the root cause is different from the plan: **STOP**, move back to `review`, update `solutionPlan`
 - Follow project conventions
 
 ### Verify

@@ -48,8 +48,11 @@ sidstack/
 ├── packages/
 │   ├── cli/               # Oclif CLI
 │   ├── mcp-server/        # MCP Server for Claude Code
-│   ├── api-server/        # REST API
+│   ├── api-server/        # REST API (central gateway)
+│   ├── bot-server/        # SidBot (Gemini intent router)
+│   ├── web-ui/            # React SPA (browser access)
 │   └── shared/            # Shared types + SQLite
+├── docker/                # Docker deployment configs
 ├── openspec/              # Change proposals
 ├── docs/                  # Documentation
 └── .sidstack/             # Local data (configs, knowledge)
@@ -69,7 +72,7 @@ pnpm typecheck            # Type checking
 
 ## Architecture Reference
 
-**MCP Tools:** knowledge (5), tasks (5), impact (3), tickets (4), training (2) — 19 core tools.
+**MCP Tools:** knowledge (9), tasks (5), impact (3), tickets (4), training (8), OKRs (2), test results (3), agent desk (5), memory (6), traceability (1), entity references (3) — 49 tools.
 **Agents:** Worker (`sidstack-worker`) for implementation, Reviewer (`sidstack-reviewer`) for verification. Skills auto-trigger per role.
 **Knowledge:** `.sidstack/knowledge/` in 9 categories (`00-context` through `08-incidents`).
 **Impact:** `impact_analyze` → `impact_check_gate`. Gates: `blocked`, `warning`, `clear`.

@@ -8,11 +8,11 @@
 
 ## Vision Statement
 
-**SidStack** = Local-first AI Project Intelligence Platform
+**SidStack** = AI-Powered Project Intelligence Platform
 
 > "Your AI finally remembers your project"
 
-Structured project knowledge, impact analysis, and governance for AI coding assistants. Persistent context that makes every AI session smarter.
+Structured project knowledge, impact analysis, and governance for AI coding assistants. Persistent context that makes every AI session smarter. Available as local desktop app, remote Docker deployment, or Web UI.
 
 ---
 
@@ -22,8 +22,8 @@ Structured project knowledge, impact analysis, and governance for AI coding assi
 |-------|-------------|--------|
 | **Context Persistence** | AI remembers project context across sessions | Setup once, use forever |
 | **Quality Governance** | AI follows coding standards and patterns | Pass quality gates before completion |
-| **Local-First Privacy** | Data stays local, no cloud dependency | Zero external data transfer |
-| **Visual Management** | Track AI work via desktop UI instead of terminal | Real-time status visibility |
+| **Flexible Deployment** | Local desktop, Docker server, or Web UI | Deploy where it fits |
+| **Visual Management** | Track AI work via desktop/web UI instead of terminal | Real-time status visibility |
 
 ---
 
@@ -188,8 +188,8 @@ Capability tree, entity connections, and project overview.
 
 - More context than single-agent tools (Claude Code, Cursor)
 - Simpler than enterprise platforms
-- Local-first (privacy)
-- Visual management (not just terminal)
+- Flexible deployment (local or Docker)
+- Visual management (desktop, web, or terminal)
 
 ---
 
@@ -206,12 +206,12 @@ Capability tree, entity connections, and project overview.
 | "Setup once, AI remembers forever" | Context loss | Landing page hero |
 | "One orchestrator, multiple agents" | Manual coordination | Feature section |
 | "Governed AI that follows your standards" | Inconsistent output | For teams |
-| "Local-first. Your code stays yours." | Privacy concerns | Security-conscious users |
-| "See what your AI is doing" | No visibility | Desktop app pitch |
+| "Deploy anywhere. Your code, your rules." | Privacy concerns | Security-conscious users |
+| "See what your AI is doing" | No visibility | Desktop/web UI pitch |
 
 ### Elevator Pitch (30 seconds)
 
-> "SidStack is a project intelligence platform for AI coding agents. Unlike Claude Code which forgets everything each session, SidStack keeps your project knowledge persistent - so your AI always understands your codebase, follows your coding standards, and learns from past mistakes. It's local-first, so your code never leaves your machine."
+> "SidStack is a project intelligence platform for AI coding agents. Unlike Claude Code which forgets everything each session, SidStack keeps your project knowledge persistent - so your AI always understands your codebase, follows your coding standards, and learns from past mistakes. Deploy locally or on your own server - your code stays under your control."
 
 ---
 
@@ -236,10 +236,10 @@ Capability tree, entity connections, and project overview.
 
 ## Product Principles
 
-### 1. Local-First Always
-- Data stays on user's machine
-- No cloud dependency for core features
-- Optional sync only with explicit consent
+### 1. Flexible Deployment
+- Local-first by default (data stays on user's machine)
+- Optional Docker deployment for team/remote access
+- Web UI for browser-based project management
 
 ### 2. Progressive Complexity
 - Simple to start (single agent + basic knowledge)
@@ -276,22 +276,22 @@ Capability tree, entity connections, and project overview.
 | CLI Commands | Agent-friendly interfaces |
 
 ### Next Phase (Q2 2026)
-**Phase:** Orchestration & Multi-Agent
-
-| Feature | Value Delivered |
-|---------|-----------------|
-| Orchestrator Core | Multi-agent coordination |
-| Agent Terminal UX | Visual agent management |
-| Session Persistence | Resume AI work |
-
-### Future (H2 2026)
-**Phase:** Team & Scale
+**Phase:** Team Collaboration & Scale
 
 | Feature | Value Delivered |
 |---------|-----------------|
 | Team Knowledge Sharing | Collaborative AI |
 | Advanced Governance | Enterprise-ready |
-| Integrations | IDE plugins, CI/CD |
+| VS Code Extension | MCP App integration |
+
+### Future (H2 2026)
+**Phase:** Enterprise & Integrations
+
+| Feature | Value Delivered |
+|---------|-----------------|
+| CI/CD Integration | Automated governance |
+| Advanced Memory | Semantic search at scale |
+| Multi-project Analytics | Cross-project insights |
 
 ---
 

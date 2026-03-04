@@ -9,15 +9,15 @@
 
 ## Vision Statement (Updated)
 
-**SidStack** = Project Knowledge Browser & Agent Workspace
+**SidStack** = AI-Powered Project Intelligence Platform
 
-**Focus**: Knowledge management and visualization first, then orchestration.
+**Focus**: Knowledge management, governance, and multi-deployment architecture.
 
 Core principles:
 - **Knowledge-first** - Understand the project before automating
 - **Visual & Friendly** - Both agents and humans can read and update
 - **Incremental** - Small incremental steps, not big-bang releases
-- **Local-first** - No complex server dependencies
+- **Flexible Deployment** - Local desktop, Docker server, or Web UI
 
 ---
 
@@ -40,15 +40,19 @@ All CLI commands support JSON output (`--json`), exit codes, and strict mode (`-
 | `sidstack knowledge templates` | List knowledge templates | ✅ Done |
 | `sidstack knowledge create` | Create from template | ✅ Done |
 
-### Knowledge Templates
+### Knowledge Categories (9)
 
-| Template | Description |
+| Category | Description |
 |----------|-------------|
-| `business-logic` | Business rules and workflows |
-| `api-endpoint` | API endpoint documentation |
-| `design-pattern` | Design pattern documentation |
-| `database-table` | Database table documentation |
-| `module` | Module documentation |
+| `00-context` | Vision, glossary, onboarding |
+| `01-architecture` | System design, module boundaries |
+| `02-decisions` | ADRs, technical decisions |
+| `03-standards` | Coding conventions, naming rules |
+| `04-data` | Database schema, data models |
+| `05-api` | API contracts, schemas |
+| `06-operations` | Deployment, monitoring |
+| `07-projects` | Project-specific docs |
+| `08-incidents` | Incident reports, root cause analysis |
 
 ### Desktop App (View-Only)
 
@@ -81,7 +85,7 @@ See `docs/USER_GUIDE_VIEW_ONLY_APP.md` for user guide.
 | Feature | Status |
 |---------|--------|
 | Task Manager (Kanban + Tree + List views) | ✅ Done |
-| Session Manager (launch/track Claude sessions) | ✅ Done |
+| Session Manager (launch/track Claude sessions) | ❌ Removed in v0.5.0 |
 | Ticket Queue (intake, review, convert to task) | ✅ Done |
 | Knowledge Browser (unified knowledge API) | ✅ Done |
 | Project Hub (central dashboard) | ✅ Done |
@@ -97,12 +101,56 @@ See `docs/USER_GUIDE_VIEW_ONLY_APP.md` for user guide.
 
 | Feature | Status |
 |---------|--------|
-| MCP Server (task, impact, knowledge, training tools) | ✅ Done |
-| External Session Launch (iTerm, Terminal, Warp, etc.) | ✅ Done |
+| MCP Server (49 tools) | ✅ Done |
 | Agent Governance (principles, skills, workflows) | ✅ Done |
-| Simplified Agent Roles (Orchestrator, Worker, Reviewer) | ✅ Done |
-| Capability Skills (implement, design, test, review, deploy) | ✅ Done |
-| Lesson Detection & Suggestion | ✅ Done |
+| Simplified Agent Roles (Worker, Reviewer) | ✅ Done |
+| Capability Skills (sidstack-aware, sidstack-dev) | ✅ Done |
+
+---
+
+## Completed: SidStack v0.5.0 - Docker & Remote Architecture
+
+**Status**: ✅ Completed (2026-02-25)
+
+### Docker Deployment
+| Feature | Status |
+|---------|--------|
+| API Server Dockerfile | ✅ Done |
+| MCP Server Dockerfile (Streamable HTTP) | ✅ Done |
+| Web UI Dockerfile (React SPA + Caddy) | ✅ Done |
+| Bot Server Dockerfile (SidBot + Gemini) | ✅ Done |
+| docker-compose.yml (full stack) | ✅ Done |
+| Caddy reverse proxy with auto TLS | ✅ Done |
+| mem0 semantic memory (optional) | ✅ Done |
+
+### Web UI
+| Feature | Status |
+|---------|--------|
+| Knowledge browser (list, tree, detail, CRUD, search) | ✅ Done |
+| Task management (list, detail, update) | ✅ Done |
+| Ticket management (list, detail, update, convert) | ✅ Done |
+| Responsive layout with mobile support | ✅ Done |
+
+### New MCP Tools (18 new)
+| Tool Category | Count | Status |
+|---------------|-------|--------|
+| Test Results | 3 | ✅ Done |
+| Agent Desk | 5 | ✅ Done |
+| Memory (mem0) | 6 | ✅ Done |
+| Traceability | 1 | ✅ Done |
+| Entity References | 3 | ✅ Done |
+
+### Desktop App Changes
+| Feature | Status |
+|---------|--------|
+| Agent Desk view | ✅ Added |
+| Traceability view | ✅ Added |
+| Docs view | ✅ Added |
+| Connection Setup screen | ✅ Added |
+| SSE real-time notifications | ✅ Added |
+| Session Manager | ❌ Removed |
+| Worktree Status | ❌ Removed |
+| Capability Registry | ❌ Removed |
 
 ### Quality & Testing
 
@@ -589,19 +637,14 @@ sidstack/
 
 ## Document Schema (Shared)
 
-All documents use this frontmatter structure:
+All knowledge documents use this frontmatter structure:
 
 ```yaml
 ---
-id: unique-identifier
-type: business-logic | api-endpoint | design-pattern | database-table
-module: module-name
-status: draft | implemented | deprecated
-created: 2026-01-15
-updated: 2026-01-15
-author: name
-related: [other-doc-ids]
+title: Document Title
+category: 00-context | 01-architecture | 02-decisions | 03-standards | 04-data | 05-api | 06-operations | 07-projects | 08-incidents
 tags: [tag1, tag2]
+status: draft | current | deprecated
 ---
 ```
 
@@ -641,6 +684,6 @@ tags: [tag1, tag2]
 
 ## Related Files
 
-- `src/components/knowledge/` - UI components (to create)
-- `packages/shared/src/knowledge-types.ts` - Document types (to create)
-- `.sidstack/knowledge/` - Document storage (to create)
+- `src/components/blocks/views/KnowledgeBrowserBlockView.tsx` - Knowledge UI
+- `packages/shared/src/knowledge/` - Knowledge types and services
+- `.sidstack/knowledge/` - Document storage (9 categories)

@@ -3,8 +3,8 @@
 Get from zero to productive in minutes.
 
 SidStack has multiple interfaces - use any combination:
-- **MCP Server** - Use from Claude Code with 32 MCP tools
-- **Desktop App** - Visual project management (macOS)
+- **MCP Server** - Use from Claude Code with 49 MCP tools
+- **Desktop App** - Visual project management (macOS/Linux)
 - **Web UI** - Browser-based access (remote/team)
 - **Docker** - Deploy full stack on a server
 
@@ -33,7 +33,7 @@ npx @sidstack/cli init
 
 ### 2. Use MCP Tools in Claude Code
 
-Once initialized, Claude Code has access to 32 tools:
+Once initialized, Claude Code has access to 49 tools:
 
 **Knowledge (understand your project)**
 ```
@@ -90,9 +90,38 @@ okr_list            - List objectives and key results
 okr_update          - Update key result progress
 ```
 
-**Sessions**
+**Test Results (persist test execution)**
 ```
-session_launch      - Launch Claude session with context
+test_result_create  - Persist test results
+test_result_list    - List test results
+test_result_get     - Get detailed test result
+```
+
+**Agent Desk (workspace isolation)**
+```
+desk_list           - List all agent desks
+desk_status         - Get desk status
+desk_acquire        - Acquire a desk for an agent
+desk_release        - Release a desk
+desk_pool_init      - Initialize desk pool
+```
+
+**Memory (semantic search via mem0)**
+```
+memory_add              - Add a memory entry
+memory_search           - Semantic search across memories
+memory_list             - List memory entries
+memory_delete           - Delete a memory entry
+memory_index_knowledge  - Index knowledge docs into memory
+memory_cleanup          - Clean up stale entries
+```
+
+**Traceability & Entity References**
+```
+traceability_matrix - Generate spec-task-test coverage matrix
+entity_link         - Link entities (task↔knowledge, etc.)
+entity_references   - Get references for an entity
+entity_context      - Build context from linked entities
 ```
 
 ### 3. Example Workflow
@@ -288,11 +317,11 @@ Claude should use the `task_list` MCP tool and connect to the remote server.
 
 ---
 
-## Option B: Desktop App (macOS)
+## Option B: Desktop App (macOS/Linux)
 
 ### 1. Install
 
-Download the `.dmg` from [Releases](https://github.com/junixlabs/sidstack/releases).
+Download the `.dmg` (macOS) or `.deb`/`.AppImage` (Linux) from [Releases](https://github.com/junixlabs/sidstack/releases).
 
 Or build from source:
 
@@ -302,28 +331,42 @@ cd sidstack
 pnpm install && pnpm packages:build && pnpm tauri:build
 ```
 
-### 2. Open Your Project
+### 2. Connect to Server
 
-Launch SidStack and select your project folder. If not initialized, the app will guide you through setup.
+On first launch, the app shows a **Connection Setup** screen. Enter your Server URL and API Key, then test the connection.
 
-### 3. Explore the 7 Views
+### 3. Explore the Views
 
 | View | Shortcut | Description |
 |------|----------|-------------|
-| **Project Hub** | `Cmd+1` | Capability tree, entity connections, OKR progress |
-| **Task Manager** | `Cmd+2` | Create/track tasks, 4 view modes (list, kanban, timeline, detail) |
+| **Project Hub** | `Cmd+1` | Dashboard with capabilities, goals, and quick actions |
+| **Task Manager** | `Cmd+2` | Create/track tasks, list/kanban/timeline views |
 | **Knowledge Browser** | `Cmd+3` | Browse `.sidstack/knowledge/` docs with tree view and search |
 | **Ticket Queue** | `Cmd+4` | External ticket intake, review workflow, convert to tasks |
 | **Training Room** | `Cmd+5` | Capture lessons from incidents, build rules over time |
+| **Agent Desk** | - | Manage isolated agent workspaces (git worktrees) |
+| **Traceability** | - | Spec-task-test coverage matrix |
+| **Docs** | - | Built-in documentation viewer |
 | **Settings** | `Cmd+,` | Project configuration |
-| **Worktree Status** | - | Git branch and file status |
 
 ---
 
 ## Key Concepts
 
 ### Knowledge System
-SidStack stores structured project knowledge in `.sidstack/knowledge/` as markdown with YAML frontmatter. Categories: business-logic, api, database, patterns, modules.
+SidStack stores structured project knowledge in `.sidstack/knowledge/` as markdown with YAML frontmatter. 9 categories:
+
+| Category | Purpose |
+|----------|---------|
+| `00-context` | Vision, glossary, onboarding |
+| `01-architecture` | System design, module boundaries |
+| `02-decisions` | ADRs, technical decisions |
+| `03-standards` | Coding conventions, naming rules |
+| `04-data` | Database schema, data models |
+| `05-api` | API contracts, schemas |
+| `06-operations` | Deployment, monitoring |
+| `07-projects` | Project-specific docs |
+| `08-incidents` | Incident reports, root cause analysis |
 
 Use `init --scan` to auto-generate these docs, or create them manually.
 

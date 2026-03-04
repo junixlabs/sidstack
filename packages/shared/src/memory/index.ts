@@ -1,9 +1,14 @@
-export { Mem0Client, createMem0Client } from './client.js';
+export { SidMemoClient, createSidMemoClient, Mem0Client, createMem0Client } from './client.js';
 export type {
-  Mem0Config,
+  SidMemoConfig,
+  SidMemoMemory,
+  SidMemoSearchResult,
+  SidMemoListResponse,
+  SidMemoHistoryEntry,
+  EntityDetail,
+  EntityListResponse,
+  SubgraphResponse,
   Mem0Memory,
-  Mem0AddRequest,
-  Mem0SearchRequest,
   MemorySourceType,
 } from './types.js';
 export {

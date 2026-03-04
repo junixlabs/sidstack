@@ -2,7 +2,7 @@
 name: sidstack-aware
 user-invocable: false
 allowed-tools: mcp__sidstack__task_update, mcp__sidstack__task_list, mcp__sidstack__task_complete, mcp__sidstack__task_get, mcp__sidstack__incident_create, mcp__sidstack__lesson_create, mcp__sidstack__memory_add, mcp__sidstack__memory_search, mcp__sidstack__entity_link, mcp__sidstack__entity_references, mcp__sidstack__knowledge_search, mcp__sidstack__entity_context
-description: "Task lifecycle and completion flow. Auto-triggers during implementation."
+description: "Tracks task progress milestones and guides completion flow with quality gates. Auto-triggers when code changes are made, work nears completion, user queries task status, or a task needs the plan-first gate check before implementation."
 ---
 
 # SidStack Task Progress & Completion
@@ -18,6 +18,33 @@ This skill provides workflow guidance during active implementation:
 > **Note:** Task lifecycle is guided by the `/sidstack-dev` skill. This skill tracks progress and completion flow.
 
 ---
+
+## Plan-First Gate (MANDATORY)
+
+**Before any implementation begins**, verify the task has an approved plan:
+
+```
+mcp__sidstack__task_get({ taskId: "[id]" })
+→ check: planStatus === "approved"
+```
+
+| planStatus | Action |
+|------------|--------|
+| `undefined` / no plan | **STOP.** Run `/sidstack-plan [task-id]` to create a plan first. |
+| `draft` | **STOP.** Plan is pending user review. Do not implement. |
+| `revision_requested` | **STOP.** Read `planReviewNotes`, revise plan, resubmit. |
+| `approved` | **PROCEED.** Move to `in_progress` and implement following the plan. |
+
+**Exception:** hotfix mode only (critical production issues can skip plan review).
+
+### Implementation Must Follow the Plan
+
+When `planStatus === "approved"`:
+1. Read the `solutionPlan` field — this is the contract
+2. Change only files listed in the plan
+3. Follow the approach described in the plan
+4. If you discover the plan is wrong or incomplete: **STOP**, update notes, move back to `review`
+5. If you need to touch files NOT in the plan: ask user before proceeding
 
 ## Progress Tracking
 

@@ -50,6 +50,10 @@ export default class Update extends Command {
       description: 'Force update even if versions match',
       default: false,
     }),
+    'skip-claude-md': Flags.boolean({
+      description: 'Skip CLAUDE.md merge (useful for batch updates)',
+      default: false,
+    }),
   };
 
   static args = {
@@ -122,7 +126,9 @@ export default class Update extends Command {
       this.log('\n📄 Updating CLAUDE.md...');
       const claudeMdPath = path.join(projectPath, 'CLAUDE.md');
 
-      if (!fs.existsSync(claudeMdPath)) {
+      if (flags['skip-claude-md']) {
+        this.log('  ⏭ CLAUDE.md skipped (--skip-claude-md)');
+      } else if (!fs.existsSync(claudeMdPath)) {
         // No CLAUDE.md, generate new
         const content = this.getClaudeMdTemplate(config.projectName, projectPath);
         fs.writeFileSync(claudeMdPath, content);
@@ -487,9 +493,10 @@ pnpm test        # All pass
 
     // SidStack-managed skill folders (current + legacy for cleanup)
     const managedSkillDirs = [
-      // Current skills
+      // Current skills (will be re-copied from templates)
       path.join(projectPath, '.claude', 'skills', 'sidstack-aware'),
       path.join(projectPath, '.claude', 'skills', 'sidstack-dev'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-plan'),
       // Legacy skills (cleaned up on update)
       path.join(projectPath, '.claude', 'skills', 'sidstack-implement'),
       path.join(projectPath, '.claude', 'skills', 'sidstack-review'),
@@ -498,6 +505,25 @@ pnpm test        # All pass
       path.join(projectPath, '.claude', 'skills', 'sidstack-impact-safe'),
       path.join(projectPath, '.claude', 'skills', 'sidstack-lesson-detector'),
       path.join(projectPath, '.claude', 'skills', 'sidstack-training-context'),
+    ];
+
+    // Old .sidstack format directories (pre-v0.5.0)
+    const legacySidstackDirs = [
+      path.join(projectPath, '.sidstack', 'skills'),
+      path.join(projectPath, '.sidstack', 'principles'),
+      path.join(projectPath, '.sidstack', 'workflows'),
+      path.join(projectPath, '.sidstack', 'modules'),
+      path.join(projectPath, '.sidstack', 'shared'),
+      path.join(projectPath, '.sidstack', 'capabilities'),
+    ];
+
+    // Stale files from old versions
+    const staleFiles = [
+      path.join(projectPath, '.sidstack', 'sessions.json'),
+      path.join(projectPath, '.sidstack', 'worktrees.json'),
+      path.join(projectPath, '.sidstack', 'ports.json'),
+      path.join(projectPath, '.sidstack', 'workspace.json'),
+      path.join(projectPath, '.sidstack', 'project-profile.yaml'),
     ];
 
     // Files managed by SidStack
@@ -516,6 +542,22 @@ pnpm test        # All pass
     for (const skillDir of managedSkillDirs) {
       if (fs.existsSync(skillDir)) {
         fs.rmSync(skillDir, { recursive: true, force: true });
+      }
+    }
+
+    // Remove old .sidstack format directories (pre-v0.5.0)
+    for (const dir of legacySidstackDirs) {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+        this.log(`  🧹 Removed legacy ${path.relative(projectPath, dir)}/`);
+      }
+    }
+
+    // Remove stale files from old versions
+    for (const file of staleFiles) {
+      if (fs.existsSync(file)) {
+        fs.unlinkSync(file);
+        this.log(`  🧹 Removed stale ${path.relative(projectPath, file)}`);
       }
     }
 

@@ -234,15 +234,21 @@ Capture what goes wrong, learn from it, and prevent it from happening again.
 
 ## MCP Integration
 
-SidStack connects to Claude Code via a **Model Context Protocol (MCP) server** that provides 32 tools:
+SidStack connects to Claude Code via a **Model Context Protocol (MCP) server** that provides 49 tools:
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| Knowledge | `knowledge_context`, `knowledge_search`, `knowledge_list`, `knowledge_get`, `knowledge_modules` | Build context, search docs |
-| Tasks | `task_create`, `task_update`, `task_list`, `task_get`, `task_complete` | Manage governed work |
-| Impact | `impact_analyze`, `impact_check_gate`, `impact_list` | Assess change risk |
-| Tickets | `ticket_create`, `ticket_list`, `ticket_update`, `ticket_convert_to_task` | Manage intake |
-| Training | `incident_create`, `lesson_create`, `skill_create`, `rule_check` | Learn from mistakes |
+| Knowledge (9) | `knowledge_context`, `knowledge_search`, `knowledge_list`, `knowledge_get`, `knowledge_modules`, `knowledge_create`, `knowledge_update`, `knowledge_delete`, `knowledge_health` | Build context, search docs |
+| Tasks (5) | `task_create`, `task_update`, `task_list`, `task_get`, `task_complete` | Manage governed work |
+| Impact (3) | `impact_analyze`, `impact_check_gate`, `impact_list` | Assess change risk |
+| Tickets (4) | `ticket_create`, `ticket_list`, `ticket_update`, `ticket_convert_to_task` | Manage intake |
+| Training (8) | `incident_create`, `incident_list`, `lesson_create`, `lesson_list`, `skill_create`, `skill_list`, `rule_check`, `training_context_get` | Learn from mistakes |
+| OKRs (2) | `okr_list`, `okr_update` | Track project goals |
+| Test Results (3) | `test_result_create`, `test_result_list`, `test_result_get` | Persist test execution |
+| Agent Desk (5) | `desk_list`, `desk_status`, `desk_acquire`, `desk_release`, `desk_pool_init` | Workspace isolation |
+| Memory (6) | `memory_add`, `memory_search`, `memory_list`, `memory_delete`, `memory_index_knowledge`, `memory_cleanup` | Semantic search |
+| Traceability (1) | `traceability_matrix` | Spec-task-test coverage |
+| Entity Refs (3) | `entity_link`, `entity_references`, `entity_context` | Cross-entity linking |
 
 ---
 

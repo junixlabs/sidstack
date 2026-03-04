@@ -1,8 +1,8 @@
 /**
  * Memory MCP Tool Handlers
  *
- * Semantic memory tools powered by mem0 REST API server.
- * All tools gracefully degrade when mem0 server is unavailable.
+ * Semantic memory tools powered by SidMemo API (mem.sidcorp.co).
+ * All tools gracefully degrade when SidMemo is unavailable.
  *
  * Tools:
  * - memory_add: Store a memory (with conflict detection + TTL)
@@ -14,11 +14,13 @@
  */
 
 import {
-  createMem0Client,
+  createSidMemoClient,
   createApiClient,
   detectWorkspace,
   isMemoryExpired,
-  type Mem0Client,
+  KnowledgeIndexer,
+  type SidMemoClient,
+  type SidMemoMemory,
   type Mem0Memory,
 } from '@sidstack/shared';
 import { validateProjectPath } from './validate-path.js';
@@ -27,11 +29,11 @@ import { validateProjectPath } from './validate-path.js';
 // Singleton client (reused across tool calls)
 // =============================================================================
 
-let _client: Mem0Client | null = null;
+let _client: SidMemoClient | null = null;
 
-function getClient(): Mem0Client {
+function getClient(): SidMemoClient {
   if (!_client) {
-    _client = createMem0Client();
+    _client = createSidMemoClient();
   }
   return _client;
 }
@@ -41,15 +43,15 @@ function resolveWorkspacePath(projectPath: string): string {
   return workspace ? workspace.workspaceRoot : projectPath;
 }
 
-/** Partition memories into active and expired. */
-function partitionByExpiry(memories: Mem0Memory[]): {
-  active: Mem0Memory[];
-  expired: Mem0Memory[];
+/** Partition memories into active and expired (works with both types). */
+function partitionByExpiry(memories: Array<SidMemoMemory | Mem0Memory>): {
+  active: Array<SidMemoMemory | Mem0Memory>;
+  expired: Array<SidMemoMemory | Mem0Memory>;
 } {
-  const active: Mem0Memory[] = [];
-  const expired: Mem0Memory[] = [];
+  const active: Array<SidMemoMemory | Mem0Memory> = [];
+  const expired: Array<SidMemoMemory | Mem0Memory> = [];
   for (const mem of memories) {
-    if (isMemoryExpired(mem)) {
+    if (isMemoryExpired(mem as Mem0Memory)) {
       expired.push(mem);
     } else {
       active.push(mem);
@@ -59,9 +61,10 @@ function partitionByExpiry(memories: Mem0Memory[]): {
 }
 
 /** Background-delete expired memories (fire-and-forget). */
-function backgroundDeleteExpired(client: Mem0Client, expired: Mem0Memory[], userId?: string): void {
-  for (const mem of expired) {
-    client.delete(mem.id, userId).catch(() => {});
+function backgroundDeleteExpired(client: SidMemoClient, expired: Array<SidMemoMemory | Mem0Memory>): void {
+  const ids = expired.map(m => m.id);
+  if (ids.length > 0) {
+    client.bulkDelete(ids).catch(() => {});
   }
 }
 
@@ -72,7 +75,7 @@ function backgroundDeleteExpired(client: Mem0Client, expired: Mem0Memory[], user
 export const memoryTools = [
   {
     name: 'memory_add',
-    description: 'Store a memory in the semantic memory system (mem0). Memories are searchable by meaning, not just keywords. Use user_id for project isolation.',
+    description: 'Store a memory in the semantic memory system. Memories are searchable by meaning, not just keywords. Use user_id for project isolation.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -82,7 +85,7 @@ export const memoryTools = [
         },
         projectId: {
           type: 'string',
-          description: 'Project ID for memory isolation (used as user_id in mem0)',
+          description: 'Project ID for memory isolation (used as user_id)',
         },
         metadata: {
           type: 'object',
@@ -144,7 +147,7 @@ export const memoryTools = [
         },
         projectId: {
           type: 'string',
-          description: 'Project ID for ownership verification (used as user_id in mem0)',
+          description: 'Project ID for ownership verification',
         },
       },
       required: ['memoryId'],
@@ -152,7 +155,7 @@ export const memoryTools = [
   },
   {
     name: 'memory_index_knowledge',
-    description: 'Bulk-index all knowledge documents from .sidstack/knowledge/ into semantic memory. Use this to bootstrap semantic search for an existing knowledge base.',
+    description: 'Bulk-index all knowledge documents into semantic memory with chunking. Use this to bootstrap semantic search for an existing knowledge base.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -202,7 +205,7 @@ export async function handleMemoryAdd(args: {
   if (!(await client.isAvailable())) {
     return {
       success: false,
-      error: 'mem0 server is not available. Start the mem0 Docker container to enable semantic memory.',
+      error: 'SidMemo API is not available. Check SIDMEMO_API_KEY environment variable.',
     };
   }
 
@@ -238,25 +241,37 @@ export async function handleMemorySearch(args: {
   if (!(await client.isAvailable())) {
     return {
       success: false,
-      error: 'mem0 server is not available. Start the mem0 Docker container to enable semantic search.',
+      error: 'SidMemo API is not available.',
       memories: [],
     };
   }
 
   try {
     const rawMemories = await client.search(args.query, args.projectId, args.limit || 10);
-    const { active, expired } = partitionByExpiry(rawMemories);
+    // Map to Mem0Memory shape for partitioning
+    const asMem0 = rawMemories.map(m => ({
+      id: m.id,
+      memory: m.content,
+      metadata: m.metadata_ as Record<string, unknown> | undefined,
+      score: m.score,
+    }));
+    const { active, expired } = partitionByExpiry(asMem0);
 
     // Background-delete expired results
     if (expired.length > 0) {
-      backgroundDeleteExpired(client, expired, args.projectId);
+      backgroundDeleteExpired(client, expired);
     }
 
     return {
       success: true,
       query: args.query,
       total: active.length,
-      memories: active,
+      memories: active.map(m => ({
+        id: m.id,
+        memory: (m as Mem0Memory).memory || (m as SidMemoMemory).content,
+        score: (m as Mem0Memory).score ?? (m as SidMemoMemory).score,
+        metadata: (m as Mem0Memory).metadata || (m as SidMemoMemory).metadata_,
+      })),
       ...(expired.length > 0 ? { expiredFiltered: expired.length } : {}),
     };
   } catch (error) {
@@ -276,24 +291,36 @@ export async function handleMemoryList(args: {
   if (!(await client.isAvailable())) {
     return {
       success: false,
-      error: 'mem0 server is not available.',
+      error: 'SidMemo API is not available.',
       memories: [],
     };
   }
 
   try {
-    const rawMemories = await client.list(args.projectId);
-    const { active, expired } = partitionByExpiry(rawMemories);
+    const response = await client.list(args.projectId);
+    const rawMemories = response.items;
+    // Map to Mem0Memory shape for partitioning
+    const asMem0 = rawMemories.map(m => ({
+      id: m.id,
+      memory: m.content,
+      metadata: m.metadata_ as Record<string, unknown> | undefined,
+      score: m.score,
+    }));
+    const { active, expired } = partitionByExpiry(asMem0);
 
     // Background-delete expired entries
     if (expired.length > 0) {
-      backgroundDeleteExpired(client, expired, args.projectId);
+      backgroundDeleteExpired(client, expired);
     }
 
     return {
       success: true,
       total: active.length,
-      memories: active,
+      memories: active.map(m => ({
+        id: m.id,
+        memory: (m as Mem0Memory).memory || (m as SidMemoMemory).content,
+        metadata: (m as Mem0Memory).metadata || (m as SidMemoMemory).metadata_,
+      })),
       ...(expired.length > 0 ? { expiredFiltered: expired.length } : {}),
     };
   } catch (error) {
@@ -314,16 +341,15 @@ export async function handleMemoryDelete(args: {
   if (!(await client.isAvailable())) {
     return {
       success: false,
-      error: 'mem0 server is not available.',
+      error: 'SidMemo API is not available.',
     };
   }
 
   try {
-    const deleted = await client.delete(args.memoryId, args.projectId);
+    await client.delete(args.memoryId);
     return {
-      success: deleted,
+      success: true,
       memoryId: args.memoryId,
-      ...(deleted ? {} : { error: 'Failed to delete memory' }),
     };
   } catch (error) {
     return {
@@ -343,7 +369,7 @@ export async function handleMemoryIndexKnowledge(args: {
   if (!(await client.isAvailable())) {
     return {
       success: false,
-      error: 'mem0 server is not available. Start the mem0 Docker container first.',
+      error: 'SidMemo API is not available. Check SIDMEMO_API_KEY environment variable.',
     };
   }
 
@@ -353,43 +379,15 @@ export async function handleMemoryIndexKnowledge(args: {
     const response = await knowledgeApiClient.knowledge.list({ projectPath: workspacePath, limit: '1000' } as any);
     const docs = response.documents || [];
 
-    let indexed = 0;
-    let failed = 0;
-    const errors: string[] = [];
-
-    for (const doc of docs) {
-      try {
-        const content = [
-          `Title: ${doc.title}`,
-          doc.summary ? `Summary: ${doc.summary}` : '',
-          `Type: ${doc.type}`,
-          doc.module ? `Module: ${doc.module}` : '',
-          doc.tags?.length ? `Tags: ${doc.tags.join(', ')}` : '',
-          '',
-          doc.content,
-        ]
-          .filter(Boolean)
-          .join('\n');
-
-        await client.addSmart(content, args.projectId, {
-          sourceType: 'knowledge_doc',
-          docId: doc.id,
-          docType: doc.type,
-          module: doc.module,
-        });
-        indexed++;
-      } catch (err) {
-        failed++;
-        errors.push(`${doc.id}: ${err instanceof Error ? err.message : 'unknown error'}`);
-      }
-    }
+    const indexer = new KnowledgeIndexer(client);
+    const result = await indexer.indexAll(docs, args.projectId);
 
     return {
       success: true,
-      total: docs.length,
-      indexed,
-      failed,
-      ...(errors.length > 0 ? { errors: errors.slice(0, 10) } : {}),
+      total: result.total,
+      indexed: result.indexed,
+      failed: result.failed,
+      ...(result.errors.length > 0 ? { errors: result.errors.slice(0, 10) } : {}),
     };
   } catch (error) {
     return {
@@ -408,23 +406,37 @@ export async function handleMemoryCleanup(args: {
   if (!(await client.isAvailable())) {
     return {
       success: false,
-      error: 'mem0 server is not available.',
+      error: 'SidMemo API is not available.',
     };
   }
 
   try {
-    const allMemories = await client.list(args.projectId);
-    const { active, expired } = partitionByExpiry(allMemories);
+    const response = await client.list(args.projectId);
+    const allMemories = response.items;
+    const asMem0 = allMemories.map(m => ({
+      id: m.id,
+      memory: m.content,
+      metadata: m.metadata_ as Record<string, unknown> | undefined,
+    }));
+    const { active, expired } = partitionByExpiry(asMem0);
 
     if (!args.dryRun) {
       let deleted = 0;
-      let failedDeletes = 0;
-      for (const mem of expired) {
+      if (expired.length > 0) {
+        const ids = expired.map(m => m.id);
         try {
-          await client.delete(mem.id, args.projectId);
-          deleted++;
+          const result = await client.bulkDelete(ids);
+          deleted = result.deleted;
         } catch {
-          failedDeletes++;
+          // Fall back to individual deletes
+          for (const mem of expired) {
+            try {
+              await client.delete(mem.id);
+              deleted++;
+            } catch {
+              // skip
+            }
+          }
         }
       }
       return {
@@ -432,7 +444,6 @@ export async function handleMemoryCleanup(args: {
         scanned: allMemories.length,
         active: active.length,
         deleted,
-        ...(failedDeletes > 0 ? { failedDeletes } : {}),
       };
     }
 
@@ -444,9 +455,9 @@ export async function handleMemoryCleanup(args: {
       wouldDelete: expired.length,
       expiredMemories: expired.map(m => ({
         id: m.id,
-        memory: m.memory?.substring(0, 100),
-        sourceType: m.metadata?.sourceType,
-        expiresAt: m.metadata?.expiresAt,
+        memory: (m as Mem0Memory).memory?.substring(0, 100),
+        sourceType: (m as Mem0Memory).metadata?.sourceType,
+        expiresAt: (m as Mem0Memory).metadata?.expiresAt,
       })),
     };
   } catch (error) {
@@ -458,11 +469,24 @@ export async function handleMemoryCleanup(args: {
 }
 
 /**
- * Get the singleton Mem0Client for use in other handlers.
- * Returns null if mem0 is not available.
+ * Get the singleton SidMemoClient for use in other handlers.
+ * Returns null if SidMemo is not available.
  */
-export async function getMem0ClientIfAvailable(): Promise<Mem0Client | null> {
+export async function getSidMemoClientIfAvailable(): Promise<SidMemoClient | null> {
   const client = getClient();
   const available = await client.isAvailable();
   return available ? client : null;
+}
+
+/** @deprecated Use getSidMemoClientIfAvailable */
+export const getMem0ClientIfAvailable = getSidMemoClientIfAvailable;
+
+/**
+ * Get a KnowledgeIndexer backed by the singleton SidMemoClient.
+ * Returns null if SidMemo is not available.
+ */
+export async function getKnowledgeIndexer(): Promise<KnowledgeIndexer | null> {
+  const client = await getSidMemoClientIfAvailable();
+  if (!client) return null;
+  return new KnowledgeIndexer(client);
 }

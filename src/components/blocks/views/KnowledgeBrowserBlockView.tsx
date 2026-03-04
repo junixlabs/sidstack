@@ -96,6 +96,47 @@ interface KnowledgeStats {
   byModule: Record<string, number>;
 }
 
+// Module overview types (loaded when viewing a type='module' document)
+interface ModuleOverviewData {
+  module: {
+    id: string;
+    title: string;
+    summary?: string;
+    status: string;
+    owner?: string;
+    tags: string[];
+    content?: string;
+    covers: string[];
+    updatedAt?: string;
+  };
+  documents: {
+    total: number;
+    byType: Record<string, number>;
+    byStatus: Record<string, number>;
+    items: KnowledgeDocument[];
+    stale: KnowledgeDocument[];
+    recentlyUpdated: KnowledgeDocument[];
+  };
+  dependencies: {
+    dependsOn: Array<{ id: string; title: string; summary?: string; documentCount: number }>;
+    dependedBy: Array<{ id: string; title: string }>;
+    related: Array<{ id: string; title: string; summary?: string; documentCount: number }>;
+  };
+  health: {
+    score: number;
+    totalDocs: number;
+    staleDocs: number;
+    coverage: {
+      hasModuleDoc: boolean;
+      hasSpecs: boolean;
+      hasGuides: boolean;
+      hasReferences: boolean;
+      hasDecisions: boolean;
+    };
+  };
+}
+
+
 // =============================================================================
 // Constants
 // =============================================================================
@@ -182,6 +223,10 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
   // Tree state
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
+  // Module overview (loaded when selecting a type='module' doc)
+  const [moduleOverview, setModuleOverview] = useState<ModuleOverviewData | null>(null);
+  const [isLoadingModule, setIsLoadingModule] = useState(false);
+
   // ===========================================================================
   // Data Loading
   // ===========================================================================
@@ -232,9 +277,18 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
       setStats(statsData);
       setTree(treeData);
 
-      // Auto-expand first level
-      const firstLevel = treeData.map((n: KnowledgeTreeNode) => n.path);
-      setExpandedFolders(new Set(firstLevel));
+      // Auto-expand all folder levels so documents are visible immediately
+      const allFolders = new Set<string>();
+      function collectFolders(nodes: KnowledgeTreeNode[]) {
+        for (const node of nodes) {
+          if (node.type === 'folder') {
+            allFolders.add(node.path);
+            if (node.children) collectFolders(node.children);
+          }
+        }
+      }
+      collectFolders(treeData);
+      setExpandedFolders(allFolders);
     } catch (e) {
       console.error("Error loading knowledge:", e);
       setError(e instanceof Error ? e.message : "Failed to load knowledge");
@@ -266,6 +320,26 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
 
       const doc = await res.json();
       setSelectedDoc(doc);
+
+      // If this is a module doc, also load module overview
+      if (doc.type === 'module' && doc.module) {
+        setIsLoadingModule(true);
+        setModuleOverview(null);
+        try {
+          const overviewRes = await apiFetch(
+            `${API_BASE}/modules/${encodeURIComponent(doc.module)}/overview?projectPath=${encodeURIComponent(workspacePath)}`
+          );
+          if (overviewRes.ok) {
+            setModuleOverview(await overviewRes.json());
+          }
+        } catch {
+          // Non-blocking — module overview is supplementary
+        } finally {
+          setIsLoadingModule(false);
+        }
+      } else {
+        setModuleOverview(null);
+      }
     } catch (e) {
       console.error("Error loading document:", e);
     }
@@ -559,7 +633,6 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
               compact
             />
           ) : filteredTree.length === 0 && hasFilters ? (
-            // Filters active but no matches
             <div className="flex flex-col items-center justify-center h-32 text-center px-4">
               <Search className="w-7 h-7 text-[var(--text-muted)] mb-2 opacity-40" />
               <p className="text-[12px] font-medium text-[var(--text-secondary)] mb-1">No matching documents</p>
@@ -578,7 +651,6 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
               </button>
             </div>
           ) : tree.length === 0 ? (
-            // No documents at all
             <EmptyState
               icon={<BookOpen className="w-full h-full" />}
               title="No Knowledge Documents"
@@ -592,8 +664,8 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
                 },
               ]}
               tips={[
-                "Create .sidstack/knowledge/ folder to add documents",
-                "Supported types: guides, tutorials, patterns, skills",
+                "Use MCP tools or API to create knowledge documents",
+                "Supported types: guides, references, decisions, specs, rules",
               ]}
               compact
             />
@@ -631,10 +703,10 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
               <span className="uppercase tracking-wider font-semibold">
                 Knowledge
               </span>
-              {selectedDoc.category && (
+              {selectedDoc.module && (
                 <>
                   <span className="opacity-40">/</span>
-                  <span>{selectedDoc.category}</span>
+                  <span>{selectedDoc.module}</span>
                 </>
               )}
               <span className="opacity-40">/</span>
@@ -693,7 +765,6 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
                     Owner: <span className="text-[var(--text-secondary)]">{selectedDoc.owner}</span>
                   </span>
                 )}
-                {/* Quick navigation to related tasks */}
                 {selectedDoc.module && (
                   <button
                     onClick={() => navigateToTaskManager({ filterByModule: selectedDoc.module! })}
@@ -706,7 +777,6 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
                 )}
               </div>
 
-              {/* Related documents */}
               {(selectedDoc.related?.length || selectedDoc.dependsOn?.length) && (
                 <div className="mt-2 pt-2 border-t border-[var(--border-muted)] flex flex-wrap gap-2 text-[11px]">
                   {selectedDoc.dependsOn?.length ? (
@@ -744,6 +814,25 @@ export const KnowledgeBrowserBlockView = memo(function KnowledgeBrowserBlockView
 
             {/* Type Context Bar - type-specific info */}
             <TypeContextBar doc={selectedDoc} />
+
+            {/* Module Overview (shown inline when doc type is 'module') */}
+            {selectedDoc.type === 'module' && (
+              isLoadingModule ? (
+                <div className="flex items-center gap-2 px-6 py-4 border-b border-[var(--border-muted)] text-[var(--text-muted)]">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span className="text-[12px]">Loading module overview...</span>
+                </div>
+              ) : moduleOverview ? (
+                <ModuleOverviewPanel
+                  overview={moduleOverview}
+                  onDocClick={handleSelectDocument}
+                  onModuleClick={(modId) => {
+                    const modDoc = documents.find(d => d.type === 'module' && d.module === modId);
+                    if (modDoc) handleSelectDocument(modDoc.id);
+                  }}
+                />
+              ) : null
+            )}
 
             {/* Document Content + TOC */}
             <div className="flex flex-1 overflow-hidden">
@@ -824,6 +913,8 @@ function TreeNode({
   const isFolder = node.type === "folder";
   const isSelected = !isFolder && node.id === selectedDocId;
 
+  const isModuleNode = isFolder && (node.id.startsWith('module:') || node.id === '_project');
+
   if (isFolder) {
     return (
       <div role="treeitem" aria-expanded={isExpanded}>
@@ -841,7 +932,9 @@ function TreeNode({
           <span className="flex-shrink-0 transition-transform duration-150" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
             <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
           </span>
-          {isExpanded ? (
+          {isModuleNode ? (
+            <Box className="w-3.5 h-3.5 text-[var(--doc-type-module)] flex-shrink-0" />
+          ) : isExpanded ? (
             <FolderOpen className="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0" />
           ) : (
             <Folder className="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0" />
@@ -1242,6 +1335,162 @@ function DocTableOfContents({
           </button>
         ))}
       </nav>
+    </div>
+  );
+}
+
+// =============================================================================
+// Module Overview Panel (inline, shown when selecting a type='module' doc)
+// =============================================================================
+
+function ModuleOverviewPanel({
+  overview,
+  onDocClick,
+  onModuleClick,
+}: {
+  overview: ModuleOverviewData;
+  onDocClick: (docId: string) => void;
+  onModuleClick: (moduleId: string) => void;
+}) {
+  const { documents, dependencies, health } = overview;
+  const healthColor = health.score >= 70 ? "var(--color-success)" : health.score >= 40 ? "var(--color-warning)" : "var(--color-error)";
+
+  return (
+    <div className="border-b border-[var(--border-muted)]">
+      {/* Stats + Health + Dependencies row */}
+      <div className="px-6 py-4 border-b border-[var(--border-muted)] grid grid-cols-3 gap-4">
+        {/* Stats */}
+        <div className="bg-[var(--surface-1)] rounded-lg p-3 border border-[var(--border-muted)]">
+          <div className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Documents</div>
+          <div className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{documents.total}</div>
+          <div className="flex flex-wrap gap-1 mt-2">
+            {Object.entries(documents.byType).map(([type, count]) => {
+              const tc = TYPE_CONFIG[type as DocumentType];
+              return tc ? (
+                <span key={type} className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: `${tc.color}12`, color: tc.color }}>
+                  {tc.label} {count}
+                </span>
+              ) : null;
+            })}
+          </div>
+        </div>
+
+        {/* Health */}
+        <div className="bg-[var(--surface-1)] rounded-lg p-3 border border-[var(--border-muted)]">
+          <div className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Health</div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[20px] font-bold tabular-nums" style={{ color: healthColor }}>{health.score}</span>
+            <span className="text-[11px] text-[var(--text-muted)]">/ 100</span>
+          </div>
+          <div className="mt-2 space-y-1">
+            {[
+              { label: "Module doc", ok: health.coverage.hasModuleDoc },
+              { label: "Specs", ok: health.coverage.hasSpecs },
+              { label: "Guides", ok: health.coverage.hasGuides },
+              { label: "References", ok: health.coverage.hasReferences },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center gap-1.5 text-[10px]">
+                <span className={cn("w-1.5 h-1.5 rounded-full", item.ok ? "bg-[var(--color-success)]" : "bg-[var(--border-muted)]")} />
+                <span className={item.ok ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}>{item.label}</span>
+              </div>
+            ))}
+            {health.staleDocs > 0 && (
+              <div className="text-[10px] text-[var(--color-warning)] mt-1">{health.staleDocs} stale doc{health.staleDocs > 1 ? 's' : ''}</div>
+            )}
+          </div>
+        </div>
+
+        {/* Dependencies */}
+        <div className="bg-[var(--surface-1)] rounded-lg p-3 border border-[var(--border-muted)]">
+          <div className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Dependencies</div>
+          {dependencies.dependsOn.length === 0 && dependencies.dependedBy.length === 0 && dependencies.related.length === 0 ? (
+            <p className="text-[11px] text-[var(--text-muted)]">None defined</p>
+          ) : (
+            <div className="space-y-2">
+              {dependencies.dependsOn.length > 0 && (
+                <div>
+                  <div className="text-[10px] text-[var(--text-muted)] mb-1">Depends on</div>
+                  {dependencies.dependsOn.map((dep) => (
+                    <button key={dep.id} onClick={() => onModuleClick(dep.id)} className="block text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors truncate">
+                      {dep.title} <span className="text-[var(--text-muted)]">({dep.documentCount})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {dependencies.dependedBy.length > 0 && (
+                <div>
+                  <div className="text-[10px] text-[var(--text-muted)] mb-1">Used by</div>
+                  {dependencies.dependedBy.map((dep) => (
+                    <button key={dep.id} onClick={() => onModuleClick(dep.id)} className="block text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors truncate">
+                      {dep.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {dependencies.related.length > 0 && (
+                <div>
+                  <div className="text-[10px] text-[var(--text-muted)] mb-1">Related</div>
+                  {dependencies.related.map((dep) => (
+                    <button key={dep.id} onClick={() => onModuleClick(dep.id)} className="block text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors truncate">
+                      {dep.title} <span className="text-[var(--text-muted)]">({dep.documentCount})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Document list grouped by type */}
+      <div className="px-6 py-4">
+        <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">Documents</div>
+        {documents.total === 0 ? (
+          <p className="text-[12px] text-[var(--text-muted)] py-4">No documents in this module yet.</p>
+        ) : (
+          <div className="space-y-4">
+            {/* Group items by type */}
+            {Object.entries(
+              documents.items.reduce<Record<string, KnowledgeDocument[]>>((acc, doc) => {
+                const t = doc.type;
+                if (!acc[t]) acc[t] = [];
+                acc[t].push(doc);
+                return acc;
+              }, {})
+            ).map(([type, docs]) => {
+              const tc = TYPE_CONFIG[type as DocumentType];
+              return (
+                <div key={type}>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    {tc && <tc.icon className="w-3.5 h-3.5" style={{ color: tc.color }} />}
+                    <span className="text-[11px] font-medium" style={{ color: tc?.color }}>
+                      {tc?.label || type} ({docs.length})
+                    </span>
+                  </div>
+                  <div className="space-y-px ml-5">
+                    {docs.map((doc) => (
+                      <button
+                        key={doc.id}
+                        onClick={() => onDocClick(doc.id)}
+                        className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md hover:bg-[var(--surface-2)] transition-colors text-left group"
+                      >
+                        <span className="text-[12px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] truncate">{doc.title}</span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <DocumentStatusDot status={doc.status} />
+                          <span className="text-[10px] text-[var(--text-muted)] tabular-nums">
+                            {new Date(doc.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

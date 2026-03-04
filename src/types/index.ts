@@ -124,37 +124,35 @@ export interface Tab {
 // =============================================================================
 
 /**
- * Port allocation for a worktree.
- * Each worktree gets unique ports to avoid conflicts.
+ * Port allocation for a worktree / agent desk.
  */
 export interface PortAllocation {
-  dev: number;      // Development server (3000-3099)
-  api: number;      // API server (19432-19531)
-  preview: number;  // Preview server (4000-4099)
+  api: number;
+  mcp: number;
+  web: number;
+  dev: number;
 }
 
 /**
  * A git worktree within a project.
  * Multiple worktrees can exist for the same project (same git remote).
+ *
+ * Desk v2: persistent dev machine — status computed from git state.
+ * On non-main branch or dirty = 'working', otherwise 'idle'.
  */
-export type AgentRole = 'worker' | 'reviewer';
-export type AgentDeskStatus = 'idle' | 'assigned' | 'working' | 'review';
+export type AgentDeskStatus = 'idle' | 'working';
 
 export interface Worktree {
-  id: string;                    // Unique ID derived from branch name (e.g., "main", "feature-auth")
-  path: string;                  // Absolute filesystem path (e.g., "/Users/x/sidstack-feature-auth")
-  branch: string;                // Git branch name (e.g., "feature/auth")
-  purpose?: string;              // Optional description of what this worktree is for
-  ports: PortAllocation;         // Allocated ports for dev servers
+  id: string;                    // Unique ID = desk name (e.g., "desk-1")
+  path: string;                  // Absolute filesystem path
+  branch: string;                // Git branch name
+  ports: PortAllocation;         // Allocated ports
   isActive: boolean;             // Whether this worktree is currently selected
   lastActive: string;            // ISO timestamp of last activity
-
-  // Agent Desk fields (optional — when set, this worktree is an "agent desk")
-  agentRole?: AgentRole;         // 'worker' | 'reviewer'
-  agentName?: string;            // Display name (e.g., "Worker 1")
-  agentStatus?: AgentDeskStatus; // 'idle' | 'assigned' | 'working' | 'review'
-  currentTaskId?: string;        // Active task reference
-  currentTaskTitle?: string;     // Display text for assigned task
+  agentStatus: AgentDeskStatus;  // Computed: idle or working
+  tags?: string[];               // User/auto tags (feature, bugfix, etc.)
+  bootstrapStatus?: 'pending' | 'running' | 'done' | 'failed';
+  bootstrapError?: string;
 }
 
 /**
@@ -170,20 +168,4 @@ export interface Project {
   sharedContextPath: string;     // Path to shared context (e.g., ~/.sidstack/projects/<hash>/)
 }
 
-/**
- * Port range configuration for allocation.
- */
-export interface PortRange {
-  start: number;
-  end: number;
-}
-
-/**
- * Port ranges for different server types.
- */
-export interface PortRanges {
-  dev: PortRange;
-  api: PortRange;
-  preview: PortRange;
-}
 

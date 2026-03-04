@@ -9,7 +9,7 @@
  */
 
 import { Router } from 'express';
-import { getDB } from '@sidstack/shared';
+import { getRepository } from '@sidstack/shared';
 import type {
   EntityType,
   EntityReferenceRelationship,
@@ -22,7 +22,7 @@ export const referencesRouter: Router = Router();
 // =============================================================================
 referencesRouter.post('/', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { sourceType, sourceId, targetType, targetId, relationship, metadata, createdBy } = req.body;
 
     if (!sourceType || !sourceId || !targetType || !targetId || !relationship) {
@@ -31,7 +31,7 @@ referencesRouter.post('/', async (req, res) => {
       });
     }
 
-    const ref = db.createEntityReference({
+    const ref = await repo.entityLinks.create({
       sourceType: sourceType as EntityType,
       sourceId,
       targetType: targetType as EntityType,
@@ -56,14 +56,14 @@ referencesRouter.post('/', async (req, res) => {
 // =============================================================================
 referencesRouter.post('/bulk', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { references } = req.body;
 
     if (!Array.isArray(references) || references.length === 0) {
       return res.status(400).json({ error: 'references must be a non-empty array' });
     }
 
-    const results = db.createEntityReferences(
+    const results = await repo.entityLinks.createBatch(
       references.map((r: any) => ({
         sourceType: r.sourceType as EntityType,
         sourceId: r.sourceId,
@@ -87,7 +87,7 @@ referencesRouter.post('/bulk', async (req, res) => {
 // =============================================================================
 referencesRouter.delete('/link', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { sourceType, sourceId, targetType, targetId, relationship } = req.body;
 
     if (!sourceType || !sourceId || !targetType || !targetId || !relationship) {
@@ -96,7 +96,7 @@ referencesRouter.delete('/link', async (req, res) => {
       });
     }
 
-    const deleted = db.deleteEntityReferenceByLink(
+    const deleted = await repo.entityLinks.deleteByLink(
       sourceType as EntityType,
       sourceId,
       targetType as EntityType,
@@ -120,8 +120,8 @@ referencesRouter.delete('/link', async (req, res) => {
 // =============================================================================
 referencesRouter.delete('/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const deleted = db.deleteEntityReference(req.params.id);
+    const repo = await getRepository();
+    const deleted = await repo.entityLinks.delete(req.params.id);
 
     if (!deleted) {
       return res.status(404).json({ error: 'Reference not found' });
@@ -139,7 +139,7 @@ referencesRouter.delete('/:id', async (req, res) => {
 // =============================================================================
 referencesRouter.get('/', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       sourceType, sourceId, targetType, targetId,
       entityType, entityId, relationship, direction,
@@ -152,7 +152,7 @@ referencesRouter.get('/', async (req, res) => {
         : relationship as EntityReferenceRelationship
       : undefined;
 
-    const refs = db.queryEntityReferences({
+    const refs = await repo.entityLinks.query({
       sourceType: sourceType as EntityType | undefined,
       sourceId: sourceId as string | undefined,
       targetType: targetType as EntityType | undefined,
@@ -165,7 +165,7 @@ referencesRouter.get('/', async (req, res) => {
       offset: offset ? parseInt(offset as string, 10) : undefined,
     });
 
-    const total = db.countEntityReferences({
+    const total = await repo.entityLinks.count({
       sourceType: sourceType as EntityType | undefined,
       sourceId: sourceId as string | undefined,
       targetType: targetType as EntityType | undefined,
@@ -188,11 +188,11 @@ referencesRouter.get('/', async (req, res) => {
 // =============================================================================
 referencesRouter.get('/related/:entityType/:entityId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { entityType, entityId } = req.params;
     const maxDepth = req.query.maxDepth ? parseInt(req.query.maxDepth as string, 10) : 1;
 
-    const refs = db.getRelatedEntities(
+    const refs = await repo.entityLinks.getRelatedEntities(
       entityType as EntityType,
       entityId,
       maxDepth,
@@ -210,8 +210,8 @@ referencesRouter.get('/related/:entityType/:entityId', async (req, res) => {
 // =============================================================================
 referencesRouter.get('/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const ref = db.getEntityReference(req.params.id);
+    const repo = await getRepository();
+    const ref = await repo.entityLinks.get(req.params.id);
 
     if (!ref) {
       return res.status(404).json({ error: 'Reference not found' });

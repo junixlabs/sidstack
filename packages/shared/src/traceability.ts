@@ -1,13 +1,14 @@
 /**
  * Traceability Matrix - Shared Logic
  *
- * Builds a spec → task → test result coverage matrix.
+ * Builds a spec -> task -> test result coverage matrix.
  * Used by both MCP tool and API endpoint.
+ *
+ * Uses IRepository for async DB access (supports both SQLite and PostgreSQL).
  */
 
-import { createKnowledgeService } from './knowledge/index';
 import { listTestResults } from './test-results';
-import type { SidStackDB } from './database';
+import type { IRepository } from './repository/types';
 
 // =============================================================================
 // Types
@@ -54,15 +55,14 @@ export interface TraceabilityMatrix {
 // =============================================================================
 
 export async function buildTraceabilityMatrix(
-  db: SidStackDB,
+  repo: IRepository,
   projectPath: string,
   projectId: string,
   specId?: string,
   taskId?: string,
 ): Promise<TraceabilityMatrix> {
-  // 1. Load specs from knowledge system
-  const knowledgeService = createKnowledgeService(projectPath);
-  const result = await knowledgeService.listDocuments({ type: ['spec'] });
+  // 1. Load specs from DB
+  const result = await repo.knowledge.list(projectId, { type: 'spec', limit: 10000 });
   let specs = result.documents;
 
   if (specId) {
@@ -73,7 +73,8 @@ export async function buildTraceabilityMatrix(
   const allTestResults = listTestResults(projectPath, { projectId });
 
   // 3. Load all tasks for this project
-  const allTasks = db.listTasks(projectId, { fields: 'standard', preset: 'all' }).tasks;
+  const allTasksResult = await repo.tasks.list(projectId, { fields: 'standard', preset: 'all' });
+  const allTasks = allTasksResult.tasks;
 
   // If filtering by taskId, find which specs link to that task
   const taskIdFilter = taskId;
@@ -83,7 +84,7 @@ export async function buildTraceabilityMatrix(
 
   for (const spec of specs) {
     // Find tasks linked to this spec via entity references
-    const specRefs = db.queryEntityReferences({
+    const specRefs = await repo.entityLinks.query({
       entityType: 'knowledge',
       entityId: spec.id,
       direction: 'both',
@@ -126,7 +127,7 @@ export async function buildTraceabilityMatrix(
       if (!task) continue;
 
       // Find test results for this task
-      const taskTestRefs = db.queryEntityReferences({
+      const taskTestRefs = await repo.entityLinks.query({
         entityType: 'task',
         entityId: tId,
         direction: 'both',

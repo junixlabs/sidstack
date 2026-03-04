@@ -33,7 +33,7 @@ describe('Knowledge Schema Consistency', () => {
         'guide', 'reference',
         'template', 'checklist', 'pattern',
         'skill', 'principle', 'rule',
-        'module', 'index',
+        'module', 'okr', 'index',
       ];
       expect(ALL_DOCUMENT_TYPES).toEqual(expect.arrayContaining(expected));
       expect(expected).toEqual(expect.arrayContaining(ALL_DOCUMENT_TYPES));

@@ -29,6 +29,7 @@ import {
   handleKnowledgeSearch,
   handleKnowledgeContext,
   handleKnowledgeModules,
+  handleKnowledgeModuleOverview,
   handleKnowledgeCreate,
   handleKnowledgeUpdate,
   handleKnowledgeDelete,
@@ -53,11 +54,13 @@ import {
 
 import {
   agentDeskTools,
+  handleDeskCreate,
   handleDeskList,
   handleDeskStatus,
-  handleDeskAcquire,
-  handleDeskRelease,
-  handleDeskPoolInit,
+  handleDeskCheckout,
+  handleDeskHealth,
+  handleDeskConflicts,
+  handleDeskRemove,
 } from './handlers/agent-desk.js';
 
 import {
@@ -97,6 +100,7 @@ const MVP_TOOLS = new Set([
   'knowledge_list',
   'knowledge_get',
   'knowledge_modules',
+  'knowledge_module_overview',
   'knowledge_create',
   'knowledge_update',
   'knowledge_delete',
@@ -139,12 +143,14 @@ const MVP_TOOLS = new Set([
   'test_result_list',
   'test_result_get',
 
-  // Agent Desk (workspace isolation)
+  // Agent Desk (persistent dev machine)
+  'desk_create',
   'desk_list',
   'desk_status',
-  'desk_acquire',
-  'desk_release',
-  'desk_pool_init',
+  'desk_checkout',
+  'desk_health',
+  'desk_conflicts',
+  'desk_remove',
 
   // Memory (semantic search via mem0)
   'memory_add',
@@ -254,6 +260,8 @@ export async function handleToolCall(
         return wrapResult(handleKnowledgeContext(args as any));
       case 'knowledge_modules':
         return wrapResult(handleKnowledgeModules(args as any));
+      case 'knowledge_module_overview':
+        return wrapResult(handleKnowledgeModuleOverview(args as any));
       case 'knowledge_create':
         return wrapResult(handleKnowledgeCreate(args as any));
       case 'knowledge_update':
@@ -287,16 +295,20 @@ export async function handleToolCall(
         return wrapResult(handleTestResultTool(name, args as any));
 
       // Agent Desk tools
+      case 'desk_create':
+        return wrapResult(handleDeskCreate(args as any));
       case 'desk_list':
         return wrapResult(handleDeskList(args as any));
       case 'desk_status':
         return wrapResult(handleDeskStatus(args as any));
-      case 'desk_acquire':
-        return wrapResult(handleDeskAcquire(args as any));
-      case 'desk_release':
-        return wrapResult(handleDeskRelease(args as any));
-      case 'desk_pool_init':
-        return wrapResult(handleDeskPoolInit(args as any));
+      case 'desk_checkout':
+        return wrapResult(handleDeskCheckout(args as any));
+      case 'desk_health':
+        return wrapResult(handleDeskHealth(args as any));
+      case 'desk_conflicts':
+        return wrapResult(handleDeskConflicts(args as any));
+      case 'desk_remove':
+        return wrapResult(handleDeskRemove(args as any));
 
       // Memory tools (mem0 semantic search)
       case 'memory_add':

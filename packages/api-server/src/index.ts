@@ -15,8 +15,8 @@ import { trainingRouter } from './routes/training';
 import { tunnelRouter } from './routes/tunnel';
 import { referencesRouter } from './routes/references';
 import { traceabilityRouter } from './routes/traceability';
-import { eventsRouter } from './events';
-import { getDB } from '@sidstack/shared';
+import { initSocketIO, getIO } from './socket';
+import { initRepository, getRepository } from '@sidstack/shared';
 const app: Application = express();
 const server = createServer(app);
 const PORT = process.env.API_PORT || 19432;
@@ -44,9 +44,9 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^vscode-webview:\/\//,
 ];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (same-origin, curl, MCP server, VS Code extension host)
+// Shared CORS options for Express middleware + Socket.IO
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else if (ALLOWED_ORIGIN_PATTERNS.some((pattern) => pattern.test(origin))) {
@@ -56,7 +56,12 @@ app.use(cors({
     }
   },
   credentials: true,
-}));
+};
+
+app.use(cors(corsOptions));
+
+// Initialize Socket.IO on the same HTTP server
+initSocketIO(server, corsOptions);
 
 // Security headers
 app.use((_req: Request, res: Response, next: NextFunction) => {
@@ -82,11 +87,6 @@ if (API_KEY) {
       return next();
     }
 
-    // SSE endpoint exempt — EventSource browser API cannot send custom headers
-    if (req.path === '/api/events/stream') {
-      return next();
-    }
-
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Missing or invalid Authorization header' });
@@ -107,8 +107,8 @@ if (API_KEY) {
 // =============================================================================
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
-const RATE_LIMIT_MAX_WRITES = 100; // POST/PUT/PATCH/DELETE per window
-const RATE_LIMIT_MAX_READS = 600;  // GET per window
+const RATE_LIMIT_MAX_WRITES = 500; // POST/PUT/PATCH/DELETE per window
+const RATE_LIMIT_MAX_READS = 3000;  // GET per window
 
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
@@ -116,9 +116,17 @@ function getRateLimitKey(req: Request): string {
   return req.ip || req.socket.remoteAddress || 'unknown';
 }
 
+const LOCALHOST_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
 app.use((req: Request, res: Response, next: NextFunction) => {
-  // Skip rate limiting for health check and SSE
-  if (req.path === '/health' || req.path === '/api/events/stream') {
+  // Skip rate limiting for health check
+  if (req.path === '/health') {
+    return next();
+  }
+
+  // Skip rate limiting for localhost (Tauri app, CLI, local dev)
+  const clientIp = req.ip || req.socket.remoteAddress || '';
+  if (LOCALHOST_IPS.has(clientIp)) {
     return next();
   }
 
@@ -163,10 +171,16 @@ setInterval(() => {
 
 // Health check (before auth-protected routes so it's always accessible)
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  let socketClients = 0;
+  try {
+    socketClients = getIO().engine.clientsCount;
+  } catch {
+    // Socket.IO not initialized yet — leave at 0
+  }
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), socketClients });
 });
 
-// Core Routes (SQLite-based)
+// Core Routes
 app.use('/api/tasks', tasksRouter);
 app.use('/api/projects', projectsApiRouter);
 app.use('/api/progress', progressRouter);
@@ -179,8 +193,6 @@ app.use('/api/training', trainingRouter);
 app.use('/api/tunnel', tunnelRouter);
 app.use('/api/references', referencesRouter);
 app.use('/api/traceability', traceabilityRouter);
-app.use('/api/events', eventsRouter);
-
 // Desktop App Routes
 app.use('/api/config', configRouter);
 app.use('/api/upload', uploadRouter);
@@ -197,8 +209,17 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 // Start server
 server.listen(PORT, async () => {
   console.log(`API Server running on http://localhost:${PORT}`);
-  const db = await getDB();
-  console.log(`Database: ${db.getDbPath()}`);
+
+  // Initialize repository — PostgreSQL only (DATABASE_URL required)
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    console.error('[API] DATABASE_URL is required. API Server only supports PostgreSQL.');
+    process.exit(1);
+  }
+
+  const repo = await initRepository('postgres', { dbUrl });
+  const projects = await repo.projects.list();
+  console.log(`Database: PostgreSQL ready (${projects.length} projects)`);
 });
 
 export { app, server };

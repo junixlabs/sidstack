@@ -5,10 +5,16 @@ Code implementation after research approval. Follow detected patterns.
 ## Pre-Implementation
 
 1. **Verify plan approval**: `mcp__sidstack__task_get({ taskId })` → check `planStatus === 'approved'`
-   - If not approved: **STOP**. Tell user the solutionPlan needs approval before implementation can begin.
-   - If approved: proceed. Mark in_progress: `mcp__sidstack__task_update({ taskId, status: "in_progress" })`
-2. Create feature branch (if not exists): `git checkout -b feature/<name>`
-3. Identify needed layers from research report:
+   - If not approved: **STOP**. Tell user to run `/sidstack-plan [task-id]` and approve the plan first.
+   - If approved: read `solutionPlan` — this is the **contract** for this implementation.
+2. **Read the approved solutionPlan thoroughly** — extract:
+   - Files to change (scope boundary)
+   - Approach and logic changes
+   - Acceptance verification mapping
+   - Risks to watch for
+3. Mark in_progress: `mcp__sidstack__task_update({ taskId, status: "in_progress" })`
+4. Create feature branch (if not exists): `git checkout -b feature/<name>`
+5. Identify needed layers from the approved plan:
 
 | Layer | When Needed | Key Files |
 |-------|-------------|-----------|
@@ -64,12 +70,14 @@ Tag observations for later synthesis:
 
 ## Self-Verification (MANDATORY before handoff)
 
-Before proceeding to Step 3, verify your output against the task:
+Before proceeding to Step 3, verify your output against **both** the task AND the approved plan:
 
-1. `mcp__sidstack__task_get({ taskId })` — re-read acceptance criteria
-2. For EACH criterion, verify: does the implementation satisfy it?
-3. Check your diff: `git diff --stat` — any unexpected files? Debug code left?
-4. Run the feature manually if possible (API call, UI check, etc.)
+1. `mcp__sidstack__task_get({ taskId })` — re-read acceptance criteria AND solutionPlan
+2. For EACH acceptance criterion, verify: does the implementation satisfy it?
+3. **Plan compliance check**: did you follow the approved approach? Any deviations?
+4. **Scope check**: `git diff --stat` — are all changed files in the plan's "Files to Change" list? Any unexpected files?
+5. If a file NOT in the plan was changed: note it explicitly and explain why
+6. Run the feature manually if possible (API call, UI check, etc.)
 
 Record self-verification result:
 ```

@@ -566,7 +566,7 @@ export async function buildSessionContext(
     }
   }
 
-  // Load and format Semantic Memories (from mem0)
+  // Load and format Semantic Memories (from SidMemo)
   if (options.getSemanticMemories) {
     // Build a search query from task title or moduleId
     const searchQuery = options.taskId
@@ -582,12 +582,12 @@ export async function buildSessionContext(
           entities.push('semantic-memories');
         }
       } catch {
-        // Non-blocking: skip if mem0 unavailable
+        // Non-blocking: skip if SidMemo unavailable
       }
     }
   }
 
-  // Load and format Known Pitfalls (validation failures from mem0)
+  // Load and format Known Pitfalls (validation failures from SidMemo)
   if (options.getValidationFailures) {
     const searchQuery = options.taskId
       ? (await options.getTask?.(options.taskId))?.title
@@ -602,7 +602,7 @@ export async function buildSessionContext(
           entities.push('known-pitfalls');
         }
       } catch {
-        // Non-blocking: skip if mem0 unavailable
+        // Non-blocking: skip if SidMemo unavailable
       }
     }
   }
@@ -653,14 +653,14 @@ export function hasContextEntities(options: Partial<ContextBuilderOptions>): boo
 }
 
 /**
- * Create ContextBuilderOptions with data loaders wired to db + KnowledgeService.
+ * Create ContextBuilderOptions with data loaders wired to DB.
  *
  * Factory that removes boilerplate so callers (MCP handler, API server, etc.)
  * don't duplicate data-loader wiring for buildSessionContext().
  */
 export function createSessionContextOptions(params: {
   db: any;
-  knowledgeService: any;
+  projectId: string;
   workspacePath: string;
   taskId?: string;
   moduleId?: string;
@@ -673,7 +673,7 @@ export function createSessionContextOptions(params: {
   getSemanticMemories?: (query: string) => Promise<SemanticMemory[]>;
   getValidationFailures?: (query: string) => Promise<SemanticMemory[]>;
 }): ContextBuilderOptions {
-  const { db, knowledgeService, workspacePath } = params;
+  const { db, projectId, workspacePath } = params;
 
   return {
     workspacePath,
@@ -692,24 +692,24 @@ export function createSessionContextOptions(params: {
     getTask: db ? async (id: string) => db.getTask(id) : undefined,
     getTicket: db ? async (id: string) => db.getTicket(id) : undefined,
 
-    // Module knowledge loader - direct filesystem via KnowledgeService
-    getModuleKnowledge: knowledgeService
+    // Module knowledge loader - from DB
+    getModuleKnowledge: db
       ? async (modId: string) => {
           try {
-            const response = await knowledgeService.listDocuments({
+            const result = db.listKnowledgeDocuments(projectId, {
               module: modId,
               limit: 10,
             });
-            if (response.documents.length === 0) return null;
+            if (result.documents.length === 0) return null;
             return {
               moduleId: modId,
               name: modId,
-              docs: response.documents.map((d: any) => {
+              docs: result.documents.map((d: any) => {
                 const t = d.type as string;
                 const mappedType = ['guide', 'reference', 'pattern', 'spec', 'decision', 'rule'].includes(t) ? t : 'general';
                 return {
                   title: d.title,
-                  path: d.sourcePath,
+                  path: d.slug,
                   content: d.content || d.summary || '',
                   type: mappedType as 'guide' | 'reference' | 'pattern' | 'spec' | 'decision' | 'rule' | 'general',
                 };
@@ -721,11 +721,11 @@ export function createSessionContextOptions(params: {
         }
       : undefined,
 
-    // Spec content loader - direct filesystem via KnowledgeService
-    getSpecContent: knowledgeService
+    // Spec content loader - from DB
+    getSpecContent: db
       ? async (specId: string) => {
           try {
-            const doc = await knowledgeService.getDocument(specId);
+            const doc = db.getKnowledgeDocument(specId);
             if (!doc) return null;
             return {
               specId: doc.id,
@@ -739,7 +739,7 @@ export function createSessionContextOptions(params: {
         }
       : undefined,
 
-    // Training context loader - from db
+    // Training context loader - from DB
     getTrainingContext: db
       ? async (modId: string, role?: string, taskType?: string) => {
           try {

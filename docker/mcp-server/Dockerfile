@@ -22,7 +22,9 @@ RUN pnpm install --frozen-lockfile --filter @sidstack/mcp-server --filter @sidst
 COPY packages/shared/ packages/shared/
 COPY packages/mcp-server/ packages/mcp-server/
 
-RUN pnpm --filter @sidstack/shared build && \
+# Clean incremental cache before building (prevents stale .tsbuildinfo issues)
+RUN rm -f packages/shared/*.tsbuildinfo packages/mcp-server/*.tsbuildinfo && \
+    pnpm --filter @sidstack/shared build && \
     pnpm --filter @sidstack/mcp-server build
 
 # --- Production stage ---

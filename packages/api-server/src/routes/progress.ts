@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getDB } from '@sidstack/shared';
+import { getRepository } from '@sidstack/shared';
 
 export const progressRouter: Router = Router();
 
@@ -10,14 +10,14 @@ export const progressRouter: Router = Router();
 // Start a work session
 progressRouter.post('/sessions/start', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { workspacePath, claudeSessionId } = req.body;
 
     if (!workspacePath) {
       return res.status(400).json({ error: 'workspacePath is required' });
     }
 
-    const session = db.startWorkSession(workspacePath, claudeSessionId);
+    const session = await repo.workHistory.startSession(workspacePath, claudeSessionId);
     res.status(201).json({ success: true, session });
   } catch (error) {
     console.error('Failed to start session:', error);
@@ -28,11 +28,11 @@ progressRouter.post('/sessions/start', async (req, res) => {
 // End a work session
 progressRouter.post('/sessions/:sessionId/end', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { sessionId } = req.params;
     const { summary } = req.body;
 
-    db.endWorkSession(sessionId, summary);
+    await repo.workHistory.endSession(sessionId, summary);
     res.json({ success: true, sessionId });
   } catch (error) {
     console.error('Failed to end session:', error);
@@ -43,7 +43,7 @@ progressRouter.post('/sessions/:sessionId/end', async (req, res) => {
 // Get sessions for workspace
 progressRouter.get('/sessions', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const workspacePath = req.query.workspacePath as string;
     const timeframeHours = parseInt(req.query.timeframeHours as string) || 24;
 
@@ -51,7 +51,7 @@ progressRouter.get('/sessions', async (req, res) => {
       return res.status(400).json({ error: 'workspacePath is required' });
     }
 
-    const sessions = db.getWorkSessions(workspacePath, timeframeHours);
+    const sessions = await repo.workHistory.getSessions(workspacePath, timeframeHours);
     res.json({ success: true, sessions });
   } catch (error) {
     console.error('Failed to get sessions:', error);
@@ -62,14 +62,14 @@ progressRouter.get('/sessions', async (req, res) => {
 // Get active session for workspace
 progressRouter.get('/sessions/active', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const workspacePath = req.query.workspacePath as string;
 
     if (!workspacePath) {
       return res.status(400).json({ error: 'workspacePath is required' });
     }
 
-    const session = db.getActiveWorkSession(workspacePath);
+    const session = await repo.workHistory.getActiveSession(workspacePath);
     res.json({ success: true, session });
   } catch (error) {
     console.error('Failed to get active session:', error);
@@ -84,14 +84,14 @@ progressRouter.get('/sessions/active', async (req, res) => {
 // Log a work entry
 progressRouter.post('/entries', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { sessionId, workspacePath, actionType, actionName, taskId, details, resultSummary, durationMs } = req.body;
 
     if (!sessionId || !workspacePath || !actionType || !actionName) {
       return res.status(400).json({ error: 'sessionId, workspacePath, actionType, and actionName are required' });
     }
 
-    const entry = db.logWorkEntry({
+    const entry = await repo.workHistory.logEntry({
       sessionId,
       workspacePath,
       actionType,
@@ -112,7 +112,7 @@ progressRouter.post('/entries', async (req, res) => {
 // Get work history
 progressRouter.get('/history', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const workspacePath = req.query.workspacePath as string;
     const timeframeHours = parseInt(req.query.timeframeHours as string) || 24;
     const sessionId = req.query.sessionId as string | undefined;
@@ -124,7 +124,9 @@ progressRouter.get('/history', async (req, res) => {
       return res.status(400).json({ error: 'workspacePath is required' });
     }
 
-    const { entries, total } = db.getWorkHistory(workspacePath, timeframeHours, { sessionId, taskId }, page, pageSize);
+    const { entries, total } = await repo.workHistory.getWorkHistory(
+      workspacePath, timeframeHours, { sessionId, taskId }, page, pageSize
+    );
     res.json({ success: true, entries, total, page, pageSize });
   } catch (error) {
     console.error('Failed to get work history:', error);
@@ -139,14 +141,14 @@ progressRouter.get('/history', async (req, res) => {
 // Log task progress
 progressRouter.post('/task-progress', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { taskId, sessionId, progress, status, currentStep, notes, artifacts } = req.body;
 
     if (!taskId || !sessionId || progress === undefined || !status) {
       return res.status(400).json({ error: 'taskId, sessionId, progress, and status are required' });
     }
 
-    const progressLog = db.logTaskProgress({
+    const progressLog = await repo.tasks.logProgress({
       taskId,
       sessionId,
       progress,
@@ -166,10 +168,10 @@ progressRouter.post('/task-progress', async (req, res) => {
 // Get task progress history
 progressRouter.get('/task-progress/:taskId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { taskId } = req.params;
 
-    const history = db.getTaskProgressHistory(taskId);
+    const history = await repo.tasks.getProgressHistory(taskId);
     res.json({ success: true, history });
   } catch (error) {
     console.error('Failed to get task progress history:', error);
@@ -184,10 +186,10 @@ progressRouter.get('/task-progress/:taskId', async (req, res) => {
 // Cleanup old entries (admin endpoint)
 progressRouter.post('/cleanup', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const retentionDays = parseInt(req.body.retentionDays as string) || 30;
 
-    const result = db.cleanupWorkHistory(retentionDays);
+    const result = await repo.workHistory.cleanup(retentionDays);
     res.json({ success: true, deleted: result });
   } catch (error) {
     console.error('Failed to cleanup work history:', error);

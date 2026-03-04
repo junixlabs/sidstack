@@ -44,7 +44,7 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
   const { projectPath } = useAppStore();
   const { isActive, isWorkspaceReady, sidstackProjectId } = useWorkspaceContext();
   const fallbackId = projectPath?.split("/").pop() || "default";
-  const projectId = isWorkspaceReady ? (sidstackProjectId || fallbackId) : fallbackId;
+  const projectId = sidstackProjectId || fallbackId;
 
 
   const {
@@ -68,7 +68,7 @@ export const TaskManagerBlockView = memo(function TaskManagerBlockView(
     toggleExpanded,
     expandAll,
     collapseAll,
-  } = useTasks({ projectId, autoFetch: true });
+  } = useTasks({ projectId, autoFetch: isWorkspaceReady });
 
   // Auto-refresh based on project settings (pauses when workspace is inactive)
   useAutoRefresh({ onRefresh: refresh, enabled: isActive });

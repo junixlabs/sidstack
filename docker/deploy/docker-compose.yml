@@ -1,0 +1,58 @@
+# SidStack Remote Deploy — API Server + MCP Server only
+# nginx handles reverse proxy externally
+
+services:
+  api-server:
+    build:
+      context: ../../
+      dockerfile: docker/api-server/Dockerfile
+    container_name: sidstack-api
+    ports:
+      - "127.0.0.1:19432:19432"
+    volumes:
+      - sidstack-data:/data
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/data/sidstack.db
+      - API_PORT=19432
+      - SIDSTACK_API_KEY=${SIDSTACK_API_KEY}
+      - SIDSTACK_CORS_ORIGINS=${SIDSTACK_CORS_ORIGINS:-}
+      - SIDMEMO_API_URL=${SIDMEMO_API_URL:-https://mem.sidcorp.co}
+      - SIDMEMO_API_KEY=${SIDMEMO_API_KEY}
+      - SIDMEMO_PROJECT_SLUG=${SIDMEMO_PROJECT_SLUG:-sidstack}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:19432/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  mcp-server:
+    build:
+      context: ../../
+      dockerfile: docker/mcp-server/Dockerfile
+    container_name: sidstack-mcp
+    ports:
+      - "127.0.0.1:19433:19433"
+    depends_on:
+      api-server:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - MCP_PORT=19433
+      - SIDSTACK_API_URL=http://api-server:19432
+      - SIDSTACK_MCP_KEY=${SIDSTACK_MCP_KEY:-${SIDSTACK_API_KEY}}
+      - SIDMEMO_API_URL=${SIDMEMO_API_URL:-https://mem.sidcorp.co}
+      - SIDMEMO_API_KEY=${SIDMEMO_API_KEY}
+      - SIDMEMO_PROJECT_SLUG=${SIDMEMO_PROJECT_SLUG:-sidstack}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:19433/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  sidstack-data:

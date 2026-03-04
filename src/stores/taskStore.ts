@@ -1,12 +1,11 @@
 /**
- * Task Store - View-only task management
+ * Task Store - UI state only
  *
- * Fetches tasks from API server and provides filtering/selection.
- * This is a VIEW-ONLY store - no modifications, only reads.
+ * Manages selection, filters, view mode, and expand/collapse state.
+ * Server data (tasks, loading, errors) is handled by TanStack Query (see hooks/queries.ts).
  */
 
 import { create } from "zustand";
-import { getApiBaseUrl, apiFetch } from '@/lib/api-config';
 
 // ============================================================================
 // Types
@@ -82,61 +81,10 @@ export interface TaskProgressLog {
 
 export type StatusFilter = "all" | TaskStatus;
 
-interface TaskFilters {
+export interface TaskFilters {
   status: StatusFilter;
   projectId: string;
   searchQuery: string;
-}
-
-interface TaskStoreState {
-  // Data
-  tasks: Task[];
-  selectedTaskId: string | null;
-  selectedTaskProgress: TaskProgressLog[];
-  detailTask: Task | null;
-
-  // Progress cache: taskId -> { data, fetchedAt }
-  progressCache: Map<string, { data: TaskProgressLog[]; fetchedAt: number }>;
-
-  // UI State
-  filters: TaskFilters;
-  isLoading: boolean;
-  error: string | null;
-  viewMode: ViewMode;
-  expandedTasks: Set<string>;
-
-  // Actions (read-only)
-  fetchTasks: (projectId?: string) => Promise<void>;
-  fetchTaskDetail: (taskId: string) => Promise<void>;
-  fetchTaskProgress: (taskId: string) => Promise<void>;
-
-  // Selection
-  selectTask: (taskId: string | null) => void;
-
-  // Filters
-  setStatusFilter: (status: StatusFilter) => void;
-  setProjectId: (projectId: string) => void;
-  setSearchQuery: (query: string) => void;
-  resetFilters: () => void;
-
-  // View Mode
-  setViewMode: (mode: ViewMode) => void;
-  // Legacy compatibility
-  isTreeView: boolean;
-  toggleTreeView: () => void;
-
-  // Expand/Collapse
-  toggleExpanded: (taskId: string) => void;
-  expandAll: () => void;
-  collapseAll: () => void;
-  isExpanded: (taskId: string) => boolean;
-
-  // Computed
-  getFilteredTasks: () => Task[];
-  getTaskTree: () => TaskNode[];
-  getTasksByStatus: () => Record<TaskStatus, Task[]>;
-  getEpicsWithProgress: () => Array<{ task: Task; subtasks: Task[]; progress: number }>;
-  getStats: () => TaskStats;
 }
 
 export interface TaskNode {
@@ -153,15 +101,139 @@ export interface TaskStats {
   failed: number;
 }
 
-const API_BASE = getApiBaseUrl();
+// ============================================================================
+// Pure utility functions — used by useTasks hook with query data
+// ============================================================================
 
-const defaultFilters: TaskFilters = {
-  status: "all",
-  projectId: "default",
-  searchQuery: "",
-};
+/** Filter tasks by status and search query */
+export function filterTasks(tasks: Task[], filters: TaskFilters): Task[] {
+  let filtered = tasks;
 
-// Load persisted expanded state
+  if (filters.status !== "all") {
+    filtered = filtered.filter((t) => t.status === filters.status);
+  }
+
+  if (filters.searchQuery.trim()) {
+    const query = filters.searchQuery.toLowerCase();
+
+    if (query.startsWith('module:')) {
+      const moduleId = query.slice(7).trim();
+      filtered = filtered.filter((t) => t.moduleId === moduleId);
+    } else {
+      filtered = filtered.filter(
+        (t) =>
+          t.title.toLowerCase().includes(query) ||
+          t.description.toLowerCase().includes(query) ||
+          t.assignedAgent?.toLowerCase().includes(query) ||
+          t.moduleId?.toLowerCase().includes(query)
+      );
+    }
+  }
+
+  return filtered;
+}
+
+/** Build task tree from flat filtered list */
+export function buildTaskTree(tasks: Task[]): TaskNode[] {
+  const taskMap = new Map<string, TaskNode>();
+  for (const task of tasks) {
+    taskMap.set(task.id, { task, children: [] });
+  }
+
+  const roots: TaskNode[] = [];
+  for (const task of tasks) {
+    const node = taskMap.get(task.id)!;
+    if (task.parentTaskId && taskMap.has(task.parentTaskId)) {
+      taskMap.get(task.parentTaskId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  const sortByUpdated = (nodes: TaskNode[]) => {
+    nodes.sort((a, b) => b.task.updatedAt - a.task.updatedAt);
+    for (const node of nodes) {
+      sortByUpdated(node.children);
+    }
+  };
+  sortByUpdated(roots);
+
+  return roots;
+}
+
+/** Group tasks by status (for Kanban) */
+export function groupTasksByStatus(tasks: Task[]): Record<TaskStatus, Task[]> {
+  const grouped: Record<TaskStatus, Task[]> = {
+    pending: [],
+    review: [],
+    in_progress: [],
+    completed: [],
+    blocked: [],
+    failed: [],
+    cancelled: [],
+  };
+
+  for (const task of tasks) {
+    grouped[task.status].push(task);
+  }
+
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  for (const status of Object.keys(grouped) as TaskStatus[]) {
+    grouped[status].sort((a, b) => {
+      const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (pDiff !== 0) return pDiff;
+      return b.updatedAt - a.updatedAt;
+    });
+  }
+
+  return grouped;
+}
+
+/** Get epics with progress (for Timeline) */
+export function getEpicsWithProgress(tasks: Task[]): Array<{ task: Task; subtasks: Task[]; progress: number }> {
+  const childrenMap = new Map<string, Task[]>();
+  for (const task of tasks) {
+    if (task.parentTaskId) {
+      const children = childrenMap.get(task.parentTaskId) || [];
+      children.push(task);
+      childrenMap.set(task.parentTaskId, children);
+    }
+  }
+
+  return tasks
+    .filter(t => !t.parentTaskId && childrenMap.has(t.id))
+    .map(epic => {
+      const subtasks = childrenMap.get(epic.id) || [];
+      const completedCount = subtasks.filter(s => s.status === 'completed').length;
+      const progress = subtasks.length > 0
+        ? Math.round((completedCount / subtasks.length) * 100)
+        : epic.progress;
+
+      return {
+        task: epic,
+        subtasks: subtasks.sort((a, b) => a.createdAt - b.createdAt),
+        progress,
+      };
+    })
+    .sort((a, b) => b.task.updatedAt - a.task.updatedAt);
+}
+
+/** Compute task stats */
+export function computeTaskStats(tasks: Task[]): TaskStats {
+  return {
+    total: tasks.length,
+    pending: tasks.filter((t) => t.status === "pending").length,
+    inProgress: tasks.filter((t) => t.status === "in_progress").length,
+    completed: tasks.filter((t) => t.status === "completed").length,
+    blocked: tasks.filter((t) => t.status === "blocked").length,
+    failed: tasks.filter((t) => t.status === "failed").length,
+  };
+}
+
+// ============================================================================
+// localStorage persistence helpers
+// ============================================================================
+
 const loadExpandedTasks = (): Set<string> => {
   try {
     const stored = localStorage.getItem('sidstack:expandedTasks');
@@ -174,7 +246,6 @@ const loadExpandedTasks = (): Set<string> => {
   return new Set();
 };
 
-// Save expanded state
 const saveExpandedTasks = (expanded: Set<string>) => {
   try {
     localStorage.setItem('sidstack:expandedTasks', JSON.stringify([...expanded]));
@@ -183,7 +254,6 @@ const saveExpandedTasks = (expanded: Set<string>) => {
   }
 };
 
-// Load persisted view mode
 const loadViewMode = (): ViewMode => {
   try {
     const stored = localStorage.getItem('sidstack:viewMode');
@@ -193,10 +263,9 @@ const loadViewMode = (): ViewMode => {
   } catch {
     // Ignore errors
   }
-  return 'tree'; // Default to tree view
+  return 'tree';
 };
 
-// Save view mode
 const saveViewMode = (mode: ViewMode) => {
   try {
     localStorage.setItem('sidstack:viewMode', mode);
@@ -206,63 +275,51 @@ const saveViewMode = (mode: ViewMode) => {
 };
 
 // ============================================================================
-// Store
+// Default filters
 // ============================================================================
 
-// ============================================================================
-// Selectors (per Design Guidelines - avoid store destructuring)
-// ============================================================================
-
-export const useTaskTasks = () => useTaskStore((s) => s.tasks);
-export const useTaskSelectedId = () => useTaskStore((s) => s.selectedTaskId);
-export const useTaskDetailTask = () => useTaskStore((s) => s.detailTask);
-export const useTaskSelectedProgress = () => useTaskStore((s) => s.selectedTaskProgress);
-export const useTaskFilters = () => useTaskStore((s) => s.filters);
-export const useTaskIsLoading = () => useTaskStore((s) => s.isLoading);
-export const useTaskError = () => useTaskStore((s) => s.error);
-export const useTaskViewMode = () => useTaskStore((s) => s.viewMode);
-export const useTaskExpandedTasks = () => useTaskStore((s) => s.expandedTasks);
-
-// Action selectors (stable references)
-export const useTaskActions = () => useTaskStore((s) => ({
-  fetchTasks: s.fetchTasks,
-  fetchTaskDetail: s.fetchTaskDetail,
-  fetchTaskProgress: s.fetchTaskProgress,
-  selectTask: s.selectTask,
-  setStatusFilter: s.setStatusFilter,
-  setProjectId: s.setProjectId,
-  setSearchQuery: s.setSearchQuery,
-  resetFilters: s.resetFilters,
-  setViewMode: s.setViewMode,
-  toggleTreeView: s.toggleTreeView,
-  toggleExpanded: s.toggleExpanded,
-  expandAll: s.expandAll,
-  collapseAll: s.collapseAll,
-  isExpanded: s.isExpanded,
-  getFilteredTasks: s.getFilteredTasks,
-  getTaskTree: s.getTaskTree,
-  getTasksByStatus: s.getTasksByStatus,
-  getEpicsWithProgress: s.getEpicsWithProgress,
-  getStats: s.getStats,
-}));
+const defaultFilters: TaskFilters = {
+  status: "all",
+  projectId: "default",
+  searchQuery: "",
+};
 
 // ============================================================================
-// Store Implementation
+// Store — UI state only
 // ============================================================================
 
-// Cache TTL in milliseconds (30 seconds)
-const PROGRESS_CACHE_TTL = 30000;
+interface TaskStoreState {
+  // UI State
+  selectedTaskId: string | null;
+  filters: TaskFilters;
+  viewMode: ViewMode;
+  expandedTasks: Set<string>;
+
+  // Selection
+  selectTask: (taskId: string | null) => void;
+
+  // Filters
+  setStatusFilter: (status: StatusFilter) => void;
+  setProjectId: (projectId: string) => void;
+  setSearchQuery: (query: string) => void;
+  resetFilters: () => void;
+
+  // View Mode
+  setViewMode: (mode: ViewMode) => void;
+  isTreeView: boolean;
+  toggleTreeView: () => void;
+
+  // Expand/Collapse
+  toggleExpanded: (taskId: string) => void;
+  expandAllFor: (tasks: Task[]) => void;
+  collapseAll: () => void;
+  isExpanded: (taskId: string) => boolean;
+}
 
 export const useTaskStore = create<TaskStoreState>((set, get) => ({
   // Initial state
-  tasks: [],
   selectedTaskId: null,
-  selectedTaskProgress: [],
-  detailTask: null,
-  progressCache: new Map(),
   filters: { ...defaultFilters },
-  isLoading: false,
-  error: null,
   viewMode: loadViewMode(),
   expandedTasks: loadExpandedTasks(),
 
@@ -271,124 +328,9 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
     return get().viewMode === 'tree';
   },
 
-  // Fetch tasks from API
-  fetchTasks: async (projectId?: string) => {
-    const pid = projectId || get().filters.projectId;
-
-    // Clear stale tasks immediately when switching projects
-    const prevPid = get().filters.projectId;
-    const hasTasks = get().tasks.length > 0;
-    if (pid !== prevPid) {
-      // Project switched — clear old data and show loading
-      set({ tasks: [], filters: { ...get().filters, projectId: pid }, isLoading: true, error: null });
-    } else if (!hasTasks) {
-      // Same project, no data yet — show loading
-      set({ isLoading: true, error: null });
-    } else {
-      // Same project, already have data — background refresh (no loading flash)
-      set({ error: null });
-    }
-
-    try {
-      const response = await apiFetch(`${API_BASE}/api/tasks?projectId=${pid}&fields=standard`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tasks: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const tasks = (data.tasks || []) as Task[];
-      set({ tasks, isLoading: false });
-    } catch (error) {
-      console.error("[taskStore] Failed to fetch tasks:", error);
-      set({
-        error: error instanceof Error ? error.message : "Failed to fetch tasks",
-        isLoading: false,
-      });
-    }
-  },
-
-  // Fetch full task detail (governance, acceptanceCriteria, validation)
-  fetchTaskDetail: async (taskId: string) => {
-    // Safely parse a JSON field that may be a string or already parsed
-    const safeParse = (val: unknown) => {
-      if (!val) return undefined;
-      if (typeof val === 'string') {
-        try { return JSON.parse(val); } catch { return undefined; }
-      }
-      return val; // already parsed
-    };
-
-    try {
-      const response = await apiFetch(`${API_BASE}/api/tasks/${taskId}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch task detail: ${response.statusText}`);
-      }
-      const data = await response.json();
-      const task = data.task;
-      if (task) {
-        const detailTask: Task = {
-          ...task,
-          governance: safeParse(task.governance),
-          acceptanceCriteria: safeParse(task.acceptanceCriteria),
-          validation: safeParse(task.validation),
-        };
-        set({ detailTask });
-      }
-    } catch (error) {
-      console.error("[taskStore] Failed to fetch task detail:", error);
-    }
-  },
-
-  // Fetch task progress history (with caching)
-  fetchTaskProgress: async (taskId: string) => {
-    const { progressCache } = get();
-    const cached = progressCache.get(taskId);
-    const now = Date.now();
-
-    // Use cache if valid (not stale)
-    if (cached && (now - cached.fetchedAt) < PROGRESS_CACHE_TTL) {
-      set({ selectedTaskProgress: cached.data });
-      return;
-    }
-
-    try {
-      const response = await apiFetch(`${API_BASE}/api/tasks/${taskId}/progress`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch progress: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const progressHistory = (data.progressHistory || []).map((p: any) => ({
-        ...p,
-        artifacts: p.artifacts ? JSON.parse(p.artifacts) : [],
-      }));
-
-      // Update cache
-      const newCache = new Map(progressCache);
-      newCache.set(taskId, { data: progressHistory, fetchedAt: now });
-
-      set({ selectedTaskProgress: progressHistory, progressCache: newCache });
-    } catch (error) {
-      console.error("[taskStore] Failed to fetch task progress:", error);
-      set({ selectedTaskProgress: [] });
-    }
-  },
-
-  // Selection - use cached progress immediately, fetch in background if stale
+  // Selection
   selectTask: (taskId) => {
-    const { progressCache } = get();
-
-    // Use cached progress immediately (no flash)
-    const cached = taskId ? progressCache.get(taskId) : null;
-    const cachedData = cached?.data ?? [];
-
-    set({ selectedTaskId: taskId, selectedTaskProgress: cachedData, detailTask: null });
-
-    // Fetch full detail and progress in background
-    if (taskId) {
-      get().fetchTaskDetail(taskId);
-      get().fetchTaskProgress(taskId);
-    }
+    set({ selectedTaskId: taskId });
   },
 
   // Filters
@@ -402,7 +344,6 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
     set((state) => ({
       filters: { ...state.filters, projectId },
     }));
-    get().fetchTasks(projectId);
   },
 
   setSearchQuery: (searchQuery) => {
@@ -421,7 +362,6 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
     set({ viewMode: mode });
   },
 
-  // Legacy compatibility
   toggleTreeView: () => {
     const current = get().viewMode;
     const next = current === 'tree' ? 'list' : 'tree';
@@ -442,9 +382,7 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
     set({ expandedTasks: next });
   },
 
-  expandAll: () => {
-    const { tasks } = get();
-    // Expand all parent tasks (tasks without parentTaskId that have children)
+  expandAllFor: (tasks: Task[]) => {
     const parentIds = tasks.filter(t => !t.parentTaskId).map(t => t.id);
     const all = new Set(parentIds);
     saveExpandedTasks(all);
@@ -459,150 +397,5 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
 
   isExpanded: (taskId: string) => {
     return get().expandedTasks.has(taskId);
-  },
-
-  // Computed: filter tasks
-  getFilteredTasks: () => {
-    const { tasks, filters } = get();
-    let filtered = tasks;
-
-    // Filter by status
-    if (filters.status !== "all") {
-      filtered = filtered.filter((t) => t.status === filters.status);
-    }
-
-    // Filter by search
-    if (filters.searchQuery.trim()) {
-      const query = filters.searchQuery.toLowerCase();
-
-      // Special filter: module:<moduleId>
-      if (query.startsWith('module:')) {
-        const moduleId = query.slice(7).trim();
-        filtered = filtered.filter((t) => t.moduleId === moduleId);
-      } else {
-        filtered = filtered.filter(
-          (t) =>
-            t.title.toLowerCase().includes(query) ||
-            t.description.toLowerCase().includes(query) ||
-            t.assignedAgent?.toLowerCase().includes(query) ||
-            t.moduleId?.toLowerCase().includes(query)
-        );
-      }
-    }
-
-    return filtered;
-  },
-
-  // Computed: build task tree
-  getTaskTree: () => {
-    const tasks = get().getFilteredTasks();
-
-    // Build map
-    const taskMap = new Map<string, TaskNode>();
-    for (const task of tasks) {
-      taskMap.set(task.id, { task, children: [] });
-    }
-
-    // Build tree
-    const roots: TaskNode[] = [];
-    for (const task of tasks) {
-      const node = taskMap.get(task.id)!;
-
-      if (task.parentTaskId && taskMap.has(task.parentTaskId)) {
-        // Add as child
-        taskMap.get(task.parentTaskId)!.children.push(node);
-      } else {
-        // Root task
-        roots.push(node);
-      }
-    }
-
-    // Sort by updatedAt descending
-    const sortByUpdated = (nodes: TaskNode[]) => {
-      nodes.sort((a, b) => b.task.updatedAt - a.task.updatedAt);
-      for (const node of nodes) {
-        sortByUpdated(node.children);
-      }
-    };
-    sortByUpdated(roots);
-
-    return roots;
-  },
-
-  // Computed: group tasks by status (for Kanban)
-  getTasksByStatus: () => {
-    const tasks = get().getFilteredTasks();
-    const grouped: Record<TaskStatus, Task[]> = {
-      pending: [],
-      review: [],
-      in_progress: [],
-      completed: [],
-      blocked: [],
-      failed: [],
-      cancelled: [],
-    };
-
-    for (const task of tasks) {
-      grouped[task.status].push(task);
-    }
-
-    // Sort each column by priority (high first) then by updatedAt
-    const priorityOrder = { high: 0, medium: 1, low: 2 };
-    for (const status of Object.keys(grouped) as TaskStatus[]) {
-      grouped[status].sort((a, b) => {
-        const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-        if (pDiff !== 0) return pDiff;
-        return b.updatedAt - a.updatedAt;
-      });
-    }
-
-    return grouped;
-  },
-
-  // Computed: get epics with progress (for Timeline)
-  getEpicsWithProgress: () => {
-    const tasks = get().getFilteredTasks();
-
-    // Find epics (tasks without parent that have children)
-    const childrenMap = new Map<string, Task[]>();
-    for (const task of tasks) {
-      if (task.parentTaskId) {
-        const children = childrenMap.get(task.parentTaskId) || [];
-        children.push(task);
-        childrenMap.set(task.parentTaskId, children);
-      }
-    }
-
-    const epics = tasks
-      .filter(t => !t.parentTaskId && childrenMap.has(t.id))
-      .map(epic => {
-        const subtasks = childrenMap.get(epic.id) || [];
-        const completedCount = subtasks.filter(s => s.status === 'completed').length;
-        const progress = subtasks.length > 0
-          ? Math.round((completedCount / subtasks.length) * 100)
-          : epic.progress;
-
-        return {
-          task: epic,
-          subtasks: subtasks.sort((a, b) => a.createdAt - b.createdAt),
-          progress,
-        };
-      })
-      .sort((a, b) => b.task.updatedAt - a.task.updatedAt);
-
-    return epics;
-  },
-
-  // Computed: stats
-  getStats: () => {
-    const tasks = get().tasks;
-    return {
-      total: tasks.length,
-      pending: tasks.filter((t) => t.status === "pending").length,
-      inProgress: tasks.filter((t) => t.status === "in_progress").length,
-      completed: tasks.filter((t) => t.status === "completed").length,
-      blocked: tasks.filter((t) => t.status === "blocked").length,
-      failed: tasks.filter((t) => t.status === "failed").length,
-    };
   },
 }));

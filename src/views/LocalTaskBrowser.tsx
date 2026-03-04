@@ -18,6 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useState } from "react";
+import { useWorkspaceContext } from "@/contexts/WorkspaceContext";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,7 @@ async function fetchTasks(projectId: string = "default"): Promise<SidStackTask[]
 
 export function LocalTaskBrowser({ isDark = true, className }: LocalTaskBrowserProps) {
   const { projectPath } = useAppStore();
+  const { isWorkspaceReady, sidstackProjectId } = useWorkspaceContext();
   const [activeTab, setActiveTabLocal] = useState<"tasks" | "sessions">("tasks");
 
   // SidStack Tasks state
@@ -97,11 +99,11 @@ export function LocalTaskBrowser({ isDark = true, className }: LocalTaskBrowserP
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
-  // Fetch SidStack tasks
+  // Fetch SidStack tasks (wait for workspace to resolve correct projectId)
   const fetchTasksData = useCallback(async () => {
     setTasksLoading(true);
     try {
-      const projectId = projectPath?.split("/").pop() || "default";
+      const projectId = sidstackProjectId || projectPath?.split("/").pop() || "default";
       const result = await fetchTasks(projectId);
       setTasks(result);
     } catch (err) {
@@ -110,11 +112,13 @@ export function LocalTaskBrowser({ isDark = true, className }: LocalTaskBrowserP
     } finally {
       setTasksLoading(false);
     }
-  }, [projectPath]);
+  }, [projectPath, sidstackProjectId]);
 
   useEffect(() => {
-    fetchTasksData();
-  }, [fetchTasksData]);
+    if (isWorkspaceReady) {
+      fetchTasksData();
+    }
+  }, [fetchTasksData, isWorkspaceReady]);
 
   const handleRefresh = () => {
     fetchTasksData();

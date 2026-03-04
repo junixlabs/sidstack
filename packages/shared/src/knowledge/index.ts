@@ -22,16 +22,18 @@ export {
   generateIdFromPath,
 } from './parser';
 
-// Adapters
-export {
-  type KnowledgeAdapter,
-  SidStackAdapter,
-  AdapterRegistry,
-  defaultAdapterRegistry,
-} from './adapters';
+// Chunker
+export { chunkDocument, type KnowledgeChunk } from './chunker';
 
-// Service
+// Indexer
+export { KnowledgeIndexer, type IndexResult, type BatchIndexResult } from './indexer';
+
+// Hybrid Search + RAG Context
 export {
-  KnowledgeService,
-  createKnowledgeService,
-} from './service';
+  hybridSearch,
+  buildRAGContext,
+  type HybridSearchOptions,
+  type HybridSearchResult,
+  type RAGContextOptions,
+  type RAGContextResult,
+} from './hybrid-search';

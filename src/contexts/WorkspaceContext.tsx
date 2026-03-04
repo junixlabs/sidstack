@@ -621,13 +621,16 @@ export function WorkspaceProvider({ workspacePath, isActive, children, workspace
         setSidstackProjectId(configProjectId);
         setSidstackProjectName(configProjectName);
 
-        const { invoke } = await import("@tauri-apps/api/core");
-
-        const wsExists = await invoke<boolean>("workspace_exists", { workspacePath });
-
-        if (!wsExists) {
-          const name = configProjectName || workspacePath.split("/").pop() || "workspace";
-          await invoke("workspace_init", { workspacePath, name });
+        // Tauri-specific workspace init (only works in desktop app, not browser)
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          const wsExists = await invoke<boolean>("workspace_exists", { workspacePath });
+          if (!wsExists) {
+            const name = configProjectName || workspacePath.split("/").pop() || "workspace";
+            await invoke("workspace_init", { workspacePath, name });
+          }
+        } catch {
+          // Not in Tauri environment (browser/web UI) — skip workspace init
         }
 
         // Register project in SQLite database (for MCP tools)
@@ -649,25 +652,34 @@ export function WorkspaceProvider({ workspacePath, isActive, children, workspace
               }),
             });
 
-            // If 409 conflict (same ID exists with different path), add path hash suffix
+            // If 409 conflict (same ID exists with different path)
             if (createRes.status === 409) {
-              const pathHash = Math.abs(workspacePath.split("").reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0)).toString(16).slice(0, 6);
-              projectId = `${projectId}-${pathHash}`;
-              createRes = await fetch("http://localhost:19432/api/projects", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  id: projectId,
-                  name: projectName,
-                  path: workspacePath,
-                  status: "active",
-                }),
-              });
-            }
-
-            if (createRes.ok) {
+              if (configProjectId) {
+                // config.json explicitly sets projectId — reuse existing project
+                // (multiple workspace paths can share the same logical project)
+                console.log("[WorkspaceProvider] Project already exists, reusing:", configProjectId);
+                // sidstackProjectId already set from config.json, no change needed
+              } else {
+                // No explicit projectId in config — create hash-suffixed project
+                const pathHash = Math.abs(workspacePath.split("").reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0)).toString(16).slice(0, 6);
+                projectId = `${projectId}-${pathHash}`;
+                createRes = await fetch("http://localhost:19432/api/projects", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    id: projectId,
+                    name: projectName,
+                    path: workspacePath,
+                    status: "active",
+                  }),
+                });
+                if (createRes.ok) {
+                  console.log("[WorkspaceProvider] Project registered:", projectId);
+                  setSidstackProjectId(projectId);
+                }
+              }
+            } else if (createRes.ok) {
               console.log("[WorkspaceProvider] Project registered:", projectId);
-              // Update state with the actually-registered ID
               setSidstackProjectId(projectId);
             }
           } else if (res.ok) {

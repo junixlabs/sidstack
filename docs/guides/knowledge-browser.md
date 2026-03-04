@@ -4,26 +4,29 @@ Store and search project knowledge that persists across AI sessions.
 
 ## Overview
 
-The Knowledge Browser manages documents stored in `.sidstack/knowledge/`. Documents are categorized by type and linked to modules.
+The Knowledge Browser manages documents stored in `.sidstack/knowledge/`. Documents are organized into 9 categories.
 
-## Document Types
+## Knowledge Categories
 
-| Type | Description |
-|------|-------------|
-| `business-logic` | Business rules and workflows |
-| `api-endpoint` | API documentation |
-| `design-pattern` | Design patterns used |
-| `database` | Database schemas |
-| `module` | Module documentation |
+| Category | Purpose |
+|----------|---------|
+| `00-context` | Vision, glossary, onboarding, team structure |
+| `01-architecture` | System design, module boundaries, patterns |
+| `02-decisions` | ADRs, technical decisions (date-prefixed) |
+| `03-standards` | Coding conventions, naming, testing rules |
+| `04-data` | Database schema, ownership, retention |
+| `05-api` | API contracts, schemas, versioning |
+| `06-operations` | Deployment, monitoring, rollback strategy |
+| `07-projects` | Project-specific docs (date-prefixed) |
+| `08-incidents` | Incident reports, root cause analysis (date-prefixed) |
 
 ## Creating Documents
 
 ### Via CLI
 ```bash
-sidstack knowledge create \
-  --type business-logic \
-  --title "User Auth Flow" \
-  --module auth
+npx @sidstack/cli knowledge create \
+  --category 01-architecture \
+  --title "Auth Design"
 ```
 
 ### Via MCP
@@ -32,17 +35,16 @@ Create a knowledge document about the authentication flow
 ```
 
 ### Manual
-Create a markdown file in `.sidstack/knowledge/` with frontmatter:
+Create a markdown file in `.sidstack/knowledge/<category>/` with frontmatter:
 
 ```markdown
 ---
-title: User Auth Flow
-type: business-logic
-module: auth
+title: Auth Design
+category: 01-architecture
 tags: [authentication, JWT]
 ---
 
-# User Authentication Flow
+# Authentication Design
 
 Login uses JWT tokens with refresh...
 ```
@@ -71,4 +73,23 @@ SidStack builds context from knowledge documents for Claude sessions:
 Build context for the auth module
 ```
 
-This aggregates relevant business logic, API docs, and patterns into a single context document for the session.
+This aggregates relevant architecture docs, API specs, and patterns into a single context document for the session.
+
+## Knowledge Sync (Remote)
+
+Push local knowledge files to a remote SidStack server:
+
+```bash
+npx @sidstack/cli knowledge sync \
+  --api-url https://api.yourdomain.com \
+  --api-key sk-your-key
+```
+
+## Knowledge Health
+
+Check coverage gaps across your categories:
+
+```
+Check knowledge health
+```
+Uses `knowledge_health` tool. Returns coverage percentages and suggestions.

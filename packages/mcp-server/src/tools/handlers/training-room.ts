@@ -711,13 +711,13 @@ export async function handleIncidentCreate(args: {
           const similarMemories = results.filter(
             m => m.score !== undefined
               && m.score >= 0.7
-              && m.metadata?.sourceType === 'incident'
-              && m.metadata?.incidentId !== incident.id
+              && m.metadata_?.sourceType === 'incident'
+              && m.metadata_?.incidentId !== incident.id
           );
 
           if (similarMemories.length > 0) {
             similarIncidentIds = similarMemories
-              .map(m => m.metadata?.incidentId as string)
+              .map(m => m.metadata_?.incidentId as string)
               .filter(Boolean);
             usedSemantic = true;
           }

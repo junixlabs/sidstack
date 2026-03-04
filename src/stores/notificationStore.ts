@@ -2,14 +2,14 @@
  * Notification Store
  *
  * Manages notifications for pending reviews, task updates, and agent messages.
- * Connects to API server via SSE for real-time events, with polling fallback.
+ * Connects to API server via Socket.IO for real-time events, with polling fallback.
  */
 
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 
 import { mcpCall } from "@/lib/ipcClient";
-import { getApiBaseUrl } from "@/lib/api-config";
+import { connectSocket, disconnectSocket } from "@/lib/socket";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,11 +94,6 @@ interface NotificationState {
 // ---------------------------------------------------------------------------
 
 let pollInterval: ReturnType<typeof setInterval> | null = null;
-let eventSource: EventSource | null = null;
-let sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let sseReconnectAttempts = 0;
-const SSE_MAX_RECONNECT_ATTEMPTS = 10;
-const SSE_RECONNECT_BASE_MS = 2000;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -298,91 +293,51 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   // -------------------------------------------------------------------------
-  // SSE — real-time event stream from API server
+  // Socket.IO — real-time events via WebSocket
   // -------------------------------------------------------------------------
 
   connectSse: (projectId?: string) => {
-    // Avoid duplicate connections
-    if (eventSource) {
-      get().disconnectSse();
-    }
+    // Disconnect any previous connection
+    get().disconnectSse();
 
-    const baseUrl = getApiBaseUrl();
-    const url = projectId
-      ? `${baseUrl}/api/events/stream?projectId=${encodeURIComponent(projectId)}`
-      : `${baseUrl}/api/events/stream`;
+    const socket = connectSocket({
+      projectId,
+      onStateChange: (state) => {
+        set({ sseConnected: state === "connected" });
+      },
+    });
 
-    try {
-      eventSource = new EventSource(url);
+    // Listen for typed events
+    const eventTypes = [
+      "task_created",
+      "task_updated",
+      "task_completed",
+      "ticket_created",
+      "ticket_updated",
+      "knowledge_created",
+      "knowledge_updated",
+      "knowledge_deleted",
+    ];
 
-      eventSource.onopen = () => {
-        sseReconnectAttempts = 0;
-        set({ sseConnected: true });
-      };
+    for (const eventType of eventTypes) {
+      socket.on(eventType, (data: SseEventData) => {
+        try {
+          const notification = buildNotification(data);
+          get().addNotification(notification);
 
-      // Listen for typed events
-      const eventTypes = [
-        "task_created",
-        "task_updated",
-        "task_completed",
-        "ticket_created",
-        "ticket_updated",
-        "knowledge_created",
-        "knowledge_updated",
-        "knowledge_deleted",
-      ];
-
-      for (const eventType of eventTypes) {
-        eventSource.addEventListener(eventType, (event: MessageEvent) => {
-          try {
-            const data: SseEventData = JSON.parse(event.data);
-            const notification = buildNotification(data);
-            get().addNotification(notification);
-
-            // Desktop notification for important events
-            if (DESKTOP_NOTIFY_EVENTS.has(data.type)) {
-              showDesktopNotification(notification.title, notification.message);
-            }
-          } catch {
-            // Ignore malformed events
+          // Desktop notification for important events
+          if (DESKTOP_NOTIFY_EVENTS.has(data.type)) {
+            showDesktopNotification(notification.title, notification.message);
           }
-        });
-      }
-
-      eventSource.onerror = () => {
-        set({ sseConnected: false });
-
-        // Close the failed connection
-        if (eventSource) {
-          eventSource.close();
-          eventSource = null;
+        } catch {
+          // Ignore malformed events
         }
-
-        // Reconnect with exponential backoff
-        if (sseReconnectAttempts < SSE_MAX_RECONNECT_ATTEMPTS) {
-          const delay = SSE_RECONNECT_BASE_MS * Math.pow(1.5, sseReconnectAttempts);
-          sseReconnectAttempts++;
-
-          sseReconnectTimer = setTimeout(() => {
-            get().connectSse(projectId);
-          }, delay);
-        }
-      };
-    } catch {
-      set({ sseConnected: false });
+      });
     }
   },
 
   disconnectSse: () => {
-    if (sseReconnectTimer) {
-      clearTimeout(sseReconnectTimer);
-      sseReconnectTimer = null;
-    }
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
-    }
-    sseReconnectAttempts = 0;
+    disconnectSocket();
     set({ sseConnected: false });
   },
 }));

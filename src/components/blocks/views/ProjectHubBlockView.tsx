@@ -22,18 +22,18 @@ function ProjectHubBlockView({ block }: BlockViewProps) {
   const projectPath = block.cwd || process.cwd();
   const { isActive, isWorkspaceReady, sidstackProjectId } = useWorkspaceContext();
   const fallbackId = projectPath.split('/').pop() || 'default';
-  const projectId = isWorkspaceReady ? (sidstackProjectId || fallbackId) : fallbackId;
+  const projectId = sidstackProjectId || fallbackId;
 
   const contextBar = useProjectHubStore((s) => s.contextBar);
   const fetchContextBar = useProjectHubStore((s) => s.fetchContextBar);
   const setProjectContext = useProjectHubStore((s) => s.setProjectContext);
 
-  // Initialize store with project context
+  // Initialize store with project context (wait for workspace to resolve correct projectId)
   useEffect(() => {
-    if (isActive) {
+    if (isActive && isWorkspaceReady) {
       setProjectContext(projectPath, projectId);
     }
-  }, [projectPath, projectId, isActive, setProjectContext]);
+  }, [projectPath, projectId, isActive, isWorkspaceReady, setProjectContext]);
 
   const fetchCapabilityTree = useProjectHubStore((s) => s.fetchCapabilityTree);
 
@@ -43,7 +43,7 @@ function ProjectHubBlockView({ block }: BlockViewProps) {
       fetchContextBar(projectId);
       fetchCapabilityTree(projectPath);
     },
-    enabled: isActive,
+    enabled: isActive && isWorkspaceReady,
   });
 
   return (

@@ -256,6 +256,11 @@ class KnowledgeApi {
     return this.c.request('GET', '/api/knowledge/modules', undefined, query as any);
   }
 
+  moduleOverview(query: { projectPath: string; moduleId: string }): Promise<any> {
+    const { moduleId, ...rest } = query;
+    return this.c.request('GET', `/api/knowledge/modules/${encodeURIComponent(moduleId)}/overview`, undefined, rest as any);
+  }
+
   create(body: Record<string, unknown>): Promise<any> {
     return this.c.request('POST', '/api/knowledge', body);
   }

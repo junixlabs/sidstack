@@ -1,13 +1,23 @@
 /**
- * useTasks Hook - View-only task access
+ * useTasks Hook - View-only task access (hybrid pattern)
  *
- * Provides convenient access to task store with auto-fetch on mount.
- * This is a VIEW-ONLY hook - no task modifications.
+ * Combines TanStack Query (server state) with Zustand (UI state).
+ * Provides the same interface as before — components don't need to change.
  */
 
-import { useEffect } from "react";
+import { useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { useTaskStore } from "@/stores/taskStore";
+import { useTasksQuery, useTaskProgressQuery } from "@/hooks/queries";
+import { queryKeys } from "@/lib/query-keys";
+import {
+  useTaskStore,
+  filterTasks,
+  buildTaskTree,
+  groupTasksByStatus,
+  getEpicsWithProgress as computeEpics,
+  computeTaskStats,
+} from "@/stores/taskStore";
 
 interface UseTasksOptions {
   projectId?: string;
@@ -16,7 +26,7 @@ interface UseTasksOptions {
 
 /**
  * Hook for accessing tasks in a view-only manner.
- * Note: Views should use useAutoRefresh for polling — this hook no longer polls.
+ * Server data via TanStack Query, UI state via Zustand.
  */
 export function useTasks(options: UseTasksOptions = {}) {
   const {
@@ -24,55 +34,89 @@ export function useTasks(options: UseTasksOptions = {}) {
     autoFetch = true,
   } = options;
 
-  const {
-    tasks,
-    selectedTaskId,
-    selectedTaskProgress,
-    filters,
-    isLoading,
-    error,
-    viewMode,
-    isTreeView,
-    expandedTasks,
-    fetchTasks,
-    fetchTaskProgress,
-    selectTask,
-    setStatusFilter,
-    setSearchQuery,
-    resetFilters,
-    setViewMode,
-    toggleTreeView,
-    toggleExpanded,
-    expandAll,
-    collapseAll,
-    isExpanded,
-    getFilteredTasks,
-    getTaskTree,
-    getTasksByStatus,
-    getEpicsWithProgress,
-    getStats,
-  } = useTaskStore();
+  // --- Server state (TanStack Query) ---
+  const { data: tasks = [], isLoading, error: queryError } = useTasksQuery(
+    autoFetch ? projectId : ''
+  );
+  const error = queryError?.message ?? null;
 
-  // Auto-fetch on mount
-  useEffect(() => {
-    if (autoFetch) {
-      fetchTasks(projectId);
-    }
-  }, [autoFetch, projectId, fetchTasks]);
+  // --- UI state (Zustand) ---
+  const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+  const filters = useTaskStore((s) => s.filters);
+  const viewMode = useTaskStore((s) => s.viewMode);
+  const expandedTasks = useTaskStore((s) => s.expandedTasks);
 
-  // Get selected task
-  const selectedTask = selectedTaskId
-    ? tasks.find((t) => t.id === selectedTaskId)
-    : null;
+  // Store actions (stable refs from Zustand)
+  const selectTask = useTaskStore((s) => s.selectTask);
+  const setStatusFilter = useTaskStore((s) => s.setStatusFilter);
+  const setSearchQuery = useTaskStore((s) => s.setSearchQuery);
+  const resetFilters = useTaskStore((s) => s.resetFilters);
+  const setViewMode = useTaskStore((s) => s.setViewMode);
+  const toggleTreeView = useTaskStore((s) => s.toggleTreeView);
+  const toggleExpanded = useTaskStore((s) => s.toggleExpanded);
+  const expandAllFor = useTaskStore((s) => s.expandAllFor);
+  const collapseAll = useTaskStore((s) => s.collapseAll);
+  const isExpanded = useTaskStore((s) => s.isExpanded);
+
+  // --- Derived/computed data (memoized) ---
+  const filteredTasks = useMemo(
+    () => filterTasks(tasks, filters),
+    [tasks, filters]
+  );
+
+  const taskTree = useMemo(
+    () => buildTaskTree(filteredTasks),
+    [filteredTasks]
+  );
+
+  const tasksByStatus = useMemo(
+    () => groupTasksByStatus(filteredTasks),
+    [filteredTasks]
+  );
+
+  const epicsWithProgress = useMemo(
+    () => computeEpics(filteredTasks),
+    [filteredTasks]
+  );
+
+  const stats = useMemo(
+    () => computeTaskStats(tasks),
+    [tasks]
+  );
+
+  // Legacy compatibility
+  const isTreeView = viewMode === 'tree';
+
+  // Selected task from query data
+  const selectedTask = useMemo(
+    () => selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) ?? null : null,
+    [selectedTaskId, tasks]
+  );
+
+  // Progress for selected task (TanStack Query)
+  const { data: selectedTaskProgress = [] } = useTaskProgressQuery(selectedTaskId);
+
+  // Refresh via query invalidation
+  const queryClient = useQueryClient();
+  const refresh = useCallback(
+    () => { queryClient.invalidateQueries({ queryKey: queryKeys.tasks.list(projectId) }); },
+    [queryClient, projectId]
+  );
+
+  // Bound expandAll — needs tasks data
+  const expandAll = useCallback(
+    () => expandAllFor(tasks),
+    [expandAllFor, tasks]
+  );
 
   return {
     // Data
     tasks,
-    filteredTasks: getFilteredTasks(),
-    taskTree: getTaskTree(),
-    tasksByStatus: getTasksByStatus(),
-    epicsWithProgress: getEpicsWithProgress(),
-    stats: getStats(),
+    filteredTasks,
+    taskTree,
+    tasksByStatus,
+    epicsWithProgress,
+    stats,
     selectedTask,
     selectedTaskProgress,
 
@@ -85,7 +129,7 @@ export function useTasks(options: UseTasksOptions = {}) {
     expandedTasks,
 
     // Actions
-    refresh: () => fetchTasks(projectId),
+    refresh,
     selectTask,
     setStatusFilter,
     setSearchQuery,
@@ -96,7 +140,6 @@ export function useTasks(options: UseTasksOptions = {}) {
     expandAll,
     collapseAll,
     isExpanded,
-    fetchTaskProgress,
   };
 }
 
@@ -104,42 +147,31 @@ export function useTasks(options: UseTasksOptions = {}) {
  * Hook for a single task view
  */
 export function useTask(taskId: string | null) {
-  const { tasks, fetchTasks, fetchTaskProgress, selectedTaskProgress } =
-    useTaskStore();
+  // Use current project's tasks from the same TanStack Query cache
+  const projectId = useTaskStore((s) => s.filters.projectId);
+  const { data: tasks = [] } = useTasksQuery(projectId);
+  const { data: progressHistory = [] } = useTaskProgressQuery(taskId);
 
-  // Fetch tasks if not loaded
-  useEffect(() => {
-    if (tasks.length === 0) {
-      fetchTasks();
-    }
-  }, [tasks.length, fetchTasks]);
+  const task = useMemo(
+    () => taskId ? tasks.find((t) => t.id === taskId) ?? null : null,
+    [taskId, tasks]
+  );
 
-  // Note: fetchTaskProgress is called by selectTask() already
-  // This useEffect is only needed when useTask is used independently
-  // The cache in taskStore prevents duplicate network calls
-  useEffect(() => {
-    if (taskId) {
-      fetchTaskProgress(taskId);
-    }
-  }, [taskId, fetchTaskProgress]);
+  const subtasks = useMemo(
+    () => taskId ? tasks.filter((t) => t.parentTaskId === taskId) : [],
+    [taskId, tasks]
+  );
 
-  const task = taskId ? tasks.find((t) => t.id === taskId) : null;
-
-  // Get subtasks
-  const subtasks = taskId
-    ? tasks.filter((t) => t.parentTaskId === taskId)
-    : [];
-
-  // Get parent task
-  const parentTask = task?.parentTaskId
-    ? tasks.find((t) => t.id === task.parentTaskId)
-    : null;
+  const parentTask = useMemo(
+    () => task?.parentTaskId ? tasks.find((t) => t.id === task.parentTaskId) ?? null : null,
+    [task, tasks]
+  );
 
   return {
     task,
     subtasks,
     parentTask,
-    progressHistory: selectedTaskProgress,
+    progressHistory,
     isLoading: !task && tasks.length === 0,
   };
 }

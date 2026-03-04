@@ -21,7 +21,9 @@ RUN pnpm install --frozen-lockfile --filter @sidstack/api-server --filter @sidst
 COPY packages/shared/ packages/shared/
 COPY packages/api-server/ packages/api-server/
 
-RUN pnpm --filter @sidstack/shared build && \
+# Clean incremental cache before building (prevents stale .tsbuildinfo issues)
+RUN rm -f packages/shared/*.tsbuildinfo packages/api-server/*.tsbuildinfo && \
+    pnpm --filter @sidstack/shared build && \
     pnpm --filter @sidstack/api-server build
 
 # --- Production stage ---

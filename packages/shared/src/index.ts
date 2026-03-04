@@ -57,9 +57,8 @@ export type {
   HealthIssue,
 } from './knowledge';
 
-// Re-export service factory and config constants
+// Re-export config constants
 export {
-  createKnowledgeService,
   DOCUMENT_TYPE_CONFIG,
   DOCUMENT_STATUS_CONFIG,
   FOLDER_CONFIG,
@@ -68,7 +67,10 @@ export {
   FOLDER_TO_DEFAULT_TYPE,
   TYPE_TO_FOLDER,
   DEFAULT_FOLDERS,
+  TYPE_GROUPS,
+  getTypeGroup,
   type FolderConfig,
+  type TypeGroupConfig,
 } from './knowledge';
 
 // Project Settings
@@ -126,21 +128,99 @@ export {
   type TraceabilitySummary,
 } from './traceability';
 
-// Memory System (mem0 semantic search)
-export { Mem0Client, createMem0Client, MEMORY_TTL_MS, computeExpiresAt, isMemoryExpired } from './memory/index.js';
+// Memory System (SidMemo semantic search + Knowledge Graph)
+export { SidMemoClient, createSidMemoClient, Mem0Client, createMem0Client, MEMORY_TTL_MS, computeExpiresAt, isMemoryExpired } from './memory/index.js';
 export type {
-  Mem0Config,
+  SidMemoConfig,
+  SidMemoMemory,
+  SidMemoSearchResult,
+  SidMemoListResponse,
+  SidMemoHistoryEntry,
+  EntityDetail,
+  EntityListResponse,
+  SubgraphResponse,
   Mem0Memory,
-  Mem0AddRequest,
-  Mem0SearchRequest,
   MemorySourceType,
 } from './memory/index.js';
 
-// Database exports (renamed to avoid conflicts with ./types)
+// Knowledge RAG Pipeline
+export { chunkDocument, KnowledgeIndexer, hybridSearch, buildRAGContext } from './knowledge/index';
+export type {
+  KnowledgeChunk,
+  IndexResult,
+  BatchIndexResult,
+  HybridSearchOptions,
+  HybridSearchResult,
+  RAGContextOptions,
+  RAGContextResult,
+} from './knowledge/index';
+
+// Repository Pattern (async database abstraction)
 export {
-  SidStackDB,
-  getDB,
-  closeDB,
+  initRepository,
+  getRepository,
+  closeRepository,
+  SQLiteRepository,
+  createSQLiteRepository,
+  type DatabaseType,
+} from './repository';
+export type {
+  IRepository,
+  IProjectRepository,
+  ITaskRepository,
+  ITicketRepository,
+  IKnowledgeRepository,
+  IImpactRepository,
+  ITestResultRepository,
+  IMemoryRepository,
+  IEntityLinkRepository,
+  ITrainingRepository,
+  ISessionRepository,
+  IWorkHistoryRepository,
+  TaskFilters,
+  TaskListResult,
+  TicketFilters,
+  // ImpactAnalysis intentionally omitted — conflicts with ./impact's ImpactAnalysis
+  ImpactAnalysis as RepoImpactAnalysis,
+  ImpactAnalysisFilters,
+  ImpactValidation,
+  GateApproval as RepoGateApproval,
+  AnalysisHistory,
+  KnowledgeDocumentFilters,
+  KnowledgeDocListResult,
+  WorkHistoryFilters,
+  GovernanceViolationFilters,
+  SessionListResult,
+} from './repository';
+
+// Agent Desk v2 (persistent dev machine)
+export {
+  DeskManager,
+  DeskError,
+  DeskNotFoundError,
+  DeskAlreadyExistsError,
+  DeskDirtyError,
+  DeskGitError,
+  BranchNotFoundError,
+  BranchExistsError,
+  bootstrapContext as bootstrapDeskContext,
+  cleanContext as cleanDeskContext,
+  PORT_BASES,
+  PORT_STRIDE,
+  type DeskStatus,
+  type DeskSession,
+  type DeskPorts,
+  type DeskGitStatus,
+  type DeskInfo,
+  type DeskHealthIssue,
+  type DeskHealthReport,
+  type HealthIssueType,
+  type DeskCreateOptions,
+  type DeskRemoveOptions,
+} from './desk/index.js';
+
+// Database type exports (renamed to avoid conflicts with ./types)
+export {
   type Project as DBProject,
   type Task as DBTask,
   type WorkSession,

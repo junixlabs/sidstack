@@ -1,6 +1,30 @@
 # SidStack API Reference
 
-REST API running on `localhost:19432`.
+REST API running on `localhost:19432` (local) or your configured server URL (remote).
+
+## Authentication
+
+When `SIDSTACK_API_KEY` is set, all endpoints (except `/health` and `/api/events/stream`) require a Bearer token:
+
+```
+Authorization: Bearer YOUR_API_KEY
+```
+
+## Rate Limiting
+
+- **Writes** (POST/PUT/PATCH/DELETE): 100 requests per 15 minutes
+- **Reads** (GET): 600 requests per 15 minutes
+
+Response headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+
+## Health Check
+
+```
+GET /health
+
+Response: 200
+{ "status": "ok", "timestamp": "2026-02-25T..." }
+```
 
 ## Tasks
 
@@ -88,83 +112,9 @@ Response: 200
 { "ticket": {...}, "task": {...} }
 ```
 
-### Start Session for Ticket
-```
-POST /api/tickets/:id/start-session
-{ "workspacePath": "/path/to/project" }
-
-Response: 200
-```
-
 ### Delete Ticket
 ```
 DELETE /api/tickets/:id
-
-Response: 204
-```
-
-## Sessions
-
-### Create Session
-```
-POST /api/sessions
-{
-  "workspacePath": "/path/to/project",
-  "taskId": "task-123",
-  "prompt": "Fix the authentication bug"
-}
-
-Response: 201
-```
-
-### List Sessions
-```
-GET /api/sessions?workspacePath=/path&status=active
-
-Response: 200
-{ "sessions": [...] }
-```
-
-### Get Session
-```
-GET /api/sessions/:id
-
-Response: 200
-```
-
-### Update Session Status
-```
-POST /api/sessions/:id/status
-{ "status": "completed" }
-
-Response: 200
-```
-
-### Resume Session
-```
-POST /api/sessions/:id/resume
-{ "additionalPrompt": "Continue where we left off" }
-
-Response: 200
-```
-
-### Get Active Sessions
-```
-GET /api/sessions/query/active
-
-Response: 200
-```
-
-### Get Session Stats
-```
-GET /api/sessions/stats/overview
-
-Response: 200
-```
-
-### Delete Session
-```
-DELETE /api/sessions/:id
 
 Response: 204
 ```
@@ -173,7 +123,7 @@ Response: 204
 
 ### List Documents
 ```
-GET /api/knowledge?projectPath=/path&type=business-logic&module=auth
+GET /api/knowledge?projectPath=/path&category=01-architecture
 
 Response: 200
 { "documents": [...] }
@@ -194,6 +144,37 @@ GET /api/knowledge?projectPath=/path&search=authentication
 Response: 200
 ```
 
+### Create Document
+```
+POST /api/knowledge
+{
+  "projectPath": "/path",
+  "category": "01-architecture",
+  "title": "Auth Design",
+  "content": "# Auth Design\n..."
+}
+
+Response: 201
+```
+
+### Update Document
+```
+PUT /api/knowledge/doc/:id
+{
+  "projectPath": "/path",
+  "content": "# Updated content..."
+}
+
+Response: 200
+```
+
+### Delete Document
+```
+DELETE /api/knowledge/doc/:id?projectPath=/path
+
+Response: 204
+```
+
 ### Build Context
 ```
 GET /api/knowledge/context?projectPath=/path&moduleId=auth&format=claude
@@ -202,19 +183,25 @@ Response: 200
 (raw markdown)
 ```
 
-### List Types
-```
-GET /api/knowledge/types?projectPath=/path
-
-Response: 200
-{ "types": [{ "type": "business-logic", "count": 8 }, ...] }
-```
-
 ### List Modules
 ```
 GET /api/knowledge/modules?projectPath=/path
 
 Response: 200
+```
+
+### Knowledge Health
+```
+GET /api/knowledge/health?projectPath=/path
+
+Response: 200
+```
+
+### Cache Management
+```
+GET /api/knowledge/cache/stats
+POST /api/knowledge/cache/invalidate
+{ "projectPath": "/path/to/project" }
 ```
 
 ## Impact Analysis
@@ -256,41 +243,6 @@ Response: 200
 ### Run Validation
 ```
 POST /api/impact/:id/validations/:vid/run
-
-Response: 200
-```
-
-## Progress Tracking
-
-### List Work Sessions
-```
-GET /api/progress/sessions?workspacePath=/path
-
-Response: 200
-```
-
-### Get Active Session
-```
-GET /api/progress/sessions/active?workspacePath=/path
-
-Response: 200
-```
-
-### Log Work Entry
-```
-POST /api/progress/entries
-{
-  "sessionId": "session-...",
-  "action": "edit",
-  "filePath": "src/auth.ts"
-}
-
-Response: 201
-```
-
-### Get Work History
-```
-GET /api/progress/history?workspacePath=/path&hours=24
 
 Response: 200
 ```
@@ -355,6 +307,84 @@ POST /api/training/rules
 Response: 201
 ```
 
+## Entity References
+
+### Link Entities
+```
+POST /api/references/link
+{
+  "sourceType": "task",
+  "sourceId": "task-123",
+  "targetType": "knowledge",
+  "targetId": "doc-456"
+}
+
+Response: 201
+```
+
+### Get References
+```
+GET /api/references?entityType=task&entityId=task-123
+
+Response: 200
+```
+
+## Traceability
+
+### Get Matrix
+```
+GET /api/traceability/matrix?projectId=my-project
+
+Response: 200
+```
+
+## Events (SSE)
+
+### Stream Events
+```
+GET /api/events/stream
+
+Response: text/event-stream
+(Server-Sent Events — no auth required)
+```
+
+Events include task updates, ticket changes, and knowledge modifications. Used by the desktop app for real-time sync.
+
+## Progress Tracking
+
+### List Work Sessions
+```
+GET /api/progress/sessions?workspacePath=/path
+
+Response: 200
+```
+
+### Get Active Session
+```
+GET /api/progress/sessions/active?workspacePath=/path
+
+Response: 200
+```
+
+### Log Work Entry
+```
+POST /api/progress/entries
+{
+  "sessionId": "session-...",
+  "action": "edit",
+  "filePath": "src/auth.ts"
+}
+
+Response: 201
+```
+
+### Get Work History
+```
+GET /api/progress/history?workspacePath=/path&hours=24
+
+Response: 200
+```
+
 ## Error Codes
 
 | Code | Meaning |
@@ -363,23 +393,9 @@ Response: 201
 | 201 | Created |
 | 204 | Deleted |
 | 400 | Bad request (validation error) |
+| 401 | Unauthorized (missing/invalid auth) |
+| 403 | Forbidden (invalid API key) |
 | 404 | Not found |
 | 409 | Conflict (duplicate) |
+| 429 | Too many requests (rate limited) |
 | 500 | Internal server error |
-
-## Cache Management
-
-### Get Cache Stats
-```
-GET /api/knowledge/cache/stats
-
-Response: 200
-```
-
-### Invalidate Cache
-```
-POST /api/knowledge/cache/invalidate
-{ "projectPath": "/path/to/project" }
-
-Response: 200
-```

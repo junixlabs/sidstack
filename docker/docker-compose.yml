@@ -1,5 +1,5 @@
 # SidStack Server Stack
-# API Server + MCP Server + mem0 + Caddy reverse proxy
+# PostgreSQL + API Server + MCP Server + Caddy reverse proxy
 #
 # Usage:
 #   cp .env.example .env   # Edit with your values
@@ -10,11 +10,33 @@
 #   mcp-server  :19433  — MCP tools (Streamable HTTP for Claude Code)
 #   bot-server  :3222   — SidBot (Gemini intent router + chat)
 #   web-ui      :5174   — React SPA (browser access)
-#   mem0        :4321   — Semantic memory (optional)
-#   litellm     :4000   — LLM gateway for mem0 (optional)
 #   caddy       :80/443 — Reverse proxy with auto TLS
+#
+# Semantic memory: powered by SidMemo API (mem.sidcorp.co) — no local containers needed
 
 services:
+  # ===========================================================================
+  # Database
+  # ===========================================================================
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sidstack
+      POSTGRES_USER: sidstack
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sidstack_dev}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sidstack"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # ===========================================================================
   # Core Services
   # ===========================================================================
@@ -29,11 +51,18 @@ services:
       - sidstack-data:/data
     environment:
       - NODE_ENV=production
+      - DATABASE_TYPE=postgres
+      - DATABASE_URL=postgres://sidstack:${POSTGRES_PASSWORD:-sidstack_dev}@postgres:5432/sidstack
       - DATABASE_PATH=/data/sidstack.db
       - API_PORT=19432
       - SIDSTACK_API_KEY=${SIDSTACK_API_KEY}
       - SIDSTACK_CORS_ORIGINS=${SIDSTACK_CORS_ORIGINS:-}
-      - MEM0_API_URL=http://mem0:8000
+      - SIDMEMO_API_URL=${SIDMEMO_API_URL:-https://mem.sidcorp.co}
+      - SIDMEMO_API_KEY=${SIDMEMO_API_KEY}
+      - SIDMEMO_PROJECT_SLUG=${SIDMEMO_PROJECT_SLUG:-sidstack}
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "-O-", "http://localhost:19432/health"]
@@ -56,7 +85,9 @@ services:
       - MCP_PORT=19433
       - SIDSTACK_API_URL=http://api-server:19432
       - SIDSTACK_MCP_KEY=${SIDSTACK_MCP_KEY:-}
-      - MEM0_API_URL=http://mem0:8000
+      - SIDMEMO_API_URL=${SIDMEMO_API_URL:-https://mem.sidcorp.co}
+      - SIDMEMO_API_KEY=${SIDMEMO_API_KEY}
+      - SIDMEMO_PROJECT_SLUG=${SIDMEMO_PROJECT_SLUG:-sidstack}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "-O-", "http://localhost:19433/health"]
@@ -86,49 +117,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-
-  # ===========================================================================
-  # Semantic Memory (optional — comment out if not needed)
-  # ===========================================================================
-
-  litellm:
-    image: ghcr.io/berriai/litellm:main-stable
-    volumes:
-      - ./mem0/litellm-config.yaml:/app/config.yaml
-    ports:
-      - "4000:4000"
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
-    environment:
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-sidstack-dev}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/readiness')"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-
-  mem0:
-    build: ./mem0
-    ports:
-      - "4321:8000"
-    depends_on:
-      litellm:
-        condition: service_healthy
-    environment:
-      - MEM0_API_KEY=${MEM0_API_KEY:-}
-      - QDRANT_HOST=${QDRANT_HOST}
-      - QDRANT_PORT=${QDRANT_PORT:-6333}
-      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
-      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-sidstack_mem0}
-      - LITELLM_BASE_URL=http://litellm:4000/v1
-      - LITELLM_API_BASE=http://litellm:4000/v1
-      - OPENAI_BASE_URL=http://litellm:4000/v1
-      - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-sidstack-dev}
-      - LLM_MODEL=${LLM_MODEL:-gemini-flash}
-      - EMBED_MODEL=${EMBED_MODEL:-gemini-embedding}
-    restart: unless-stopped
 
   # ===========================================================================
   # Web UI (React SPA served by Caddy)
@@ -175,6 +163,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  pgdata:
   sidstack-data:
   caddy-data:
   caddy-config:

@@ -1,9 +1,9 @@
 /**
- * Tests for projectStore - worktree management
+ * Tests for projectStore - Desk v2: persistent dev machine model
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useProjectStore, PORT_RANGES } from './projectStore';
+import { useProjectStore } from './projectStore';
 import type { Project, Worktree } from '@/types';
 
 // Mock Tauri invoke
@@ -41,6 +41,11 @@ vi.mock('@tauri-apps/api/path', () => ({
   join: vi.fn().mockImplementation((...parts: string[]) => parts.join('/')),
 }));
 
+// Mock Tauri plugin-fs
+vi.mock('@tauri-apps/plugin-fs', () => ({
+  readTextFile: vi.fn().mockRejectedValue(new Error('not found')),
+}));
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -50,9 +55,10 @@ function createMockWorktree(overrides: Partial<Worktree> = {}): Worktree {
     id: 'main',
     path: '/test/project',
     branch: 'main',
-    ports: { dev: 3000, api: 19432, preview: 4000 },
+    ports: { api: 3100, mcp: 3200, web: 3300, dev: 5100 },
     isActive: true,
     lastActive: new Date().toISOString(),
+    agentStatus: 'idle',
     ...overrides,
   };
 }
@@ -79,107 +85,6 @@ describe('projectStore', () => {
     useProjectStore.setState({
       projects: [],
       activeProjectId: null,
-    });
-  });
-
-  // ===========================================================================
-  // Port Allocation
-  // ===========================================================================
-
-  describe('allocatePorts', () => {
-    it('should allocate first available ports when no worktrees exist', () => {
-      const ports = useProjectStore.getState().allocatePorts();
-      expect(ports.dev).toBe(PORT_RANGES.dev.start);
-      expect(ports.api).toBe(PORT_RANGES.api.start);
-      expect(ports.preview).toBe(PORT_RANGES.preview.start);
-    });
-
-    it('should avoid port collisions with existing worktrees', () => {
-      // Set up a project with one worktree using first ports
-      const existingProject = createMockProject({
-        worktrees: [
-          createMockWorktree({
-            ports: { dev: 3000, api: 19432, preview: 4000 },
-          }),
-        ],
-      });
-
-      useProjectStore.setState({ projects: [existingProject] });
-
-      const ports = useProjectStore.getState().allocatePorts();
-      expect(ports.dev).toBe(3001);
-      expect(ports.api).toBe(19433);
-      expect(ports.preview).toBe(4001);
-    });
-
-    it('should avoid collisions across multiple projects', () => {
-      const project1 = createMockProject({
-        id: 'proj-1',
-        worktrees: [
-          createMockWorktree({ ports: { dev: 3000, api: 19432, preview: 4000 } }),
-          createMockWorktree({ id: 'feat-1', branch: 'feat-1', ports: { dev: 3001, api: 19433, preview: 4001 } }),
-        ],
-      });
-
-      const project2 = createMockProject({
-        id: 'proj-2',
-        worktrees: [
-          createMockWorktree({ ports: { dev: 3002, api: 19434, preview: 4002 } }),
-        ],
-      });
-
-      useProjectStore.setState({ projects: [project1, project2] });
-
-      const ports = useProjectStore.getState().allocatePorts();
-      expect(ports.dev).toBe(3003);
-      expect(ports.api).toBe(19435);
-      expect(ports.preview).toBe(4003);
-    });
-
-    it('should skip ports with value 0 (unallocated)', () => {
-      const project = createMockProject({
-        worktrees: [
-          createMockWorktree({ ports: { dev: 0, api: 0, preview: 0 } }),
-        ],
-      });
-
-      useProjectStore.setState({ projects: [project] });
-
-      const ports = useProjectStore.getState().allocatePorts();
-      expect(ports.dev).toBe(PORT_RANGES.dev.start);
-    });
-  });
-
-  // ===========================================================================
-  // getAllocatedPorts
-  // ===========================================================================
-
-  describe('getAllocatedPorts', () => {
-    it('should return empty set when no projects exist', () => {
-      const used = useProjectStore.getState().getAllocatedPorts('dev');
-      expect(used.size).toBe(0);
-    });
-
-    it('should return all used ports across projects', () => {
-      const project1 = createMockProject({
-        id: 'p1',
-        worktrees: [
-          createMockWorktree({ ports: { dev: 3000, api: 19432, preview: 4000 } }),
-        ],
-      });
-      const project2 = createMockProject({
-        id: 'p2',
-        worktrees: [
-          createMockWorktree({ ports: { dev: 3005, api: 19437, preview: 4005 } }),
-        ],
-      });
-
-      useProjectStore.setState({ projects: [project1, project2] });
-
-      const devPorts = useProjectStore.getState().getAllocatedPorts('dev');
-      expect(devPorts.has(3000)).toBe(true);
-      expect(devPorts.has(3005)).toBe(true);
-      expect(devPorts.has(3001)).toBe(false);
     });
   });
 
@@ -240,86 +145,6 @@ describe('projectStore', () => {
   });
 
   // ===========================================================================
-  // removeWorktreeFromDisk
-  // ===========================================================================
-
-  describe('removeWorktreeFromDisk', () => {
-    it('should find main worktree as reference (not by index)', async () => {
-      const { invoke } = await import('@tauri-apps/api/core');
-
-      const project = createMockProject({
-        worktrees: [
-          // Index 0 is NOT main
-          createMockWorktree({ id: 'feature-auth', branch: 'feature/auth', path: '/test/feature-auth' }),
-          // Index 1 IS main
-          createMockWorktree({ id: 'main', branch: 'main', path: '/test/main' }),
-          // Target to remove
-          createMockWorktree({ id: 'bugfix', branch: 'bugfix/fix-1', path: '/test/bugfix' }),
-        ],
-        activeWorktreeId: 'main',
-      });
-
-      useProjectStore.setState({ projects: [project] });
-
-      await useProjectStore.getState().removeWorktreeFromDisk('test-project-id', 'bugfix');
-
-      // Should use main worktree's path as cwd, not index 0
-      expect(invoke).toHaveBeenCalledWith('run_git_command', {
-        cwd: '/test/main',
-        args: ['worktree', 'remove', '/test/bugfix'],
-      });
-    });
-
-    it('should fallback to another worktree if main not found', async () => {
-      const { invoke } = await import('@tauri-apps/api/core');
-
-      const project = createMockProject({
-        worktrees: [
-          createMockWorktree({ id: 'dev', branch: 'dev', path: '/test/dev' }),
-          createMockWorktree({ id: 'staging', branch: 'staging', path: '/test/staging' }),
-        ],
-        activeWorktreeId: 'dev',
-      });
-
-      useProjectStore.setState({ projects: [project] });
-
-      await useProjectStore.getState().removeWorktreeFromDisk('test-project-id', 'staging');
-
-      // Should use dev (the remaining worktree) as cwd
-      expect(invoke).toHaveBeenCalledWith('run_git_command', {
-        cwd: '/test/dev',
-        args: ['worktree', 'remove', '/test/staging'],
-      });
-    });
-
-    it('should remove worktree from state after disk removal', async () => {
-      const project = createMockProject({
-        worktrees: [
-          createMockWorktree({ id: 'main', branch: 'main', path: '/test/main' }),
-          createMockWorktree({ id: 'feat', branch: 'feat', path: '/test/feat' }),
-        ],
-      });
-
-      useProjectStore.setState({ projects: [project] });
-
-      await useProjectStore.getState().removeWorktreeFromDisk('test-project-id', 'feat');
-
-      const updated = useProjectStore.getState().projects[0];
-      expect(updated.worktrees.length).toBe(1);
-      expect(updated.worktrees[0].id).toBe('main');
-    });
-
-    it('should do nothing for non-existent worktree', async () => {
-      const project = createMockProject();
-      useProjectStore.setState({ projects: [project] });
-
-      await useProjectStore.getState().removeWorktreeFromDisk('test-project-id', 'does-not-exist');
-
-      expect(useProjectStore.getState().projects[0].worktrees.length).toBe(1);
-    });
-  });
-
-  // ===========================================================================
   // switchWorktree
   // ===========================================================================
 
@@ -373,23 +198,27 @@ describe('projectStore', () => {
   });
 
   // ===========================================================================
-  // releasePorts
+  // getDesks
   // ===========================================================================
 
-  describe('releasePorts', () => {
-    it('should reset ports to 0', () => {
+  describe('getDesks', () => {
+    it('should return worktrees from active project', () => {
       const project = createMockProject({
         worktrees: [
-          createMockWorktree({ id: 'main', ports: { dev: 3000, api: 19432, preview: 4000 } }),
+          createMockWorktree({ id: 'main' }),
+          createMockWorktree({ id: 'desk-1', branch: 'feat/test', agentStatus: 'working' }),
         ],
       });
 
-      useProjectStore.setState({ projects: [project] });
+      useProjectStore.setState({ projects: [project], activeProjectId: 'test-project-id' });
 
-      useProjectStore.getState().releasePorts('test-project-id', 'main');
+      const desks = useProjectStore.getState().getDesks();
+      expect(desks.length).toBe(2);
+    });
 
-      const updated = useProjectStore.getState().projects[0];
-      expect(updated.worktrees[0].ports).toEqual({ dev: 0, api: 0, preview: 0 });
+    it('should return empty array when no active project', () => {
+      const desks = useProjectStore.getState().getDesks();
+      expect(desks).toEqual([]);
     });
   });
 

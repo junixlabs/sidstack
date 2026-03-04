@@ -55,6 +55,9 @@ SidStack is an **AI-Powered Project Intelligence Platform** for Claude Code.
 | **Ticket Queue** | Intake external tickets, review, convert to tasks |
 | **Training Room** | Capture lessons from incidents, build reusable skills and rules |
 | **OKRs** | Define project goals, track progress through task completion |
+| **Agent Desk** | Isolated workspaces for AI agents via git worktrees |
+| **Memory** | Semantic search across project memories (via mem0) |
+| **Traceability** | Spec-task-test coverage matrix |
 
 ---
 
@@ -69,6 +72,14 @@ npx @sidstack/cli init --scan       # Setup + AI knowledge scan
 npx @sidstack/cli knowledge list    # List knowledge docs
 npx @sidstack/cli knowledge create  # Create from template
 npx @sidstack/cli knowledge templates  # List available templates
+npx @sidstack/cli knowledge sync    # Sync to remote server
+npx @sidstack/cli knowledge validate  # Validate frontmatter
+
+# Agent Desk
+npx @sidstack/cli desk list         # List agent desks
+npx @sidstack/cli desk add <name>   # Add a new desk
+npx @sidstack/cli desk remove <name>  # Remove a desk
+npx @sidstack/cli new <name>        # Create workspace with .bare/
 
 # Governance
 npx @sidstack/cli governance show   # View governance overview
@@ -96,13 +107,19 @@ your-project/
 │   │   ├── security.md
 │   │   └── ...
 │   ├── skills/
-│   │   └── capabilities/
-│   │       ├── implement/        # feature, bugfix, refactor
-│   │       └── review/           # code, security, performance
+│   │   └── sidstack/
+│   │       ├── sidstack-aware/   # Task lifecycle skill
+│   │       └── sidstack-dev/     # Development workflow skill
 │   └── knowledge/                # Project knowledge docs (from --scan)
-│       ├── modules/
-│       ├── business-logic/
-│       └── api-endpoints/
+│       ├── 00-context/           # Vision, glossary, onboarding
+│       ├── 01-architecture/      # System design, patterns
+│       ├── 02-decisions/         # ADRs
+│       ├── 03-standards/         # Coding conventions
+│       ├── 04-data/              # Database schema
+│       ├── 05-api/               # API contracts
+│       ├── 06-operations/        # Deployment, monitoring
+│       ├── 07-projects/          # Project-specific docs
+│       └── 08-incidents/         # Incident reports
 ├── .claude/
 │   └── settings.local.json       # MCP tool auto-approval
 ├── .mcp.json                     # Claude Code MCP config
@@ -115,7 +132,9 @@ your-project/
 
 ### Install
 
-Download the `.dmg` from [Releases](https://github.com/junixlabs/sidstack/releases).
+Download from [Releases](https://github.com/junixlabs/sidstack/releases):
+- macOS: `.dmg`
+- Linux: `.deb` or `.AppImage`
 
 Or build from source:
 ```bash
@@ -136,7 +155,7 @@ pnpm install && pnpm packages:build && pnpm tauri:build
 | Settings | `Cmd+,` |
 | Open Project | `Cmd+O` |
 
-### 7 Views
+### Views
 
 | View | Description |
 |------|-------------|
@@ -145,8 +164,10 @@ pnpm install && pnpm packages:build && pnpm tauri:build
 | **Knowledge Browser** | Browse and search project knowledge documents |
 | **Ticket Queue** | External ticket intake, review workflow, convert to tasks |
 | **Training Room** | Incidents, lessons, skills, and enforcement rules |
+| **Agent Desk** | Manage isolated agent workspaces (git worktrees) |
+| **Traceability** | Spec-task-test coverage matrix |
+| **Docs** | Built-in documentation viewer |
 | **Settings** | Per-project configuration |
-| **Worktree Status** | Git branch and file status |
 
 ---
 
@@ -183,10 +204,11 @@ pnpm test        # All pass
 2. Check `.sidstack/knowledge/` directory
 3. Ensure project has source files to analyze
 
-### Desktop app won't start
+### Desktop app won't connect
 
-1. Check that `.sidstack/` directory exists in your project
-2. Run `npx @sidstack/cli doctor` to diagnose
+1. Verify the API server is running
+2. Check Connection Setup screen (Server URL + API Key)
+3. Run `npx @sidstack/cli doctor` to diagnose
 
 ---
 

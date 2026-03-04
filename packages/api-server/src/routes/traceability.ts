@@ -1,11 +1,12 @@
 /**
  * Traceability API Routes
  *
- * Endpoint for the traceability matrix (spec → task → test coverage).
+ * Endpoint for the traceability matrix (spec -> task -> test coverage).
+ * All DB access via getRepository() (supports SQLite and PostgreSQL).
  */
 
 import { Router } from 'express';
-import { getDB, buildTraceabilityMatrix, detectWorkspace } from '@sidstack/shared';
+import { getRepository, buildTraceabilityMatrix, detectWorkspace } from '@sidstack/shared';
 
 export const traceabilityRouter: Router = Router();
 
@@ -24,8 +25,8 @@ traceabilityRouter.get('/matrix', async (req, res) => {
     const workspace = detectWorkspace(projectPath);
     const workspacePath = workspace ? workspace.workspaceRoot : projectPath;
 
-    const db = await getDB();
-    const result = await buildTraceabilityMatrix(db, workspacePath, projectId, specId, taskId);
+    const repo = await getRepository();
+    const result = await buildTraceabilityMatrix(repo, workspacePath, projectId, specId, taskId);
 
     res.json({ success: true, ...result });
   } catch (error) {

@@ -39,6 +39,7 @@ export type DocumentType =
 
   // Meta
   | "module"         // Module definitions
+  | "okr"            // Objectives & Key Results
   | "index";         // Navigation/overview
 
 /**
@@ -416,6 +417,14 @@ export const DOCUMENT_TYPE_CONFIG: Record<DocumentType, {
     folder: '01-architecture',
     description: 'Module definition',
     emoji: '📦',
+  },
+  okr: {
+    label: 'OKR',
+    icon: 'Target',
+    color: '#f59e0b',
+    folder: '07-projects',
+    description: 'Objectives & Key Results',
+    emoji: '🎯',
   },
   index: {
     label: 'Index',
@@ -830,3 +839,33 @@ export const FOLDER_TO_DEFAULT_TYPE: Record<string, DocumentType> = Object.fromE
 export const TYPE_TO_FOLDER: Record<DocumentType, string> = Object.fromEntries(
   ALL_DOCUMENT_TYPES.map(t => [t, DOCUMENT_TYPE_CONFIG[t].folder])
 ) as Record<DocumentType, string>;
+
+// =============================================================================
+// Type Groups (module-first tree organization)
+// =============================================================================
+
+/**
+ * Groups document types into semantic categories for tree display.
+ * Used by GET /tree to organize docs within each module.
+ */
+export interface TypeGroupConfig {
+  label: string;
+  types: DocumentType[];
+  icon: string;
+}
+
+export const TYPE_GROUPS: Record<string, TypeGroupConfig> = {
+  guides:     { label: 'Guides',     types: ['guide'],                                              icon: 'BookOpen' },
+  references: { label: 'References', types: ['reference', 'pattern', 'okr', 'index'],               icon: 'FileCode' },
+  decisions:  { label: 'Decisions',  types: ['decision', 'spec', 'proposal'],                       icon: 'GitBranch' },
+  governance: { label: 'Governance', types: ['rule', 'principle', 'checklist', 'template', 'skill'], icon: 'Shield' },
+};
+
+/** Get the type group key for a given document type */
+export function getTypeGroup(docType: DocumentType): string | null {
+  if (docType === 'module') return null; // Module docs are shown as module headers
+  for (const [key, group] of Object.entries(TYPE_GROUPS)) {
+    if (group.types.includes(docType)) return key;
+  }
+  return null;
+}

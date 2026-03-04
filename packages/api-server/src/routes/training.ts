@@ -6,7 +6,7 @@
  */
 
 import { Router } from 'express';
-import { getDB } from '@sidstack/shared';
+import { getRepository } from '@sidstack/shared';
 import type {
   IncidentType,
   IncidentSeverity,
@@ -33,9 +33,9 @@ export const trainingRouter: Router = Router();
 // Get training session for a module
 trainingRouter.get('/sessions/:moduleId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const projectPath = req.query.projectPath as string || '';
-    const session = db.getTrainingSessionByModule(req.params.moduleId, projectPath);
+    const session = await repo.training.getSessionByModule(req.params.moduleId, projectPath);
 
     if (!session) {
       return res.status(404).json({ error: 'Training session not found' });
@@ -51,10 +51,10 @@ trainingRouter.get('/sessions/:moduleId', async (req, res) => {
 // Get or create training session for a module
 trainingRouter.post('/sessions/:moduleId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const projectPath = (req.body.projectPath || req.query.projectPath || '') as string;
     console.log(`[Training] POST /sessions/${req.params.moduleId} - projectPath: "${projectPath}"`);
-    const session = db.getOrCreateTrainingSession(req.params.moduleId, projectPath);
+    const session = await repo.training.getOrCreateSession(req.params.moduleId, projectPath);
 
     res.json({ success: true, session });
   } catch (error) {
@@ -66,10 +66,10 @@ trainingRouter.post('/sessions/:moduleId', async (req, res) => {
 // List all training sessions
 trainingRouter.get('/sessions', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const projectPath = req.query.projectPath as string | undefined;
     const status = req.query.status as 'active' | 'archived' | undefined;
-    const sessions = db.listTrainingSessions(projectPath, status);
+    const sessions = await repo.training.listSessions(projectPath, status);
 
     res.json({ success: true, sessions, total: sessions.length });
   } catch (error) {
@@ -85,7 +85,7 @@ trainingRouter.get('/sessions', async (req, res) => {
 // Create incident
 trainingRouter.post('/incidents', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       sessionId,
       type = 'mistake',
@@ -100,12 +100,12 @@ trainingRouter.post('/incidents', async (req, res) => {
     }
 
     // Verify session exists
-    const session = db.getTrainingSession(sessionId);
+    const session = await repo.training.getSession(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Training session not found' });
     }
 
-    const incident = db.createIncident({
+    const incident = await repo.training.createIncident({
       sessionId,
       type: type as IncidentType,
       severity: severity as IncidentSeverity,
@@ -124,7 +124,7 @@ trainingRouter.post('/incidents', async (req, res) => {
 // List incidents
 trainingRouter.get('/incidents', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
 
     const sessionId = req.query.sessionId as string | undefined;
     const projectPath = req.query.projectPath as string | undefined;
@@ -133,11 +133,11 @@ trainingRouter.get('/incidents', async (req, res) => {
     const status = req.query.status as IncidentStatus | undefined;
     const taskId = req.query.taskId as string | undefined;
 
-    let incidents = db.listIncidents({ sessionId, type, severity, status, taskId });
+    let incidents = await repo.training.listIncidents({ sessionId, type, severity, status, taskId });
 
     // When no sessionId filter, scope by projectPath via session lookup
     if (!sessionId && projectPath) {
-      const sessions = db.listTrainingSessions(projectPath);
+      const sessions = await repo.training.listSessions(projectPath);
       const sessionIds = new Set(sessions.map((s) => s.id));
       incidents = incidents.filter((i) => sessionIds.has(i.sessionId));
     }
@@ -152,8 +152,8 @@ trainingRouter.get('/incidents', async (req, res) => {
 // Get incident by ID
 trainingRouter.get('/incidents/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const incident = db.getIncident(req.params.id);
+    const repo = await getRepository();
+    const incident = await repo.training.getIncident(req.params.id);
 
     if (!incident) {
       return res.status(404).json({ error: 'Incident not found' });
@@ -169,10 +169,10 @@ trainingRouter.get('/incidents/:id', async (req, res) => {
 // Update incident
 trainingRouter.patch('/incidents/:id', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { type, severity, title, description, context, resolution, status } = req.body;
 
-    const incident = db.updateIncident({
+    const incident = await repo.training.updateIncident({
       id: req.params.id,
       type: type as IncidentType | undefined,
       severity: severity as IncidentSeverity | undefined,
@@ -197,14 +197,14 @@ trainingRouter.patch('/incidents/:id', async (req, res) => {
 // Delete incident
 trainingRouter.delete('/incidents/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const incident = db.getIncident(req.params.id);
+    const repo = await getRepository();
+    const incident = await repo.training.getIncident(req.params.id);
 
     if (!incident) {
       return res.status(404).json({ error: 'Incident not found' });
     }
 
-    db.deleteIncident(req.params.id);
+    await repo.training.deleteIncident(req.params.id);
     res.json({ success: true, message: 'Incident deleted' });
   } catch (error) {
     console.error('Failed to delete incident:', error);
@@ -219,7 +219,7 @@ trainingRouter.delete('/incidents/:id', async (req, res) => {
 // Create lesson
 trainingRouter.post('/lessons', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       sessionId,
       incidentIds,
@@ -237,12 +237,12 @@ trainingRouter.post('/lessons', async (req, res) => {
     }
 
     // Verify session exists
-    const session = db.getTrainingSession(sessionId);
+    const session = await repo.training.getSession(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Training session not found' });
     }
 
-    const lesson = db.createLesson({
+    const lesson = await repo.training.createLesson({
       sessionId,
       incidentIds: incidentIds as string[] | undefined,
       title,
@@ -262,17 +262,17 @@ trainingRouter.post('/lessons', async (req, res) => {
 // List lessons
 trainingRouter.get('/lessons', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
 
     const sessionId = req.query.sessionId as string | undefined;
     const projectPath = req.query.projectPath as string | undefined;
     const status = req.query.status as LessonStatus | undefined;
 
-    let lessons = db.listLessons({ sessionId, status });
+    let lessons = await repo.training.listLessons({ sessionId, status });
 
     // When no sessionId filter, scope by projectPath via session lookup
     if (!sessionId && projectPath) {
-      const sessions = db.listTrainingSessions(projectPath);
+      const sessions = await repo.training.listSessions(projectPath);
       const sessionIds = new Set(sessions.map((s) => s.id));
       lessons = lessons.filter((l) => sessionIds.has(l.sessionId));
     }
@@ -287,8 +287,8 @@ trainingRouter.get('/lessons', async (req, res) => {
 // Get lesson by ID
 trainingRouter.get('/lessons/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const lesson = db.getLesson(req.params.id);
+    const repo = await getRepository();
+    const lesson = await repo.training.getLesson(req.params.id);
 
     if (!lesson) {
       return res.status(404).json({ error: 'Lesson not found' });
@@ -304,10 +304,10 @@ trainingRouter.get('/lessons/:id', async (req, res) => {
 // Update lesson
 trainingRouter.patch('/lessons/:id', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { title, problem, rootCause, solution, applicability, status } = req.body;
 
-    const lesson = db.updateLesson({
+    const lesson = await repo.training.updateLesson({
       id: req.params.id,
       title,
       problem,
@@ -331,10 +331,10 @@ trainingRouter.patch('/lessons/:id', async (req, res) => {
 // Approve lesson
 trainingRouter.post('/lessons/:id/approve', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { approver = 'user' } = req.body;
 
-    const lesson = db.approveLesson(req.params.id, approver);
+    const lesson = await repo.training.approveLesson(req.params.id, approver);
 
     if (!lesson) {
       return res.status(404).json({ error: 'Lesson not found' });
@@ -354,7 +354,7 @@ trainingRouter.post('/lessons/:id/approve', async (req, res) => {
 // Create skill
 trainingRouter.post('/skills', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       projectPath = '',
       name,
@@ -371,7 +371,7 @@ trainingRouter.post('/skills', async (req, res) => {
     }
 
     // Check for duplicate name within project
-    const existing = db.getSkillByName(name, projectPath);
+    const existing = await repo.training.getSkillByName(name, projectPath);
     if (existing) {
       return res.status(409).json({
         error: 'Skill with this name already exists',
@@ -379,7 +379,7 @@ trainingRouter.post('/skills', async (req, res) => {
       });
     }
 
-    const skill = db.createSkill({
+    const skill = await repo.training.createSkill({
       projectPath,
       name,
       description,
@@ -400,7 +400,7 @@ trainingRouter.post('/skills', async (req, res) => {
 // List skills
 trainingRouter.get('/skills', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
 
     const projectPath = req.query.projectPath as string | undefined;
     const module = req.query.module as string | undefined;
@@ -409,7 +409,7 @@ trainingRouter.get('/skills', async (req, res) => {
     const type = req.query.type as SkillType | undefined;
     const status = req.query.status as SkillStatus | undefined;
 
-    const skills = db.listSkills({ projectPath, module, role, taskType, type, status });
+    const skills = await repo.training.listSkills({ projectPath, module, role, taskType, type, status });
 
     res.json({ success: true, skills, total: skills.length });
   } catch (error) {
@@ -421,8 +421,8 @@ trainingRouter.get('/skills', async (req, res) => {
 // Get skill by ID
 trainingRouter.get('/skills/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const skill = db.getSkill(req.params.id);
+    const repo = await getRepository();
+    const skill = await repo.training.getSkill(req.params.id);
 
     if (!skill) {
       return res.status(404).json({ error: 'Skill not found' });
@@ -438,7 +438,7 @@ trainingRouter.get('/skills/:id', async (req, res) => {
 // Update skill
 trainingRouter.patch('/skills/:id', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       name,
       description,
@@ -449,7 +449,7 @@ trainingRouter.patch('/skills/:id', async (req, res) => {
       status,
     } = req.body;
 
-    const skill = db.updateSkill({
+    const skill = await repo.training.updateSkill({
       id: req.params.id,
       name,
       description,
@@ -474,8 +474,8 @@ trainingRouter.patch('/skills/:id', async (req, res) => {
 // Activate skill
 trainingRouter.post('/skills/:id/activate', async (req, res) => {
   try {
-    const db = await getDB();
-    const skill = db.activateSkill(req.params.id);
+    const repo = await getRepository();
+    const skill = await repo.training.activateSkill(req.params.id);
 
     if (!skill) {
       return res.status(404).json({ error: 'Skill not found' });
@@ -491,8 +491,8 @@ trainingRouter.post('/skills/:id/activate', async (req, res) => {
 // Deprecate skill
 trainingRouter.post('/skills/:id/deprecate', async (req, res) => {
   try {
-    const db = await getDB();
-    const skill = db.deprecateSkill(req.params.id);
+    const repo = await getRepository();
+    const skill = await repo.training.deprecateSkill(req.params.id);
 
     if (!skill) {
       return res.status(404).json({ error: 'Skill not found' });
@@ -508,8 +508,8 @@ trainingRouter.post('/skills/:id/deprecate', async (req, res) => {
 // Record skill usage
 trainingRouter.post('/skills/:id/usage', async (req, res) => {
   try {
-    const db = await getDB();
-    const skill = db.incrementSkillUsage(req.params.id);
+    const repo = await getRepository();
+    const skill = await repo.training.incrementSkillUsage(req.params.id);
 
     if (!skill) {
       return res.status(404).json({ error: 'Skill not found' });
@@ -529,7 +529,7 @@ trainingRouter.post('/skills/:id/usage', async (req, res) => {
 // Create rule
 trainingRouter.post('/rules', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       projectPath = '',
       name,
@@ -546,7 +546,7 @@ trainingRouter.post('/rules', async (req, res) => {
     }
 
     // Check for duplicate name within project
-    const existing = db.getRuleByName(name, projectPath);
+    const existing = await repo.training.getRuleByName(name, projectPath);
     if (existing) {
       return res.status(409).json({
         error: 'Rule with this name already exists',
@@ -554,7 +554,7 @@ trainingRouter.post('/rules', async (req, res) => {
       });
     }
 
-    const rule = db.createRule({
+    const rule = await repo.training.createRule({
       projectPath,
       name,
       description,
@@ -575,7 +575,7 @@ trainingRouter.post('/rules', async (req, res) => {
 // List rules
 trainingRouter.get('/rules', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
 
     const projectPath = req.query.projectPath as string | undefined;
     const module = req.query.module as string | undefined;
@@ -585,7 +585,7 @@ trainingRouter.get('/rules', async (req, res) => {
     const enforcement = req.query.enforcement as RuleEnforcement | undefined;
     const status = req.query.status as RuleStatus | undefined;
 
-    const rules = db.listRules({ projectPath, module, role, taskType, level, enforcement, status });
+    const rules = await repo.training.listRules({ projectPath, module, role, taskType, level, enforcement, status });
 
     res.json({ success: true, rules, total: rules.length });
   } catch (error) {
@@ -597,8 +597,8 @@ trainingRouter.get('/rules', async (req, res) => {
 // Get rule by ID
 trainingRouter.get('/rules/:id', async (req, res) => {
   try {
-    const db = await getDB();
-    const rule = db.getRule(req.params.id);
+    const repo = await getRepository();
+    const rule = await repo.training.getRule(req.params.id);
 
     if (!rule) {
       return res.status(404).json({ error: 'Rule not found' });
@@ -614,7 +614,7 @@ trainingRouter.get('/rules/:id', async (req, res) => {
 // Update rule
 trainingRouter.patch('/rules/:id', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       name,
       description,
@@ -625,7 +625,7 @@ trainingRouter.patch('/rules/:id', async (req, res) => {
       status,
     } = req.body;
 
-    const rule = db.updateRule({
+    const rule = await repo.training.updateRule({
       id: req.params.id,
       name,
       description,
@@ -650,8 +650,8 @@ trainingRouter.patch('/rules/:id', async (req, res) => {
 // Deprecate rule
 trainingRouter.post('/rules/:id/deprecate', async (req, res) => {
   try {
-    const db = await getDB();
-    const rule = db.deprecateRule(req.params.id);
+    const repo = await getRepository();
+    const rule = await repo.training.deprecateRule(req.params.id);
 
     if (!rule) {
       return res.status(404).json({ error: 'Rule not found' });
@@ -667,8 +667,8 @@ trainingRouter.post('/rules/:id/deprecate', async (req, res) => {
 // Record rule violation
 trainingRouter.post('/rules/:id/violation', async (req, res) => {
   try {
-    const db = await getDB();
-    const rule = db.recordRuleViolation(req.params.id);
+    const repo = await getRepository();
+    const rule = await repo.training.recordRuleViolation(req.params.id);
 
     if (!rule) {
       return res.status(404).json({ error: 'Rule not found' });
@@ -684,11 +684,11 @@ trainingRouter.post('/rules/:id/violation', async (req, res) => {
 // Check applicable rules for context
 trainingRouter.post('/rules/check', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { module: moduleId, role, taskType } = req.body;
 
     // Get active rules filtered by context
-    const rules = db.listRules({
+    const rules = await repo.training.listRules({
       module: moduleId,
       role,
       taskType,
@@ -709,12 +709,12 @@ trainingRouter.post('/rules/check', async (req, res) => {
 // Get training context for a module
 trainingRouter.get('/context/:moduleId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const projectPath = req.query.projectPath as string || '';
     const role = req.query.role as string | undefined;
     const taskType = req.query.taskType as string | undefined;
 
-    const context = db.getTrainingContext(req.params.moduleId, projectPath, role, taskType);
+    const context = await repo.training.getTrainingContext(req.params.moduleId, projectPath, role, taskType);
 
     res.json({ success: true, context });
   } catch (error) {
@@ -726,14 +726,14 @@ trainingRouter.get('/context/:moduleId', async (req, res) => {
 // Build training context prompt
 trainingRouter.post('/context/build', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { moduleId, projectPath = '', role, taskType, maxSkills = 10, maxRules = 10 } = req.body;
 
     if (!moduleId) {
       return res.status(400).json({ error: 'moduleId is required' });
     }
 
-    const context = db.getTrainingContext(moduleId, projectPath, role, taskType);
+    const context = await repo.training.getTrainingContext(moduleId, projectPath, role, taskType);
 
     // Build prompt
     const prompt = buildTrainingContextPrompt(context, maxSkills, maxRules);
@@ -756,7 +756,7 @@ trainingRouter.post('/context/build', async (req, res) => {
 // Submit feedback
 trainingRouter.post('/feedback', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const {
       entityType,
       entityId,
@@ -773,7 +773,7 @@ trainingRouter.post('/feedback', async (req, res) => {
       });
     }
 
-    const feedback = db.createTrainingFeedback({
+    const feedback = await repo.training.createFeedback({
       entityType: entityType as 'skill' | 'rule',
       entityId,
       taskId,
@@ -785,15 +785,15 @@ trainingRouter.post('/feedback', async (req, res) => {
 
     // Update skill success rate if applicable
     if (entityType === 'skill' && (outcome === 'helped' || outcome === 'hindered')) {
-      const skill = db.getSkill(entityId);
+      const skill = await repo.training.getSkill(entityId);
       if (skill) {
-        const feedbackList = db.listTrainingFeedback('skill', entityId);
+        const feedbackList = await repo.training.listFeedback('skill', entityId);
         const helpedCount = feedbackList.filter((f) => f.outcome === 'helped').length;
         const totalCount = feedbackList.filter((f) =>
           ['helped', 'hindered'].includes(f.outcome)
         ).length;
         const successRate = totalCount > 0 ? Math.round((helpedCount / totalCount) * 100) : 0;
-        db.updateSkill({ id: entityId, successRate });
+        await repo.training.updateSkill({ id: entityId, successRate });
       }
     }
 
@@ -807,10 +807,10 @@ trainingRouter.post('/feedback', async (req, res) => {
 // List feedback for entity
 trainingRouter.get('/feedback/:entityType/:entityId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const { entityType, entityId } = req.params;
 
-    const feedback = db.listTrainingFeedback(entityType as 'skill' | 'rule', entityId);
+    const feedback = await repo.training.listFeedback(entityType as 'skill' | 'rule', entityId);
 
     res.json({ success: true, feedback, total: feedback.length });
   } catch (error) {
@@ -826,12 +826,12 @@ trainingRouter.get('/feedback/:entityType/:entityId', async (req, res) => {
 // Get training stats for a module
 trainingRouter.get('/stats/:moduleId', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const moduleId = req.params.moduleId;
     const projectPath = req.query.projectPath as string || '';
 
     // Get session
-    const session = db.getTrainingSessionByModule(moduleId, projectPath);
+    const session = await repo.training.getSessionByModule(moduleId, projectPath);
     if (!session) {
       return res.json({
         success: true,
@@ -848,10 +848,10 @@ trainingRouter.get('/stats/:moduleId', async (req, res) => {
     }
 
     // Get counts
-    const incidents = db.listIncidents({ sessionId: session.id });
-    const lessons = db.listLessons({ sessionId: session.id });
-    const skills = db.listSkills({ projectPath, module: moduleId });
-    const rules = db.listRules({ projectPath, module: moduleId });
+    const incidents = await repo.training.listIncidents({ sessionId: session.id });
+    const lessons = await repo.training.listLessons({ sessionId: session.id });
+    const skills = await repo.training.listSkills({ projectPath, module: moduleId });
+    const rules = await repo.training.listRules({ projectPath, module: moduleId });
 
     // Calculate effectiveness
     const activeSkills = skills.filter((s) => s.status === 'active');
@@ -918,15 +918,15 @@ trainingRouter.get('/stats/:moduleId', async (req, res) => {
 // Get project-wide aggregate training stats
 trainingRouter.get('/stats', async (req, res) => {
   try {
-    const db = await getDB();
+    const repo = await getRepository();
     const projectPath = req.query.projectPath as string || '';
 
     // Get all sessions for this project
-    const sessions = db.listTrainingSessions(projectPath);
+    const sessions = await repo.training.listSessions(projectPath);
     const sessionIds = new Set(sessions.map((s) => s.id));
 
     // Aggregate incidents across all sessions
-    const allIncidents = db.listIncidents({});
+    const allIncidents = await repo.training.listIncidents({});
     const projectIncidents = allIncidents.filter((i) => sessionIds.has(i.sessionId));
 
     const incidentsByStatus: Record<string, number> = {};
@@ -937,7 +937,7 @@ trainingRouter.get('/stats', async (req, res) => {
     });
 
     // Aggregate lessons across all sessions
-    const allLessons = db.listLessons({});
+    const allLessons = await repo.training.listLessons({});
     const projectLessons = allLessons.filter((l) => sessionIds.has(l.sessionId));
 
     const lessonsByStatus: Record<string, number> = {};
@@ -946,8 +946,8 @@ trainingRouter.get('/stats', async (req, res) => {
     });
 
     // Skills and rules are already project-scoped
-    const skills = db.listSkills({ projectPath });
-    const rules = db.listRules({ projectPath });
+    const skills = await repo.training.listSkills({ projectPath });
+    const rules = await repo.training.listRules({ projectPath });
 
     const activeSkills = skills.filter((s) => s.status === 'active');
     const totalUsage = activeSkills.reduce((sum, s) => sum + s.usageCount, 0);

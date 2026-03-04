@@ -1,6 +1,6 @@
 ---
 name: sidstack-dev
-description: "Development workflow: review, feature, fix, hotfix modes. Usage: /sidstack-dev [mode] [task]"
+description: "Runs structured development workflows (review, feature, fix, hotfix) with plan-first gates, quality checks, and step-by-step implementation. Triggers on: /sidstack-dev, or when user wants to implement, fix, or review tasks."
 disable-model-invocation: true
 argument-hint: "[review|feature|fix|hotfix] [task-id(s) or description]"
 ---
@@ -30,9 +30,13 @@ Run EVERY time before any mode:
    - If task-id provided: `mcp__sidstack__task_get({ taskId })`
    - If description provided: `mcp__sidstack__task_create({ projectId: "sidstack", title: "[TYPE] description", description: "...", taskType: "feature|bugfix|refactor" })`
    - **review mode**: Load multiple tasks (no status change yet — each task updated individually during analysis)
-   - **feature/fix mode**: Keep task at `pending` — plan must go through `review` gate before implementation
+   - **feature/fix mode**: Check `planStatus` — if not `approved`, redirect to `/sidstack-plan [task-id]` first
    - **hotfix mode**: Mark `in_progress` immediately (skip review): `mcp__sidstack__task_update({ taskId, status: "in_progress", progress: 5 })`
-5. **Initialize TodoWrite** with all steps for selected mode
+5. **Plan-First Gate** (feature/fix modes only):
+   - `task_get({ taskId })` → check `planStatus`
+   - If `planStatus !== "approved"`: **STOP.** Tell user to run `/sidstack-plan [task-id]` and approve the plan first.
+   - If `planStatus === "approved"`: read `solutionPlan` — this is the contract for implementation.
+6. **Initialize TodoWrite** with all steps for selected mode
 
 ## Mode Selection
 
@@ -46,6 +50,7 @@ Run EVERY time before any mode:
 ## Review Mode (1 Step)
 
 Batch analysis: create solutionPlans for multiple tasks. No implementation.
+**Tip:** For a more focused plan review experience, use `/sidstack-plan` instead.
 
 Load: `references/review-workflow.md`
 
@@ -83,13 +88,7 @@ Load: `references/hotfix-workflow.md` for all steps.
 
 ## Teammate Mode (Agent Teams)
 
-When running as a teammate (spawned with `team_name` by a Lead):
-
-1. **Detect**: You're in teammate mode if `SendMessage` and `TaskList` (built-in) tools are available
-2. **Report progress** at milestones: `SendMessage({ type: "message", recipient: "[lead]", content: "Task [id]: [milestone]. Progress: [X]%", summary: "Progress [X]%" })`
-3. **Review handoff**: `SendMessage({ type: "message", recipient: "[reviewer]", content: "Ready for review.\nTask: [id]\nFiles: [list]\nQuality gates: PASS", summary: "Ready for review" })`
-4. **After completion**: Mark built-in task completed + send summary to Lead, then check `TaskList` for next work
-5. **Key difference**: In standalone mode you tell user to spawn a `sidstack-reviewer` agent in a new terminal. In teammate mode you message the reviewer directly via `SendMessage`.
+Load: `references/teammate-mode.md`
 
 ## Execution Rules
 
@@ -101,8 +100,11 @@ When running as a teammate (spawned with `team_name` by a Lead):
 - For feature mode: read ONLY the current step's file (e.g., `references/feature-step-1-research.md` for Step 1). Do NOT pre-read Step 2/3/4 files until you reach that step.
 
 1. Run Step 0 first, every time
-2. Load ONLY the current step's reference file
-3. Complete each step fully before loading the next
-4. Use `AskUserQuestion` at gates for user approval
-5. Update SidStack task progress at each step transition
-6. Follow project's own conventions detected in Step 0
+2. **Plan-First Gate**: feature/fix modes MUST have `planStatus === "approved"` before implementation starts. If not, redirect to `/sidstack-plan`.
+3. Load ONLY the current step's reference file
+4. **Follow the approved `solutionPlan`**: implementation must match the plan's approach, files, and scope. Deviations require user approval.
+5. Complete each step fully before loading the next
+6. Use `AskUserQuestion` at gates for user approval
+7. Update SidStack task progress at each step transition
+8. Follow project's own conventions detected in Step 0
+9. If plan proves wrong during implementation: **STOP**, move task back to `review`, update `solutionPlan` with findings, wait for re-approval

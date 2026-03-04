@@ -1,11 +1,11 @@
 import { Check, CheckCircle2, Circle, ExternalLink, GitBranch, History, Play, User, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTask } from "@/hooks/useTasks";
+import { useTaskDetailQuery } from "@/hooks/queries";
 import { cn } from "@/lib/utils";
 import { showSuccess, showError } from "@/lib/toast";
 import { launchClaudeWithContext } from "@/services/claudeCodeLauncher";
 import type { Task, TaskProgressLog } from "@/stores/taskStore";
-import { useTaskStore } from "@/stores/taskStore";
 import { useUnifiedContextStore } from "@/stores/unifiedContextStore";
 
 import { LinkedKnowledgeSection } from "./LinkedKnowledgeSection";
@@ -36,13 +36,7 @@ export function TaskDetailPanel({
 }: TaskDetailPanelProps) {
   const [isLaunching, setIsLaunching] = useState(false);
   const { subtasks, parentTask } = useTask(task.id);
-  const detailTask = useTaskStore((s) => s.detailTask);
-  const fetchTaskDetail = useTaskStore((s) => s.fetchTaskDetail);
-
-  // Fetch full detail when task changes
-  useEffect(() => {
-    fetchTaskDetail(task.id);
-  }, [task.id, fetchTaskDetail]);
+  const { data: detailTask } = useTaskDetailQuery(task.id);
 
   // Use detailTask for full fields, fall back to task for basic fields
   const isDetailLoaded = detailTask?.id === task.id;

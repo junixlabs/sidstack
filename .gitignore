@@ -129,3 +129,4 @@ packages/api-server/data/
 
 # Agent Desk worktrees
 desks/
+.sidstack-local/

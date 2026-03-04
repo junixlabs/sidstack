@@ -4599,6 +4599,245 @@ export class SidStackDB {
     };
   }
 
+  // ==========================================================================
+  // Module Overview (Unified Knowledge-Based Module System)
+  // ==========================================================================
+
+  /**
+   * Get enriched module list from knowledge_documents.
+   * Modules are identified by: docs with type='module', or distinct module field values.
+   * Returns each module with doc counts, type breakdown, health score, and dependencies.
+   */
+  getModulesWithDetails(projectId: string): any[] {
+    this.ensureInit();
+
+    // Get all docs for this project
+    const allDocs = this.db!.prepare(
+      'SELECT id, title, type, status, module, summary, tags, related, dependsOn, updatedAt, covers FROM knowledge_documents WHERE projectId = ?'
+    ).all(projectId) as any[];
+
+    // Collect all module IDs: from type='module' docs + distinct module field values
+    const moduleDocMap = new Map<string, any>(); // moduleId -> module doc
+    const moduleDocsMap = new Map<string, any[]>(); // moduleId -> docs belonging to this module
+
+    for (const doc of allDocs) {
+      // Module definition docs
+      if (doc.type === 'module') {
+        const moduleId = doc.module || doc.id;
+        moduleDocMap.set(moduleId, doc);
+      }
+      // Docs belonging to a module
+      if (doc.module) {
+        if (!moduleDocsMap.has(doc.module)) moduleDocsMap.set(doc.module, []);
+        moduleDocsMap.get(doc.module)!.push(doc);
+      }
+    }
+
+    // Merge: all unique module IDs
+    const allModuleIds = new Set([...moduleDocMap.keys(), ...moduleDocsMap.keys()]);
+
+    const modules: any[] = [];
+    const now = Date.now();
+    const STALE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+
+    for (const moduleId of allModuleIds) {
+      const moduleDef = moduleDocMap.get(moduleId);
+      const docs = (moduleDocsMap.get(moduleId) || []).filter((d: any) => d.type !== 'module');
+
+      // Aggregate by type and status
+      const byType: Record<string, number> = {};
+      const byStatus: Record<string, number> = {};
+      let staleDocs = 0;
+      let latestUpdate = '';
+
+      for (const doc of docs) {
+        byType[doc.type] = (byType[doc.type] || 0) + 1;
+        byStatus[doc.status] = (byStatus[doc.status] || 0) + 1;
+        if (doc.updatedAt > latestUpdate) latestUpdate = doc.updatedAt;
+        // Stale check
+        const updatedMs = new Date(doc.updatedAt).getTime();
+        if (now - updatedMs > STALE_MS) staleDocs++;
+      }
+
+      // Health score (0-100)
+      const hasModuleDoc = !!moduleDef;
+      const totalDocs = docs.length;
+      const activeDocs = byStatus['active'] || 0;
+      const activeRatio = totalDocs > 0 ? activeDocs / totalDocs : 0;
+      const staleRatio = totalDocs > 0 ? staleDocs / totalDocs : 0;
+      let healthScore = 0;
+      healthScore += hasModuleDoc ? 30 : 0;        // Has module definition
+      healthScore += Math.min(totalDocs, 5) * 6;   // Up to 30 for doc count (5+ docs)
+      healthScore += Math.round(activeRatio * 25);  // Up to 25 for active ratio
+      healthScore += Math.round((1 - staleRatio) * 15); // Up to 15 for freshness
+
+      // Dependencies from module doc
+      const dependsOn = moduleDef ? JSON.parse(moduleDef.dependsOn || '[]') : [];
+      const related = moduleDef ? JSON.parse(moduleDef.related || '[]') : [];
+
+      modules.push({
+        id: moduleId,
+        title: moduleDef?.title || moduleId,
+        summary: moduleDef?.summary || undefined,
+        status: moduleDef?.status || (totalDocs > 0 ? 'active' : 'draft'),
+        owner: moduleDef?.owner || undefined,
+        documentCount: totalDocs,
+        byType,
+        byStatus,
+        healthScore,
+        staleDocs,
+        lastUpdated: latestUpdate || moduleDef?.updatedAt || '',
+        dependsOn,
+        related,
+        covers: moduleDef ? JSON.parse(moduleDef.covers || '[]') : [],
+        hasModuleDoc: hasModuleDoc,
+      });
+    }
+
+    // Sort: highest health score first, then by doc count
+    modules.sort((a, b) => b.healthScore - a.healthScore || b.documentCount - a.documentCount);
+    return modules;
+  }
+
+  /**
+   * Get full overview for a single module.
+   * Combines module definition doc + all related docs + dependencies + health.
+   */
+  getModuleOverview(projectId: string, moduleId: string): any | null {
+    this.ensureInit();
+
+    // 1. Find the module definition doc (type='module' where module=moduleId or id contains moduleId)
+    const moduleDocs = this.db!.prepare(
+      `SELECT * FROM knowledge_documents WHERE projectId = ? AND (
+        (type = 'module' AND (module = ? OR id LIKE ?))
+        OR (type = 'module' AND slug = ?)
+      )`
+    ).all(projectId, moduleId, `%${moduleId}%`, moduleId) as any[];
+
+    const moduleDef = moduleDocs.length > 0 ? this.mapKnowledgeRow(moduleDocs[0]) : null;
+
+    // 2. Get all docs belonging to this module (excluding the module def itself)
+    const docs = this.db!.prepare(
+      `SELECT * FROM knowledge_documents WHERE projectId = ? AND module = ? AND type != 'module' ORDER BY type ASC, updatedAt DESC`
+    ).all(projectId, moduleId) as any[];
+
+    const mappedDocs = docs.map((r: any) => this.mapKnowledgeRow(r));
+
+    if (!moduleDef && mappedDocs.length === 0) return null;
+
+    // 3. Aggregate stats
+    const byType: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+    const now = Date.now();
+    const STALE_MS = 90 * 24 * 60 * 60 * 1000;
+    const staleDocs: any[] = [];
+    const recentDocs: any[] = [];
+
+    for (const doc of mappedDocs) {
+      byType[doc.type] = (byType[doc.type] || 0) + 1;
+      byStatus[doc.status] = (byStatus[doc.status] || 0) + 1;
+      const updatedMs = new Date(doc.updatedAt).getTime();
+      if (now - updatedMs > STALE_MS) staleDocs.push(doc);
+    }
+
+    // Recent: top 5
+    const sorted = [...mappedDocs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    recentDocs.push(...sorted.slice(0, 5));
+
+    // 4. Dependencies — resolve titles for related modules
+    const dependsOnIds: string[] = moduleDef?.dependsOn || [];
+    const relatedIds: string[] = moduleDef?.related || [];
+
+    const resolveDeps = (ids: string[]) => {
+      return ids.map(depId => {
+        // Try to find the module doc for this dependency
+        const depDoc = this.db!.prepare(
+          `SELECT id, title, module, summary FROM knowledge_documents WHERE projectId = ? AND type = 'module' AND (module = ? OR slug = ?)`
+        ).get(projectId, depId, depId) as any;
+        const depCount = (this.db!.prepare(
+          `SELECT COUNT(*) as cnt FROM knowledge_documents WHERE projectId = ? AND module = ? AND type != 'module'`
+        ).get(projectId, depId) as any)?.cnt || 0;
+        return {
+          id: depId,
+          title: depDoc?.title || depId,
+          summary: depDoc?.summary || undefined,
+          documentCount: depCount,
+        };
+      });
+    };
+
+    // Find modules that depend on this module (reverse lookup)
+    const dependedByDocs = this.db!.prepare(
+      `SELECT id, title, module, slug FROM knowledge_documents WHERE projectId = ? AND type = 'module' AND dependsOn LIKE ?`
+    ).all(projectId, `%"${moduleId}"%`) as any[];
+    const dependedBy = dependedByDocs.map((d: any) => ({
+      id: d.module || d.slug,
+      title: d.title,
+    }));
+
+    // 5. Health
+    const totalDocs = mappedDocs.length;
+    const hasModuleDoc = !!moduleDef;
+    const hasSpecs = (byType['spec'] || 0) > 0;
+    const hasGuides = (byType['guide'] || 0) > 0;
+    const hasReferences = (byType['reference'] || 0) > 0;
+    const hasDecisions = (byType['decision'] || 0) > 0;
+    const activeDocs = byStatus['active'] || 0;
+    const activeRatio = totalDocs > 0 ? activeDocs / totalDocs : 0;
+    const staleRatio = totalDocs > 0 ? staleDocs.length / totalDocs : 0;
+    let healthScore = 0;
+    healthScore += hasModuleDoc ? 30 : 0;
+    healthScore += Math.min(totalDocs, 5) * 6;
+    healthScore += Math.round(activeRatio * 25);
+    healthScore += Math.round((1 - staleRatio) * 15);
+
+    return {
+      module: moduleDef ? {
+        id: moduleDef.id,
+        title: moduleDef.title,
+        summary: moduleDef.summary,
+        status: moduleDef.status,
+        owner: moduleDef.owner,
+        tags: moduleDef.tags,
+        content: moduleDef.content,
+        covers: moduleDef.covers,
+        updatedAt: moduleDef.updatedAt,
+        createdAt: moduleDef.createdAt,
+      } : {
+        id: moduleId,
+        title: moduleId,
+        status: 'draft',
+        tags: [],
+        covers: [],
+      },
+      documents: {
+        total: totalDocs,
+        byType,
+        byStatus,
+        items: mappedDocs,
+        stale: staleDocs,
+        recentlyUpdated: recentDocs,
+      },
+      dependencies: {
+        dependsOn: resolveDeps(dependsOnIds),
+        dependedBy,
+        related: resolveDeps(relatedIds),
+      },
+      health: {
+        score: healthScore,
+        totalDocs,
+        staleDocs: staleDocs.length,
+        coverage: {
+          hasModuleDoc: hasModuleDoc,
+          hasSpecs,
+          hasGuides,
+          hasReferences,
+          hasDecisions,
+        },
+      },
+    };
+  }
+
   close(): void {
     if (this.db) {
       this.stmtCache.clear();
