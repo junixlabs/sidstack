@@ -188,6 +188,7 @@ export function getDocumentTypeIcon(
     skill: "zap",
     principle: "shield",
     rule: "alert-triangle",
+    okr: "target",
   };
   return icons[type] || "file";
 }

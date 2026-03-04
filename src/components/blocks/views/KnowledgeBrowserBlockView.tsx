@@ -162,6 +162,7 @@ const TYPE_CONFIG: Record<DocumentType, { label: string; icon: typeof FileText; 
   rule: { label: "Rule", icon: Shield, color: "var(--doc-type-rule)" },
   // Meta
   module: { label: "Module", icon: Box, color: "var(--doc-type-module)" },
+  okr: { label: "OKR", icon: Star, color: "var(--doc-type-module)" },
   index: { label: "Index", icon: LayoutList, color: "var(--doc-type-index)" },
 };
 
