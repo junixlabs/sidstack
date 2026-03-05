@@ -3,9 +3,7 @@
 
 services:
   api-server:
-    build:
-      context: ../../
-      dockerfile: docker/api-server/Dockerfile
+    image: ghcr.io/junixlabs/sidstack-api-server:latest
     container_name: sidstack-api
     ports:
       - "127.0.0.1:19432:19432"
@@ -29,9 +27,7 @@ services:
       start_period: 10s
 
   mcp-server:
-    build:
-      context: ../../
-      dockerfile: docker/mcp-server/Dockerfile
+    image: ghcr.io/junixlabs/sidstack-mcp-server:latest
     container_name: sidstack-mcp
     ports:
       - "127.0.0.1:19433:19433"

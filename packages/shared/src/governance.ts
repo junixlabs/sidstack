@@ -19,11 +19,12 @@ export type TaskType =
   | 'security'   // Security-related
   | 'perf'       // Performance optimization
   | 'debt'       // Technical debt cleanup
-  | 'spike';     // Research/investigation
+  | 'spike'      // Research/investigation
+  | 'chore';     // Routine maintenance
 
 export const TASK_TYPES: TaskType[] = [
   'feature', 'bugfix', 'refactor', 'test', 'docs',
-  'infra', 'security', 'perf', 'debt', 'spike'
+  'infra', 'security', 'perf', 'debt', 'spike', 'chore'
 ];
 
 export function isValidTaskType(type: string): type is TaskType {
@@ -168,6 +169,13 @@ export const TASK_TYPE_GOVERNANCE: Record<TaskType, GovernanceConfig> = {
     requiredCriteria: false,
     reviewRequired: false,
   },
+  chore: {
+    principles: ['task-management'],
+    skills: [],
+    qualityGates: [],
+    requiredCriteria: false,
+    reviewRequired: false,
+  },
 };
 
 /**
@@ -184,6 +192,7 @@ export const MIN_PROGRESS_UPDATES: Record<TaskType, number> = {
   perf: 3,       // Profile, optimize, verify
   debt: 2,       // Start, complete
   spike: 1,      // Complete with findings
+  chore: 1,      // Complete
 };
 
 // ============================================================================
@@ -202,6 +211,15 @@ export interface ModuleGovernance {
   };
 }
 
+const FALLBACK_GOVERNANCE: TaskGovernance = {
+  principles: ['task-management'],
+  skills: [],
+  patterns: [],
+  qualityGates: [],
+  requiredCriteria: false,
+  reviewRequired: false,
+};
+
 /**
  * Resolve governance for a task based on task type and optional module
  */
@@ -210,6 +228,11 @@ export function resolveGovernance(
   moduleGovernance?: ModuleGovernance | null
 ): TaskGovernance {
   const config = TASK_TYPE_GOVERNANCE[taskType];
+
+  // Defensive fallback for unknown task types (runtime safety for untyped callers)
+  if (!config) {
+    return FALLBACK_GOVERNANCE;
+  }
 
   // Build quality gates with commands
   const qualityGates: QualityGate[] = config.qualityGates.map(gateId => ({

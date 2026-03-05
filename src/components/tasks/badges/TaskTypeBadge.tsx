@@ -9,6 +9,7 @@ import {
   Zap,
   Wrench,
   Microscope,
+  ClipboardList,
 } from "lucide-react";
 import { type ReactNode } from "react";
 
@@ -31,6 +32,7 @@ const TASK_TYPE_CONFIG: Record<TaskType, { bgVar: string; textVar: string; icon:
   perf:     { bgVar: "var(--task-perf-bg)",     textVar: "var(--task-perf)",     icon: <Zap className="w-3 h-3" /> },
   debt:     { bgVar: "var(--task-debt-bg)",     textVar: "var(--task-debt)",     icon: <Wrench className="w-3 h-3" /> },
   spike:    { bgVar: "var(--task-spike-bg)",    textVar: "var(--task-spike)",    icon: <Microscope className="w-3 h-3" /> },
+  chore:    { bgVar: "var(--task-infra-bg)",    textVar: "var(--task-infra)",    icon: <ClipboardList className="w-3 h-3" /> },
 };
 
 export function TaskTypeBadge({ taskType, showIcon = false }: TaskTypeBadgeProps) {

@@ -4085,7 +4085,7 @@ export class SidStackDB {
     const prefixMatch = title.match(/^\[(\w+)\]/);
     if (prefixMatch) {
       const prefix = prefixMatch[1].toLowerCase();
-      const validTypes: TaskType[] = ['feature', 'bugfix', 'refactor', 'test', 'docs', 'infra', 'security', 'perf', 'debt', 'spike'];
+      const validTypes: TaskType[] = ['feature', 'bugfix', 'refactor', 'test', 'docs', 'infra', 'security', 'perf', 'debt', 'spike', 'chore'];
       if (validTypes.includes(prefix as TaskType)) {
         return prefix as TaskType;
       }

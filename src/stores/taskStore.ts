@@ -13,7 +13,7 @@ import { create } from "zustand";
 
 export type TaskStatus = "pending" | "review" | "in_progress" | "completed" | "blocked" | "failed" | "cancelled";
 export type TaskPriority = "low" | "medium" | "high";
-export type TaskType = "feature" | "bugfix" | "refactor" | "test" | "docs" | "infra" | "security" | "perf" | "debt" | "spike";
+export type TaskType = "feature" | "bugfix" | "refactor" | "test" | "docs" | "infra" | "security" | "perf" | "debt" | "spike" | "chore";
 export type ViewMode = "list" | "tree" | "kanban" | "timeline";
 
 export interface AcceptanceCriterion {
