@@ -898,7 +898,7 @@ Do NOT auto-generate business docs without user confirmation. Technical docs (ar
           fs.chmodSync(path.join(targetHooks, file), 0o755);
         }
       }
-      this.log('✓ Created .claude/hooks/ (session hooks)');
+      this.log('✓ Created .claude/hooks/ (security + init hooks)');
     }
 
     // Copy .claude/settings.json (Claude Code hooks config)
@@ -1062,6 +1062,8 @@ Do NOT auto-generate business docs without user confirmation. Technical docs (ar
       // Current skills
       path.join(projectPath, '.claude', 'skills', 'sidstack-aware'),
       path.join(projectPath, '.claude', 'skills', 'sidstack-dev'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-knowledge'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-plan'),
       // Legacy skills (cleaned up on re-init)
       path.join(projectPath, '.claude', 'skills', 'sidstack-implement'),
       path.join(projectPath, '.claude', 'skills', 'sidstack-review'),

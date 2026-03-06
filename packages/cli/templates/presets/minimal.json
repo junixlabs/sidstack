@@ -7,23 +7,15 @@
   "agents": {
     "worker": {
       "base": "base/worker",
-      "skills": [
-        "research-first",
-        "code-discovery"
-      ]
+      "skills": []
     },
     "reviewer": {
       "base": "base/reviewer",
-      "skills": [
-        "research-first"
-      ]
+      "skills": []
     }
   },
   "skills": {
-    "core": [
-      "research-first",
-      "code-discovery"
-    ],
+    "core": [],
     "optional": []
   },
   "defaults": {

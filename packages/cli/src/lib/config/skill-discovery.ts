@@ -91,8 +91,12 @@ export class SkillDiscovery {
       return userSkill;
     }
 
-    // Priority 3: Bundle (check both core and optional)
-    const bundleSkill = await this.loadFromBundle(skillName);
+    // Priority 3: Bundle (flat directory)
+    const bundleSkill = await this.loadFromDirectory(
+      this.bundleSkillsDir,
+      skillFileName,
+      'bundle'
+    );
     if (bundleSkill) {
       return bundleSkill;
     }
@@ -133,27 +137,6 @@ export class SkillDiscovery {
       console.warn(`Failed to load skill from ${filePath}:`, error);
       return null;
     }
-  }
-
-  /**
-   * Load skill from bundle (core or optional)
-   */
-  private async loadFromBundle(skillName: string): Promise<ResolvedSkill | null> {
-    const skillFileName = `${skillName}.md`;
-
-    // Try core directory first
-    const corePath = path.join(this.bundleSkillsDir, 'core', skillFileName);
-    if (fs.existsSync(corePath)) {
-      return this.loadFromDirectory(path.dirname(corePath), skillFileName, 'bundle');
-    }
-
-    // Try optional directory
-    const optionalPath = path.join(this.bundleSkillsDir, 'optional', skillFileName);
-    if (fs.existsSync(optionalPath)) {
-      return this.loadFromDirectory(path.dirname(optionalPath), skillFileName, 'bundle');
-    }
-
-    return null;
   }
 
   /**
@@ -254,26 +237,10 @@ ${sections.join('\n\n---\n\n')}`;
     // User skills
     await addSkillsFromDir(this.userSkillsDir, 'user');
 
-    // Bundle skills (core + optional)
-    await addSkillsFromDir(path.join(this.bundleSkillsDir, 'core'), 'bundle');
-    await addSkillsFromDir(path.join(this.bundleSkillsDir, 'optional'), 'bundle');
+    // Bundle skills
+    await addSkillsFromDir(this.bundleSkillsDir, 'bundle');
 
     return skills;
-  }
-
-  /**
-   * List skills by category
-   */
-  async listSkillsByCategory(): Promise<{
-    core: Array<{ name: string; config: SkillConfig; source: string }>;
-    optional: Array<{ name: string; config: SkillConfig; source: string }>;
-  }> {
-    const all = await this.listAvailableSkills();
-
-    return {
-      core: all.filter((s) => s.config.category === 'core'),
-      optional: all.filter((s) => s.config.category === 'optional'),
-    };
   }
 
   /**
@@ -479,11 +446,8 @@ ${body}`;
         return fs.existsSync(path.join(this.projectSkillsDir, skillFileName));
       case 'user':
         return fs.existsSync(path.join(this.userSkillsDir, skillFileName));
-      case 'bundle': {
-        const corePath = path.join(this.bundleSkillsDir, 'core', skillFileName);
-        const optionalPath = path.join(this.bundleSkillsDir, 'optional', skillFileName);
-        return fs.existsSync(corePath) || fs.existsSync(optionalPath);
-      }
+      case 'bundle':
+        return fs.existsSync(path.join(this.bundleSkillsDir, skillFileName));
       default:
         return false;
     }
@@ -531,8 +495,7 @@ ${body}`;
     // Get skills from each tier (no deduplication - show actual files)
     await addSkillsFromDir(this.projectSkillsDir, result.project);
     await addSkillsFromDir(this.userSkillsDir, result.user);
-    await addSkillsFromDir(path.join(this.bundleSkillsDir, 'core'), result.bundle);
-    await addSkillsFromDir(path.join(this.bundleSkillsDir, 'optional'), result.bundle);
+    await addSkillsFromDir(this.bundleSkillsDir, result.bundle);
 
     return result;
   }

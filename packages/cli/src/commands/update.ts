@@ -496,6 +496,7 @@ pnpm test        # All pass
       // Current skills (will be re-copied from templates)
       path.join(projectPath, '.claude', 'skills', 'sidstack-aware'),
       path.join(projectPath, '.claude', 'skills', 'sidstack-dev'),
+      path.join(projectPath, '.claude', 'skills', 'sidstack-knowledge'),
       path.join(projectPath, '.claude', 'skills', 'sidstack-plan'),
       // Legacy skills (cleaned up on update)
       path.join(projectPath, '.claude', 'skills', 'sidstack-implement'),
@@ -524,6 +525,11 @@ pnpm test        # All pass
       path.join(projectPath, '.sidstack', 'ports.json'),
       path.join(projectPath, '.sidstack', 'workspace.json'),
       path.join(projectPath, '.sidstack', 'project-profile.yaml'),
+      // Stale files from removed hooks (v0.7.0+)
+      path.join(projectPath, '.claude', 'context-state.json'),
+      path.join(projectPath, '.claude', 'task-cache.json'),
+      path.join(projectPath, '.claude', 'compliance-session.json'),
+      path.join(projectPath, '.claude', 'hooks.log'),
     ];
 
     // Files managed by SidStack

@@ -169,12 +169,12 @@ const AGENT_ROLES: Record<string, { role: string; specialty?: string }> = {
 };
 
 const DEFAULT_SKILLS: Record<string, string[]> = {
-  dev: ['research-first', 'code-discovery', 'architecture-understanding'],
-  ba: ['research-first', 'code-discovery'],
-  qa: ['research-first', 'code-discovery'],
-  da: ['research-first', 'code-discovery'],
-  bm: ['research-first'],
-  devops: ['research-first', 'code-discovery'],
+  dev: [],
+  ba: [],
+  qa: [],
+  da: [],
+  bm: [],
+  devops: [],
 };
 
 /**
@@ -197,7 +197,7 @@ function createAgentConfig(agentType: string): AgentConfig {
     model: 'sonnet',
     tools: DEFAULT_TOOLS[agentType] || DEFAULT_TOOLS['dev'],
     permissionMode: 'bypassPermissions',
-    skills: DEFAULT_SKILLS[agentType] || ['research-first'],
+    skills: DEFAULT_SKILLS[agentType] || [],
     metadata: {
       role: AGENT_ROLES[agentType]?.role || 'worker',
       agentId: '{{AGENT_ID}}',

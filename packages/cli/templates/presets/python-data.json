@@ -8,31 +8,16 @@
     "worker": {
       "base": "base/worker",
       "variant": "python/worker",
-      "skills": [
-        "research-first",
-        "code-discovery",
-        "architecture-understanding"
-      ]
+      "skills": []
     },
     "reviewer": {
       "base": "base/reviewer",
-      "skills": [
-        "research-first",
-        "code-discovery"
-      ]
+      "skills": []
     }
   },
   "skills": {
-    "core": [
-      "research-first",
-      "code-discovery",
-      "architecture-understanding"
-    ],
-    "optional": [
-      "test-driven-development",
-      "documentation-standards",
-      "performance-optimization"
-    ]
+    "core": [],
+    "optional": []
   },
   "defaults": {
     "model": "sonnet",

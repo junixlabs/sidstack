@@ -19,48 +19,69 @@ This project uses **SidStack** for task tracking, knowledge management, and qual
 
 ---
 
-## Development Workflow
+## Session Start
 
-Use `/sidstack-dev` skill for structured development:
-
+At the beginning of each session, check for active work:
 ```
-/sidstack-dev feature "Add user authentication"   # Full 4-step cycle
-/sidstack-dev fix task-123                         # 3-step bug fix
-/sidstack-dev hotfix "Fix crash on startup"        # 2-step critical fix
+task_list({ projectId: "{projectName}", preset: "actionable" })
 ```
+If there's an in_progress task, resume it. Otherwise, show pending tasks.
 
-For quick changes that don't need the full workflow, manage tasks directly:
+---
 
-| Action | MCP Tool |
-|--------|----------|
-| Create task | `task_create` (projectId: `{projectName}`) |
-| Mark in_progress | `task_update` (status: `in_progress`) |
-| Update progress | `task_update` (progress: 0-100) |
-| Complete task | `task_complete` (taskId) |
+## Workflow Router
 
-### When to Create Task
-- User says: "implement", "build", "fix", "add", "create", "update", "refactor"
-- Work involves modifying files in the codebase
+Classify every user request before acting. Match **semantic intent**, not keywords.
 
-### When NOT to Create Task
-- Questions: "what is...", "how does...", "explain...", "why..."
-- Read-only: "show me", "list", "check", "find"
-- Planning/discussion without explicit action request
+| User wants to... | Workflow | Action |
+|-----------------|----------|--------|
+| Ask, discuss, explore ideas | **discuss** | Answer directly. No task needed. |
+| Create, list, or check task status | **track** | `task_list` / `task_create` / `task_update` only |
+| Fix critical production issue NOW | **hotfix** | `task_create(bugfix, critical)` → `/sidstack-dev hotfix` |
+| Fix a bug, error, broken behavior | **bugfix** | `task_create(bugfix)` → `/sidstack-dev fix` |
+| Build new feature or capability | **implement** | `task_create(feature)` → `/sidstack-dev feature` |
+| Refactor, optimize, clean up code | **improve** | `task_create(refactor/perf/debt)` → `/sidstack-dev feature` |
+| Review code or audit existing work | **review** | `/sidstack-dev review` |
+| Process a ticket from queue | **ticket** | `/sidstack ticket <id>` |
+| Build or update documentation/knowledge | **knowledge** | `/sidstack-knowledge` |
+| Record lessons from incidents | **learn** | `incident_create` → `lesson_create` |
+
+### Classification Rules
+
+1. **Intent over keywords.** "Fix the tests" = bugfix. "Add tests" = implement. "Why do tests fail?" = discuss.
+2. **Urgency splits hotfix from bugfix.** Hotfix = production is broken NOW. Bugfix = known issue, can plan.
+3. **Any language.** Classify by meaning — works in Vietnamese, English, etc.
+4. **When ambiguous** — ask user: "This could be [X] or [Y], which fits?"
+5. **Explicit `/sidstack-dev` always wins** over this router.
+
+### Task Size → Flow Depth
+
+| Size | Criteria | Flow |
+|------|----------|------|
+| **Trivial** | Typo, config, <5 lines | No task. Just do it. |
+| **Small** | Bug fix, single-file | `task_create` → implement → `task_complete` |
+| **Medium** | Multi-file feature | `task_create` → `entity_context` → implement → test → `task_complete` |
+| **Large** | Architecture change | `/sidstack-dev feature` (full 4-step with plan review) |
 
 ---
 
 ## SidStack Tools Reference
 
-| Need | Tool | When |
-|------|------|------|
-| Check tasks | `task_list` | Session start, before new work |
-| Create task | `task_create` | Before implementation |
-| Update progress | `task_update` | During work (progress: 0-100) |
-| Complete task | `task_complete` | After quality checks pass |
-| Project context | `knowledge_context` | Before implementing unfamiliar area |
-| Search docs | `knowledge_search` | Looking for patterns, rules |
-| Risky change | `impact_analyze` | Core modules, DB schema, APIs |
-| Learn from bug | `lesson_create` | After fixing tricky bugs (ask user first) |
+| Workflow Moment | Tool | Purpose |
+|----------------|------|---------|
+| **Starting Work** | `task_list(preset: "actionable")` | See what needs doing |
+| | `entity_context(entityType: "task", entityId: taskId)` | Load ALL linked context in one call |
+| | `task_create(projectId, title, taskType)` | Create new task |
+| **During Work** | `task_update(taskId, progress: 0-100)` | Track progress |
+| | `impact_analyze(description, targetFiles)` | Before touching core/risky code |
+| | `knowledge_search(query)` | Find project patterns, docs |
+| **Finishing Work** | `task_complete(taskId)` | After quality gates pass |
+| | `memory_add(content, projectId)` | Store learnings for future |
+| | `lesson_create(...)` | After fixing tricky bugs (ask user first) |
+
+> **Tip:** `entity_context` loads everything linked to a task (knowledge, memory, references) in one call — use it instead of calling `knowledge_search` + `memory_search` + `entity_references` separately.
+
+---
 
 ---
 
@@ -108,93 +129,17 @@ Rule: Always create the SidStack MCP task first (for governance), then optionall
 
 ---
 
-## Agent Teams — Team Lead Orchestration Guide
+## Agent Teams
 
-SidStack provides the backbone for Claude Code Agent Teammates. The main session acts as **Team Lead**,
-using SidStack MCP tools to coordinate Worker and Reviewer teammates.
-
-### Enable
-
-Add to `.claude/settings.local.json`:
-```json
-{
-  "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" }
-}
-```
-
-### Architecture
-
-```
-Team Lead (this session)
-  ├── SidStack MCP: task_create, task_list, knowledge_context, impact_analyze
-  ├── Built-in: TeamCreate, TaskCreate, TaskList, SendMessage
-  │
-  ├── Worker Teammate (general-purpose)
-  │   ├── Auto-loads: CLAUDE.md, MCP servers, all skills
-  │   ├── Uses: /sidstack-dev feature [task-id]
-  │   └── Reports progress via SendMessage
-  │
-  └── Reviewer Teammate (general-purpose)
-      ├── Auto-loads: CLAUDE.md, MCP servers, all skills
-      ├── Uses: /sidstack-dev review [task-id]
-      └── Reports PASS/FAIL via SendMessage
-```
-
-### Spawn Templates
-
-**Spawn Worker:**
-```
-Task({
-  team_name: "[team]",
-  name: "worker",
-  subagent_type: "general-purpose",
-  prompt: "You are a Worker teammate. Your task:\n\nTask ID: [task-id]\nTitle: [title]\nDescription: [description]\n\nUse /sidstack-dev feature [task-id] to implement.\nWhen done, SendMessage to 'reviewer' with file list and quality gate results.\nThen SendMessage to '[lead]' confirming handoff."
-})
-```
-
-**Spawn Reviewer:**
-```
-Task({
-  team_name: "[team]",
-  name: "reviewer",
-  subagent_type: "general-purpose",
-  prompt: "You are a Reviewer teammate. Wait for Worker to message you, then:\n\nUse /sidstack-dev review [task-id] to review.\nReport PASS/FAIL to '[lead]' via SendMessage.\nIf FAIL, SendMessage to 'worker' with specific issues to fix."
-})
-```
-
-### Orchestration Workflow
-
-```
-1. Analyze request → mcp__sidstack__task_create (SidStack)
-2. Load context   → mcp__sidstack__knowledge_context
-3. Check risk     → mcp__sidstack__impact_analyze (if core modules)
-4. Create team    → TeamCreate({ team_name: "[name]" })
-5. Create tasks   → TaskCreate (built-in, for shared task list)
-6. Spawn workers  → Task with team_name + spawn prompt
-7. Monitor        → TaskList + inbox messages (auto-delivered)
-8. Synthesize     → Collect results when teammates report done
-9. Cleanup        → SendMessage shutdown_request to teammates
-```
-
-### Monitoring
-
-- Teammates auto-send idle notifications when finished
-- Check progress: `TaskList` (built-in) for shared task list
-- Check SidStack: `mcp__sidstack__task_list` for governance status
-- Message teammate: `SendMessage({ type: "message", recipient: "[name]", ... })`
-
-### Worker/Reviewer Handoff (within team)
-
-1. Worker completes → SendMessage to Reviewer with file list + quality results
-2. Reviewer reviews → `/sidstack-dev review [task-id]`
-3. PASS → Reviewer SendMessage to Lead "ready to complete"
-4. FAIL → Reviewer SendMessage to Worker with issues, Worker fixes and re-submits
+For multi-agent orchestration with Worker + Reviewer teammates:
+- Use `/sidstack:agent` slash command to spawn governed agents
+- See `.sidstack/governance.md` for spawn templates and orchestration workflow
 
 ---
 
 ## More Details
 
 For comprehensive governance documentation:
-- `.sidstack/governance.md` - Full governance rules
+- `.sidstack/governance.md` - Full governance rules, agent teams guide
 - `.claude/skills/` - Auto-triggered Claude Code skills
 - `.claude/agents/` - Role-specific agent definitions (Worker, Reviewer)

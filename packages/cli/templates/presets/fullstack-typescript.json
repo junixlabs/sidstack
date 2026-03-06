@@ -8,35 +8,17 @@
     "worker": {
       "base": "base/worker",
       "variant": "typescript/worker",
-      "skills": [
-        "research-first",
-        "code-discovery",
-        "architecture-understanding",
-        "security-awareness"
-      ]
+      "skills": []
     },
     "reviewer": {
       "base": "base/reviewer",
       "variant": "typescript/reviewer",
-      "skills": [
-        "research-first",
-        "code-discovery",
-        "test-driven-development"
-      ]
+      "skills": []
     }
   },
   "skills": {
-    "core": [
-      "research-first",
-      "code-discovery",
-      "architecture-understanding"
-    ],
-    "optional": [
-      "test-driven-development",
-      "documentation-standards",
-      "security-awareness",
-      "performance-optimization"
-    ]
+    "core": [],
+    "optional": []
   },
   "defaults": {
     "model": "sonnet",
