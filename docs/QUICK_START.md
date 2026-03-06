@@ -33,7 +33,7 @@ npx @sidstack/cli init
 
 ### 2. Use MCP Tools in Claude Code
 
-Once initialized, Claude Code has access to 49 tools:
+Once initialized, Claude Code has access to 53 tools:
 
 **Knowledge (understand your project)**
 ```
@@ -99,11 +99,13 @@ test_result_get     - Get detailed test result
 
 **Agent Desk (workspace isolation)**
 ```
+desk_create         - Create agent desk (git worktree)
 desk_list           - List all agent desks
 desk_status         - Get desk status
-desk_acquire        - Acquire a desk for an agent
-desk_release        - Release a desk
-desk_pool_init      - Initialize desk pool
+desk_checkout       - Switch desk to a task
+desk_health         - Check desk health
+desk_conflicts      - Detect merge conflicts
+desk_remove         - Remove agent desk
 ```
 
 **Memory (semantic search via mem0)**
@@ -122,6 +124,14 @@ traceability_matrix - Generate spec-task-test coverage matrix
 entity_link         - Link entities (task↔knowledge, etc.)
 entity_references   - Get references for an entity
 entity_context      - Build context from linked entities
+```
+
+**Productivity (v0.7.0)**
+```
+context_pack        - Build comprehensive context pack for a module
+macro_run           - Run composite macros (start_work, finish_work, quick_context)
+session_save        - Save session state for cross-session continuity
+session_restore     - Restore saved session state
 ```
 
 ### 3. Example Workflow

@@ -61,7 +61,7 @@ List my SidStack tasks
 
 Claude should use the `task_list` MCP tool.
 
-## Available MCP Tools (49)
+## Available MCP Tools (53)
 
 ### Knowledge (9)
 
@@ -132,15 +132,17 @@ Claude should use the `task_list` MCP tool.
 | `test_result_list` | List test results with filtering |
 | `test_result_get` | Get detailed test result |
 
-### Agent Desk (5)
+### Agent Desk (7)
 
 | Tool | Description |
 |------|-------------|
+| `desk_create` | Create agent desk (git worktree) |
 | `desk_list` | List all agent desks |
 | `desk_status` | Get desk status and current task |
-| `desk_acquire` | Acquire a desk for an agent |
-| `desk_release` | Release a desk |
-| `desk_pool_init` | Initialize desk pool |
+| `desk_checkout` | Switch desk to a task |
+| `desk_health` | Check desk health |
+| `desk_conflicts` | Detect merge conflicts |
+| `desk_remove` | Remove agent desk |
 
 ### Memory (6)
 
@@ -166,6 +168,28 @@ Claude should use the `task_list` MCP tool.
 | `entity_link` | Link entities (task↔knowledge, etc.) |
 | `entity_references` | Get references for an entity |
 | `entity_context` | Build context from linked entities |
+
+### Productivity (4) — v0.7.0
+
+| Tool | Description |
+|------|-------------|
+| `context_pack` | Build comprehensive context pack for a module (knowledge + memory + tasks in one call) |
+| `macro_run` | Run composite macros: `start_work`, `finish_work`, `quick_context` |
+| `session_save` | Save session state (decisions, blockers, files, progress) for continuity |
+| `session_restore` | Restore saved session state from previous conversation |
+
+### Claude Code Hooks (Quality Gates)
+
+SidStack installs lifecycle hooks in `.claude/hooks/` that enforce quality automatically:
+
+| Hook | Event | Purpose |
+|------|-------|---------|
+| `session-init.sh` | SessionStart | Smart bootstrap with branch→task correlation, changed modules, session restore |
+| `prompt-context.sh` | UserPromptSubmit | Inject active task context with completion reminder |
+| `task-complete-gate.sh` | PreToolUse (task_complete) | Block completion without test results, progress check, acceptance criteria |
+| `task-create-context.sh` | PostToolUse (task_create) | Remind agent to search knowledge/memory and link entities |
+| `task-start-training.sh` | PostToolUse (task_update) | Auto-inject relevant training lessons and rules |
+| `pre-compact.sh` | PreCompact | Save active task state before context compaction |
 
 ## Governance for Agents
 

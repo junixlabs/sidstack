@@ -89,6 +89,22 @@ import {
   handleEntityContext,
 } from './handlers/context-builder.js';
 
+import {
+  contextPackTools,
+  handleContextPack,
+} from './handlers/context-packs.js';
+
+import {
+  macroTools,
+  handleMacroRun,
+} from './handlers/macros.js';
+
+import {
+  sessionStateTools,
+  handleSessionSave,
+  handleSessionRestore,
+} from './handlers/session-state.js';
+
 // ============================================================
 // MVP Tool Whitelist
 // ============================================================
@@ -167,6 +183,16 @@ const MVP_TOOLS = new Set([
   'entity_link',
   'entity_references',
   'entity_context',
+
+  // Context Packs (combined context bundles)
+  'context_pack',
+
+  // Macros (composite operations)
+  'macro_run',
+
+  // Session Continuity (cross-session state)
+  'session_save',
+  'session_restore',
 ]);
 
 // ============================================================
@@ -209,6 +235,15 @@ const allTools: Tool[] = [
 
   // Context Builder Tools
   ...(contextBuilderTools as unknown as Tool[]),
+
+  // Context Pack Tools
+  ...(contextPackTools as unknown as Tool[]),
+
+  // Macro Tools
+  ...(macroTools as unknown as Tool[]),
+
+  // Session State Tools
+  ...(sessionStateTools as unknown as Tool[]),
 ];
 
 // Export only MVP tools
@@ -337,6 +372,20 @@ export async function handleToolCall(
       // Context Builder tools
       case 'entity_context':
         return wrapResult(handleEntityContext(args as any));
+
+      // Context Pack tools
+      case 'context_pack':
+        return wrapResult(handleContextPack(args as any));
+
+      // Macro tools
+      case 'macro_run':
+        return wrapResult(handleMacroRun(args as any));
+
+      // Session State tools
+      case 'session_save':
+        return wrapResult(handleSessionSave(args as any));
+      case 'session_restore':
+        return wrapResult(handleSessionRestore(args as any));
 
       default:
         // Try SQLite-based tools (task_*, work_*, project_*)

@@ -60,9 +60,11 @@ logs/
 # SidStack workspace data
 .sidstack/
 
-# Claude Code
+# Claude Code (project-local, not tracked)
 .claude/
 JOURNAL.md
+# Exception: CLI template files must be tracked for distribution
+!packages/cli/templates/governance/.claude/
 
 # MCP local config
 .mcp.json
@@ -119,10 +121,8 @@ src-tauri/templates/knowledge/
 # Legacy ADRs
 docs/ADRs/005-langgraph-orchestration.md
 
-# Legacy presets and skills
+# Legacy presets
 packages/cli/templates/presets/go-microservices.json
-packages/cli/templates/skills/core/file-locking-protocol.md
-packages/cli/templates/skills/core/progress-reporting.md
 
 # API server data (session artifacts)
 packages/api-server/data/

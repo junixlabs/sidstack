@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.7.0] - 2026-03-06
+
+### Added
+- **Context Packs (`context_pack`):** New MCP tool that combines knowledge search + semantic memory + related tasks into a single comprehensive context bundle per module — replaces 3-5 separate tool calls
+- **Macro Tools (`macro_run`):** Composite MCP tool with 3 built-in macros:
+  - `start_work` — create task + search knowledge + search memory in one call
+  - `finish_work` — complete task + store learnings in memory
+  - `quick_context` — search knowledge + memory + list active tasks
+- **Session Continuity (`session_save` / `session_restore`):** MCP tools to persist and restore session state (decisions, blockers, files modified, progress) across conversations
+- **Quality Gate Hook:** PreToolUse hook on `task_complete` that checks test results exist, progress >= 80%, acceptance criteria, and quality commands before allowing completion
+- **Smart Session Bootstrap:** Enhanced `session-init.sh` with git branch-to-task correlation, uncommitted changes count, changed modules detection, top pending tasks with priorities, smart next-action suggestions, and automatic session state restore on resume
+- **`chore` TaskType:** Added to task type enum for maintenance work
+- **CI Deploy:** GitHub Actions workflow for Docker image deployment to GHCR
+
+### Changed
+- **Hook Templates:** Full hook configuration now distributed via `sidstack update` — 7 hook scripts (session-init, prompt-context, pre-compact, task-create-context, task-start-training, task-complete-learn, task-complete-gate)
+- **Settings Template:** `.claude/settings.json` template updated with all hook registrations including quality gate PreToolUse matcher
+- **CLAUDE.md Template:** Simplified governance section, streamlined workflow router, updated tool reference
+- **CLI Presets:** Simplified preset configurations (minimal, fullstack-typescript, typescript-backend, python-data)
+- **Skill Discovery:** Simplified `SkillDiscovery` class, removed unused methods
+- **`sidstack-aware` Skill:** Updated with enhanced workflow classification and progress tracking
+
+### Removed
+- **Legacy CLI Skills:** `architecture-understanding`, `code-discovery`, `research-first`, `self-improvement`, `communication-protocol`, `contract-first`, `governance-compliance`, `implementation-analysis`, `workflow-negotiation`
+- **Legacy Optional Skills:** `documentation-standards`, `performance-optimization`, `security-awareness`, `tdd-workflow`, `test-driven-development`
+- **Dead Code:** `init-wizard.ts`, `skill-manager.ts`, `template-selector.ts`, `migrate-skills.ts`, `config/index.ts`
+- **Legacy CLI Skill Files:** `sidstack-init.md` and `packages/cli/skills/core/` directory
+
+### Fixed
+- Missing `okr` type in frontend Record maps (CI typecheck)
+- Unused imports in test files (CI typecheck)
+
 ## [0.6.0] - 2026-03-04
 
 ### Added

@@ -43,7 +43,7 @@ Or configure MCP manually:
 }
 ```
 
-Claude Code now has access to 32 MCP tools for knowledge, tasks, impact analysis, tickets, training, and OKRs.
+Claude Code now has access to 53 MCP tools for knowledge, tasks, impact analysis, tickets, training, memory, macros, and session management.
 
 ### Desktop App (macOS)
 
@@ -59,54 +59,86 @@ pnpm install && pnpm packages:build && pnpm tauri:build
 
 See [Quick Start Guide](docs/QUICK_START.md) for full setup instructions.
 
-## MCP Tools (32)
+## MCP Tools (53)
 
 ```
-# Knowledge (9) - understand your project
-knowledge_context       Build context for a task/module
-knowledge_search        Search across knowledge docs
-knowledge_list          List available docs
-knowledge_get           Get single document with full content
-knowledge_modules       List modules with stats
-knowledge_create        Create knowledge document
-knowledge_update        Update knowledge document
-knowledge_delete        Delete knowledge document
-knowledge_health        Check knowledge coverage health
+# Knowledge (10) - understand your project
+knowledge_context        Build context for a task/module
+knowledge_search         Search across knowledge docs
+knowledge_list           List available docs
+knowledge_get            Get single document with full content
+knowledge_modules        List modules with stats
+knowledge_module_overview Get module architecture overview
+knowledge_create         Create knowledge document
+knowledge_update         Update knowledge document
+knowledge_delete         Delete knowledge document
+knowledge_health         Check knowledge coverage health
 
 # Tasks (5) - track AI work
-task_create             Create task with governance
-task_update             Update status/progress
-task_list               List tasks with filtering
-task_get                Get task details
-task_complete           Complete with quality gate check
+task_create              Create task with governance
+task_update              Update status/progress
+task_list                List tasks with filtering
+task_get                 Get task details
+task_complete            Complete with quality gate check
 
 # Impact Analysis (3) - assess risk
-impact_analyze          Run impact analysis on a change
-impact_check_gate       Check gate status (blocked/warning/clear)
-impact_list             List analyses
+impact_analyze           Run impact analysis on a change
+impact_check_gate        Check gate status (blocked/warning/clear)
+impact_list              List analyses
 
 # Tickets (4) - external intake
-ticket_create           Create ticket
-ticket_list             List/filter tickets
-ticket_update           Update status
-ticket_convert_to_task  Convert to task
+ticket_create            Create ticket
+ticket_list              List/filter tickets
+ticket_update            Update status
+ticket_convert_to_task   Convert to task
 
 # Training (8) - learn from mistakes
-incident_create         Report an incident
-incident_list           List incidents
-lesson_create           Create lesson from incident
-lesson_list             List lessons
-skill_create            Create reusable skill
-skill_list              List skills
-rule_check              Check rules for context
-training_context_get    Get training context for session
+incident_create          Report an incident
+incident_list            List incidents
+lesson_create            Create lesson from incident
+lesson_list              List lessons
+skill_create             Create reusable skill
+skill_list               List skills
+rule_check               Check rules for context
+training_context_get     Get training context for session
 
 # OKRs (2) - project goals
-okr_list                List objectives and key results
-okr_update              Update key result progress
+okr_list                 List objectives and key results
+okr_update               Update key result progress
 
-# Sessions (1)
-session_launch          Launch Claude session with context
+# Test Results (3) - persist test execution
+test_result_create       Persist test execution results
+test_result_list         List test results with filtering
+test_result_get          Get detailed test result
+
+# Agent Desk (7) - workspace isolation
+desk_create              Create agent desk (git worktree)
+desk_list                List all agent desks
+desk_status              Get desk status and current task
+desk_checkout            Switch desk to a task
+desk_health              Check desk health
+desk_conflicts           Detect merge conflicts
+desk_remove              Remove agent desk
+
+# Memory (6) - semantic search
+memory_add               Store a memory entry
+memory_search            Semantic search across memories
+memory_list              List memory entries
+memory_delete            Delete a memory entry
+memory_index_knowledge   Index knowledge docs into memory
+memory_cleanup           Clean up expired entries
+
+# Context & References (4)
+entity_link              Link entities (task↔knowledge, etc.)
+entity_references        Get references for an entity
+entity_context           Build context from linked entities
+traceability_matrix      Generate spec-task-test coverage matrix
+
+# Productivity (v0.7.0)
+context_pack             Build comprehensive context pack for a module
+macro_run                Run composite macros (start_work, finish_work, quick_context)
+session_save             Save session state for cross-session continuity
+session_restore          Restore saved session state
 ```
 
 ## Desktop App - 7 Views
@@ -128,16 +160,21 @@ sidstack/
 ├── src/                   # React frontend (Tauri)
 ├── src-tauri/             # Rust backend (Tauri)
 ├── packages/
-│   ├── mcp-server/        # MCP Server (standalone, npx-ready)
-│   ├── api-server/        # REST API (Express.js)
-│   ├── cli/               # CLI (init, scan, doctor)
-│   ├── shared/            # SQLite + shared types + impact engine
-│   └── vscode-extension/  # VS Code sidebar integration
-├── .sidstack/             # Governance, knowledge, skills
+│   ├── mcp-server/        # MCP Server (53 tools, npx-ready)
+│   ├── api-server/        # REST API (Express.js, central gateway)
+│   ├── cli/               # CLI (init, update, scan, skills, desk)
+│   ├── bot-server/        # SidBot (Gemini intent router)
+│   ├── web-ui/            # React SPA (browser access)
+│   └── shared/            # Repository layer + shared types
+├── .sidstack/             # Project data (config, knowledge)
 │   ├── governance.md      # Master governance doc
-│   ├── knowledge/         # Project knowledge docs
-│   ├── skills/            # Capability skills (implement, review)
-│   └── principles/        # Quality standards
+│   └── knowledge/         # Project knowledge docs (9 categories)
+├── .claude/               # Claude Code integration
+│   ├── hooks/             # Lifecycle hooks (quality gates, bootstrap)
+│   ├── skills/            # Auto-triggered agent skills
+│   ├── agents/            # Worker + Reviewer agent definitions
+│   └── commands/          # Custom slash commands
+├── docker/                # Docker deployment configs
 └── docs/                  # Documentation
 ```
 
