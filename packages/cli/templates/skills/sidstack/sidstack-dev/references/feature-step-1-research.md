@@ -27,8 +27,8 @@ Use MCP tools for targeted context:
 1. **Search knowledge** for relevant docs:
    `mcp__sidstack__knowledge_search({ projectPath: ".", query: "[feature topic]" })`
 
-2. **Search semantic memory** for past learnings and related solutions:
-   `mcp__sidstack__memory_search({ query: "[feature topic]", projectId: "[project]" })`
+2. **Search knowledge and memory** for past learnings and related solutions:
+   `mcp__sidstack__knowledge_search({ projectPath: ".", query: "[feature topic]" })`
 
 3. **Build entity context** if working on an existing task with linked entities:
    `mcp__sidstack__entity_context({ entityType: "task", entityId: "[taskId]", format: "claude" })`

@@ -95,7 +95,7 @@ From any agent desk directory, MCP tools automatically resolve the shared `.sids
 
 ```bash
 # From worker-1/ directory:
-knowledge_context({ projectPath: "/path/to/worker-1" })
+entity_context({ projectPath: "/path/to/worker-1" })
 # → Resolves to shared .sidstack/ automatically
 ```
 
@@ -234,20 +234,18 @@ Capture what goes wrong, learn from it, and prevent it from happening again.
 
 ## MCP Integration
 
-SidStack connects to Claude Code via a **Model Context Protocol (MCP) server** that provides 49 tools:
+SidStack connects to Claude Code via a **Model Context Protocol (MCP) server** that provides 42 tools:
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| Knowledge (9) | `knowledge_context`, `knowledge_search`, `knowledge_list`, `knowledge_get`, `knowledge_modules`, `knowledge_create`, `knowledge_update`, `knowledge_delete`, `knowledge_health` | Build context, search docs |
+| Knowledge (9) | `knowledge_search`, `knowledge_list`, `knowledge_get`, `knowledge_modules`, `knowledge_module_overview`, `knowledge_create`, `knowledge_update`, `knowledge_delete`, `knowledge_health` | Build context, search docs |
 | Tasks (5) | `task_create`, `task_update`, `task_list`, `task_get`, `task_complete` | Manage governed work |
 | Impact (3) | `impact_analyze`, `impact_check_gate`, `impact_list` | Assess change risk |
 | Tickets (4) | `ticket_create`, `ticket_list`, `ticket_update`, `ticket_convert_to_task` | Manage intake |
-| Training (8) | `incident_create`, `incident_list`, `lesson_create`, `lesson_list`, `skill_create`, `skill_list`, `rule_check`, `training_context_get` | Learn from mistakes |
-| OKRs (2) | `okr_list`, `okr_update` | Track project goals |
+| Training (6) | `incident_create`, `incident_list`, `lesson_create`, `lesson_list`, `rule_check`, `training_context_get` | Learn from mistakes |
 | Test Results (3) | `test_result_create`, `test_result_list`, `test_result_get` | Persist test execution |
-| Agent Desk (5) | `desk_list`, `desk_status`, `desk_acquire`, `desk_release`, `desk_pool_init` | Workspace isolation |
-| Memory (6) | `memory_add`, `memory_search`, `memory_list`, `memory_delete`, `memory_index_knowledge`, `memory_cleanup` | Semantic search |
-| Traceability (1) | `traceability_matrix` | Spec-task-test coverage |
+| Agent Desk (4) | `desk_create`, `desk_list`, `desk_status`, `desk_remove` | Workspace isolation |
+| Memory (5) | `memory_add`, `memory_list`, `memory_delete`, `memory_index_knowledge`, `memory_cleanup` | Semantic search |
 | Entity Refs (3) | `entity_link`, `entity_references`, `entity_context` | Cross-entity linking |
 
 ---

@@ -2,7 +2,7 @@
  * MCP Tools Index
  *
  * Exports tool definitions and handler routing.
- * MVP: 32 focused tools.
+ * MVP: 42 focused tools.
  */
 
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
@@ -27,7 +27,6 @@ import {
   handleKnowledgeList,
   handleKnowledgeGet,
   handleKnowledgeSearch,
-  handleKnowledgeContext,
   handleKnowledgeModules,
   handleKnowledgeModuleOverview,
   handleKnowledgeCreate,
@@ -42,12 +41,6 @@ import {
 } from './handlers/training-room.js';
 
 import {
-  okrTools,
-  handleOkrList,
-  handleOkrUpdate,
-} from './handlers/okr.js';
-
-import {
   testResultTools,
   handleTestResultTool,
 } from './handlers/test-results.js';
@@ -57,26 +50,17 @@ import {
   handleDeskCreate,
   handleDeskList,
   handleDeskStatus,
-  handleDeskCheckout,
-  handleDeskHealth,
-  handleDeskConflicts,
   handleDeskRemove,
 } from './handlers/agent-desk.js';
 
 import {
   memoryTools,
   handleMemoryAdd,
-  handleMemorySearch,
   handleMemoryList,
   handleMemoryDelete,
   handleMemoryIndexKnowledge,
   handleMemoryCleanup,
 } from './handlers/memory.js';
-
-import {
-  traceabilityTools,
-  handleTraceabilityMatrix,
-} from './handlers/traceability.js';
 
 import {
   entityReferenceTools,
@@ -89,29 +73,12 @@ import {
   handleEntityContext,
 } from './handlers/context-builder.js';
 
-import {
-  contextPackTools,
-  handleContextPack,
-} from './handlers/context-packs.js';
-
-import {
-  macroTools,
-  handleMacroRun,
-} from './handlers/macros.js';
-
-import {
-  sessionStateTools,
-  handleSessionSave,
-  handleSessionRestore,
-} from './handlers/session-state.js';
-
 // ============================================================
 // MVP Tool Whitelist
 // ============================================================
 
 const MVP_TOOLS = new Set([
   // Knowledge (core value)
-  'knowledge_context',
   'knowledge_search',
   'knowledge_list',
   'knowledge_get',
@@ -146,53 +113,30 @@ const MVP_TOOLS = new Set([
   'rule_check',
   'incident_create',
   'incident_list',
-  'skill_create',
-  'skill_list',
   'training_context_get',
-
-  // OKRs (project goals)
-  'okr_list',
-  'okr_update',
 
   // Test Results (E2E persistence)
   'test_result_create',
   'test_result_list',
   'test_result_get',
 
-  // Agent Desk (persistent dev machine)
+  // Agent Desk (worktree management)
   'desk_create',
   'desk_list',
   'desk_status',
-  'desk_checkout',
-  'desk_health',
-  'desk_conflicts',
   'desk_remove',
 
-  // Memory (semantic search via mem0)
+  // Memory (SidMemo semantic)
   'memory_add',
-  'memory_search',
   'memory_list',
   'memory_delete',
   'memory_index_knowledge',
   'memory_cleanup',
 
-  // Traceability (spec → task → test coverage)
-  'traceability_matrix',
-
   // Entity References (cross-entity linking)
   'entity_link',
   'entity_references',
   'entity_context',
-
-  // Context Packs (combined context bundles)
-  'context_pack',
-
-  // Macros (composite operations)
-  'macro_run',
-
-  // Session Continuity (cross-session state)
-  'session_save',
-  'session_restore',
 ]);
 
 // ============================================================
@@ -215,35 +159,20 @@ const allTools: Tool[] = [
   // Training Room Tools
   ...(trainingRoomTools as unknown as Tool[]),
 
-  // OKR Tools
-  ...(okrTools as unknown as Tool[]),
-
   // Test Result Tools
   ...(testResultTools as unknown as Tool[]),
 
   // Agent Desk Tools
   ...(agentDeskTools as unknown as Tool[]),
 
-  // Memory Tools (mem0 semantic search)
+  // Memory Tools (SidMemo semantic)
   ...(memoryTools as unknown as Tool[]),
-
-  // Traceability Tools
-  ...(traceabilityTools as unknown as Tool[]),
 
   // Entity Reference Tools
   ...(entityReferenceTools as unknown as Tool[]),
 
   // Context Builder Tools
   ...(contextBuilderTools as unknown as Tool[]),
-
-  // Context Pack Tools
-  ...(contextPackTools as unknown as Tool[]),
-
-  // Macro Tools
-  ...(macroTools as unknown as Tool[]),
-
-  // Session State Tools
-  ...(sessionStateTools as unknown as Tool[]),
 ];
 
 // Export only MVP tools
@@ -291,8 +220,6 @@ export async function handleToolCall(
         return wrapResult(handleKnowledgeGet(args as any));
       case 'knowledge_search':
         return wrapResult(handleKnowledgeSearch(args as any));
-      case 'knowledge_context':
-        return wrapResult(handleKnowledgeContext(args as any));
       case 'knowledge_modules':
         return wrapResult(handleKnowledgeModules(args as any));
       case 'knowledge_module_overview':
@@ -312,16 +239,8 @@ export async function handleToolCall(
       case 'rule_check':
       case 'incident_create':
       case 'incident_list':
-      case 'skill_create':
-      case 'skill_list':
       case 'training_context_get':
         return wrapResult(handleTrainingRoomTool(name, args as any));
-
-      // OKR tools
-      case 'okr_list':
-        return wrapResult(handleOkrList(args as any));
-      case 'okr_update':
-        return wrapResult(handleOkrUpdate(args as any));
 
       // Test Result tools
       case 'test_result_create':
@@ -336,20 +255,12 @@ export async function handleToolCall(
         return wrapResult(handleDeskList(args as any));
       case 'desk_status':
         return wrapResult(handleDeskStatus(args as any));
-      case 'desk_checkout':
-        return wrapResult(handleDeskCheckout(args as any));
-      case 'desk_health':
-        return wrapResult(handleDeskHealth(args as any));
-      case 'desk_conflicts':
-        return wrapResult(handleDeskConflicts(args as any));
       case 'desk_remove':
         return wrapResult(handleDeskRemove(args as any));
 
       // Memory tools (mem0 semantic search)
       case 'memory_add':
         return wrapResult(handleMemoryAdd(args as any));
-      case 'memory_search':
-        return wrapResult(handleMemorySearch(args as any));
       case 'memory_list':
         return wrapResult(handleMemoryList(args as any));
       case 'memory_delete':
@@ -358,10 +269,6 @@ export async function handleToolCall(
         return wrapResult(handleMemoryIndexKnowledge(args as any));
       case 'memory_cleanup':
         return wrapResult(handleMemoryCleanup(args as any));
-
-      // Traceability tools
-      case 'traceability_matrix':
-        return wrapResult(handleTraceabilityMatrix(args as any));
 
       // Entity Reference tools
       case 'entity_link':
@@ -372,20 +279,6 @@ export async function handleToolCall(
       // Context Builder tools
       case 'entity_context':
         return wrapResult(handleEntityContext(args as any));
-
-      // Context Pack tools
-      case 'context_pack':
-        return wrapResult(handleContextPack(args as any));
-
-      // Macro tools
-      case 'macro_run':
-        return wrapResult(handleMacroRun(args as any));
-
-      // Session State tools
-      case 'session_save':
-        return wrapResult(handleSessionSave(args as any));
-      case 'session_restore':
-        return wrapResult(handleSessionRestore(args as any));
 
       default:
         // Try SQLite-based tools (task_*, work_*, project_*)

@@ -1,14 +1,14 @@
 ---
 name: SidStack Training
-description: View and manage project training data (incidents, lessons, skills, rules)
+description: View and manage project training data (incidents, lessons, rules)
 category: core
 version: 1.0.0
-tags: [sidstack, training, lessons, skills, rules, learning]
+tags: [sidstack, training, lessons, rules, learning]
 ---
 
 # SidStack Training - Learning Management
 
-Manage project-specific training: incidents, lessons, skills, and rules.
+Manage project-specific training: incidents, lessons, and rules.
 
 ## /sidstack:training (no args) — Overview
 
@@ -18,7 +18,6 @@ Show training system overview:
    ```
    incident_list({ projectPath: "." })
    lesson_list({ projectPath: "." })
-   skill_list({ projectPath: "." })
    ```
 
 2. Display:
@@ -33,14 +32,10 @@ Show training system overview:
    - [N] draft lessons
    - [N] approved lessons
 
-   ### Skills
-   - [N] active skills
-   - [N] deprecated
-
    ### Recent Activity
    - [date] [type]: [title]
 
-   Subcommands: incident, lesson, skill, rules, context
+   Subcommands: incident, lesson, rules, context
    ```
 
 ## /sidstack:training incident — Incident Management
@@ -150,62 +145,6 @@ lesson_approve({ lessonId: "$1" })
 
 Display: "Lesson [id] approved. It will now be included in training context."
 
-## /sidstack:training skill — Skill Management
-
-### /sidstack:training skill list
-
-List all skills:
-
-```
-skill_list({ projectPath: "." })
-```
-
-Display:
-```
-## Skills
-
-| Name | Type | Status | Trigger |
-|------|------|--------|---------|
-| secure-password-handling | checklist | active | task_start + module:auth |
-| code-review-checklist | checklist | active | before_commit |
-```
-
-### /sidstack:training skill create
-
-Interactive skill creation:
-
-1. Optionally link to lessons:
-   - Show approved lessons
-   - Let user select which to derive from
-
-2. Collect details:
-   - Name (kebab-case)
-   - Type: procedure, checklist, template, rule
-   - Description
-   - Content (markdown)
-   - Trigger conditions
-
-3. Create:
-   ```
-   skill_create({
-     projectPath: ".",
-     name: "[input]",
-     type: "[input]",
-     description: "[input]",
-     lessonIds: ["[selected]"],
-     content: "[input]",
-     applicability: {
-       modules: ["[input]"],
-       roles: ["worker"],
-       taskTypes: ["feature", "bugfix"]
-     },
-     trigger: {
-       when: "task_start",
-       conditions: ["module:[input]"]
-     }
-   })
-   ```
-
 ## /sidstack:training rules [module] — Check Rules
 
 Show applicable rules for a module:
@@ -248,33 +187,6 @@ training_context_get({
 
 Display the full training context that would be injected.
 
-## /sidstack:training promote <lesson-id> — Promote to Skill
-
-Convert an approved lesson to a reusable skill:
-
-1. Get lesson details:
-   ```
-   # Read lesson from lesson_list results
-   ```
-
-2. Generate skill content from lesson:
-   - Problem → Prevention checks
-   - Solution → Steps/checklist
-
-3. Create skill:
-   ```
-   skill_create({
-     projectPath: ".",
-     name: "[derived-from-lesson-title]",
-     type: "checklist",
-     lessonIds: ["[lesson-id]"],
-     content: "[generated-from-lesson]",
-     ...
-   })
-   ```
-
-4. Display: "Skill [name] created from lesson [id]."
-
 ## Arguments
 
 `$ARGUMENTS` — Subcommand and arguments. If empty, show overview.
@@ -296,7 +208,4 @@ Convert an approved lesson to a reusable skill:
 
 # View training context for api module
 /sidstack:training context api
-
-# Promote a lesson to a skill
-/sidstack:training promote lesson-xxx
 ```

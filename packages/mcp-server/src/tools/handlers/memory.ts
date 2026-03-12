@@ -6,7 +6,6 @@
  *
  * Tools:
  * - memory_add: Store a memory (with conflict detection + TTL)
- * - memory_search: Semantic search (filters expired)
  * - memory_list: List all memories (filters expired)
  * - memory_delete: Delete a memory
  * - memory_index_knowledge: Bulk-index knowledge docs
@@ -39,8 +38,12 @@ function getClient(): SidMemoClient {
 }
 
 function resolveWorkspacePath(projectPath: string): string {
-  const workspace = detectWorkspace(projectPath);
-  return workspace ? workspace.workspaceRoot : projectPath;
+  try {
+    const workspace = detectWorkspace(projectPath);
+    return workspace ? workspace.workspaceRoot : projectPath;
+  } catch {
+    return projectPath;
+  }
 }
 
 /** Partition memories into active and expired (works with both types). */
@@ -97,29 +100,6 @@ export const memoryTools = [
         },
       },
       required: ['content', 'projectId'],
-    },
-  },
-  {
-    name: 'memory_search',
-    description: 'Semantic search across memories. Finds results by meaning, not just keyword matching. For example, searching "authentication flow" will find memories about "login process".',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Search query (semantic, not keyword-based)',
-        },
-        projectId: {
-          type: 'string',
-          description: 'Project ID to search within',
-        },
-        limit: {
-          type: 'number',
-          description: 'Max results to return (default: 10)',
-          default: 10,
-        },
-      },
-      required: ['query', 'projectId'],
     },
   },
   {
@@ -227,58 +207,6 @@ export async function handleMemoryAdd(args: {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to add memory',
-    };
-  }
-}
-
-export async function handleMemorySearch(args: {
-  query: string;
-  projectId: string;
-  limit?: number;
-}): Promise<Record<string, unknown>> {
-  const client = getClient();
-
-  if (!(await client.isAvailable())) {
-    return {
-      success: false,
-      error: 'SidMemo API is not available.',
-      memories: [],
-    };
-  }
-
-  try {
-    const rawMemories = await client.search(args.query, args.projectId, args.limit || 10);
-    // Map to Mem0Memory shape for partitioning
-    const asMem0 = rawMemories.map(m => ({
-      id: m.id,
-      memory: m.content,
-      metadata: m.metadata_ as Record<string, unknown> | undefined,
-      score: m.score,
-    }));
-    const { active, expired } = partitionByExpiry(asMem0);
-
-    // Background-delete expired results
-    if (expired.length > 0) {
-      backgroundDeleteExpired(client, expired);
-    }
-
-    return {
-      success: true,
-      query: args.query,
-      total: active.length,
-      memories: active.map(m => ({
-        id: m.id,
-        memory: (m as Mem0Memory).memory || (m as SidMemoMemory).content,
-        score: (m as Mem0Memory).score ?? (m as SidMemoMemory).score,
-        metadata: (m as Mem0Memory).metadata || (m as SidMemoMemory).metadata_,
-      })),
-      ...(expired.length > 0 ? { expiredFiltered: expired.length } : {}),
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Search failed',
-      memories: [],
     };
   }
 }

@@ -2,7 +2,7 @@
  * Macro Tools MCP Handler
  *
  * Composite macros that combine multiple tool calls into one.
- * Built-in macros: start_work, finish_work, quick_context
+ * Built-in macros: start_work, finish_work
  *
  * Each macro internally calls existing handlers — no new API endpoints needed.
  */
@@ -22,15 +22,14 @@ export const macroTools = [
     description:
       'Run a composite macro that executes multiple SidStack operations in one call. Available macros:\n' +
       '- **start_work**: Create task + search knowledge + search memory + return combined context. Params: projectId, projectPath, title, taskType, description\n' +
-      '- **finish_work**: Run quality summary + complete task + store learnings. Params: projectId, taskId, implementSummary, learnings (optional)\n' +
-      '- **quick_context**: Search knowledge + memory + list active tasks in one call. Params: projectId, projectPath, query',
+      '- **finish_work**: Run quality summary + complete task + store learnings. Params: projectId, taskId, implementSummary, learnings (optional)',
     inputSchema: {
       type: 'object',
       properties: {
         macro: {
           type: 'string',
           description: 'Macro name to run',
-          enum: ['start_work', 'finish_work', 'quick_context'],
+          enum: ['start_work', 'finish_work'],
         },
         params: {
           type: 'object',
@@ -170,75 +169,6 @@ async function macroFinishWork(params: Record<string, unknown>): Promise<Record<
   return results;
 }
 
-async function macroQuickContext(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const projectId = params.projectId as string;
-  const projectPath = params.projectPath as string;
-  const query = params.query as string;
-
-  if (!projectId || !query) {
-    return { success: false, error: 'Missing required params: projectId, query' };
-  }
-
-  const results: Record<string, unknown> = { macro: 'quick_context', query };
-
-  // Run all 3 searches in parallel
-  const [knowledgeResult, memoryResult, tasksResult] = await Promise.allSettled([
-    // Knowledge search
-    projectPath
-      ? apiClient.knowledge.search({ projectPath, query, limit: 5 } as any)
-      : Promise.resolve({ results: [] }),
-    // Memory search
-    (async () => {
-      const client = await getSidMemoClientIfAvailable();
-      if (!client) return [];
-      return client.search(query, projectId, 5);
-    })(),
-    // Active tasks
-    apiClient.tasks.list({ projectId, status: 'in_progress' } as any),
-  ]);
-
-  // Process results
-  if (knowledgeResult.status === 'fulfilled') {
-    const kResult = knowledgeResult.value as any;
-    results.knowledge = (kResult.results || kResult.documents || []).map((d: any) => ({
-      id: d.id,
-      title: d.title,
-      type: d.type || d.documentType,
-      snippet: (d.snippet || d.content || '').substring(0, 200),
-    }));
-  } else {
-    results.knowledge = [];
-  }
-
-  if (memoryResult.status === 'fulfilled') {
-    const memories = memoryResult.value as any[];
-    results.memories = (memories || []).map((m: any) => ({
-      id: m.id,
-      content: (m.content || m.memory || '').substring(0, 200),
-      score: m.score,
-    }));
-  } else {
-    results.memories = [];
-  }
-
-  if (tasksResult.status === 'fulfilled') {
-    const tResult = tasksResult.value as any;
-    results.activeTasks = ((tResult.tasks || []) as any[]).map((t: any) => ({
-      id: t.id,
-      title: t.title,
-      progress: t.progress,
-      taskType: t.taskType,
-    }));
-  } else {
-    results.activeTasks = [];
-  }
-
-  results.success = true;
-  results.summary = `Found ${(results.knowledge as any[]).length} knowledge docs, ${(results.memories as any[]).length} memories, ${(results.activeTasks as any[]).length} active tasks.`;
-
-  return results;
-}
-
 // =============================================================================
 // Main Handler
 // =============================================================================
@@ -252,12 +182,10 @@ export async function handleMacroRun(args: {
       return macroStartWork(args.params);
     case 'finish_work':
       return macroFinishWork(args.params);
-    case 'quick_context':
-      return macroQuickContext(args.params);
     default:
       return {
         success: false,
-        error: `Unknown macro: ${args.macro}. Available: start_work, finish_work, quick_context`,
+        error: `Unknown macro: ${args.macro}. Available: start_work, finish_work`,
       };
   }
 }

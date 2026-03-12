@@ -803,7 +803,7 @@ Do NOT auto-generate business docs without user confirmation. Technical docs (ar
             this.log('');
             this.log('MCP tools now available in Claude Code:');
             this.log('  knowledge_search  - search across all docs');
-            this.log('  knowledge_context - inject project context into sessions');
+            this.log('  entity_context    - build context from linked entities (entity mode + RAG mode)');
             this.log('  knowledge_health  - check coverage and quality');
           }
         }

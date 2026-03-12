@@ -2,7 +2,7 @@
 name: sidstack-knowledge
 description: "Build, audit, and maintain project knowledge. Modes: init (bootstrap knowledge for existing project), audit (health check + fix), update (post-feature doc update), search (find + context). Triggers on: /sidstack-knowledge or 'build knowledge', 'audit docs', 'update docs'."
 argument-hint: "[init|audit|update|search] [module-name or description]"
-allowed-tools: mcp__sidstack__knowledge_create, mcp__sidstack__knowledge_update, mcp__sidstack__knowledge_delete, mcp__sidstack__knowledge_list, mcp__sidstack__knowledge_get, mcp__sidstack__knowledge_search, mcp__sidstack__knowledge_modules, mcp__sidstack__knowledge_module_overview, mcp__sidstack__knowledge_health, mcp__sidstack__knowledge_context, mcp__sidstack__entity_link, mcp__sidstack__entity_references, mcp__sidstack__memory_add, mcp__sidstack__memory_search
+allowed-tools: mcp__sidstack__knowledge_create, mcp__sidstack__knowledge_update, mcp__sidstack__knowledge_delete, mcp__sidstack__knowledge_list, mcp__sidstack__knowledge_get, mcp__sidstack__knowledge_search, mcp__sidstack__knowledge_modules, mcp__sidstack__knowledge_module_overview, mcp__sidstack__knowledge_health, mcp__sidstack__entity_context, mcp__sidstack__entity_link, mcp__sidstack__entity_references, mcp__sidstack__memory_add
 ---
 
 # SidStack Knowledge Management
@@ -301,8 +301,8 @@ knowledge_search(projectPath, query: "oauth flow")
 # Module browse
 knowledge_module_overview(projectPath, moduleId: "auth")
 
-# Semantic search (if available)
-memory_search(projectPath, query: "oauth flow")
+# Semantic search (SidMemo backend)
+knowledge_search(projectPath, query: "oauth flow")
 ```
 
 Present results grouped by relevance:
@@ -316,7 +316,7 @@ Present results grouped by relevance:
 2. **Auth API Reference** [reference] — Score: 80
    > Endpoints: POST /oauth/token, POST /oauth/revoke...
 
-### Semantic Matches (memory)
+### Semantic Matches (SidMemo)
 1. "OAuth refresh tokens must be rotated on each use" — relevance: 85%
 2. "Auth module uses PKCE flow since 2026-01" — relevance: 72%
 
@@ -324,7 +324,7 @@ Present results grouped by relevance:
 - **auth** — 5 docs, health: 85
 - **api-server** — 2 docs, health: 70
 
-Build full context? → knowledge_context(projectPath, moduleId: "auth")
+Build full context? → entity_context(projectPath, moduleId: "auth")
 ```
 
 ---

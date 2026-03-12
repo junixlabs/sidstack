@@ -417,8 +417,6 @@ During this session, proactively capture knowledge when you encounter these situ
 - You create a checklist that would help future sessions
 - You find an effective debugging approach for this codebase
 
-→ Call \`skill_create\` with: projectPath, name, type (procedure|checklist|template), content
-
 ### Important
 - Only create entries for genuinely useful insights, not trivial fixes
 - Be concise - focus on what would help a future agent in the same situation

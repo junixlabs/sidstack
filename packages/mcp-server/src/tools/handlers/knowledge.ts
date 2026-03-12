@@ -4,8 +4,7 @@
  * Tools for accessing unified knowledge via the SidStack API server:
  * - knowledge_list: List all knowledge documents
  * - knowledge_get: Get single document with content
- * - knowledge_search: Search across knowledge base
- * - knowledge_context: Build session context for Claude
+ * - knowledge_search: Semantic search via SidMemo
  * - knowledge_modules: List modules with knowledge stats
  *
  * Uses createApiClient from @sidstack/shared for HTTP access via api-server.
@@ -27,33 +26,6 @@ import * as path from 'path';
 // =============================================================================
 
 const apiClient = createApiClient();
-
-// =============================================================================
-// Rate Limiter for knowledge_search (30 calls/min per projectPath)
-// =============================================================================
-
-const RATE_LIMIT_MAX = 30;
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const searchCallTimestamps = new Map<string, number[]>();
-
-function checkSearchRateLimit(projectPath: string): { allowed: boolean; retryAfterSeconds?: number } {
-  const now = Date.now();
-  const timestamps = searchCallTimestamps.get(projectPath) || [];
-
-  // Prune entries outside the window
-  const recent = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
-
-  if (recent.length >= RATE_LIMIT_MAX) {
-    const oldestInWindow = recent[0];
-    const retryAfterSeconds = Math.ceil((oldestInWindow + RATE_LIMIT_WINDOW_MS - now) / 1000);
-    searchCallTimestamps.set(projectPath, recent);
-    return { allowed: false, retryAfterSeconds };
-  }
-
-  recent.push(now);
-  searchCallTimestamps.set(projectPath, recent);
-  return { allowed: true };
-}
 
 /**
  * Resolve workspace path from projectPath (handles worktrees)
@@ -136,7 +108,7 @@ export const knowledgeTools = [
   },
   {
     name: 'knowledge_search',
-    description: 'Search across all knowledge documents. Returns matching documents with summaries.',
+    description: 'Semantic search across all project knowledge and memories via vector similarity. Finds results by meaning, not keywords.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -146,62 +118,20 @@ export const knowledgeTools = [
         },
         query: {
           type: 'string',
-          description: 'Search query (searches in title, ID, summary, module, tags)',
-        },
-        type: {
-          type: 'array',
-          items: {
-            type: 'string',
-            enum: ALL_DOCUMENT_TYPES as unknown as string[],
-          },
-          description: 'Filter by document type(s)',
+          description: 'Semantic search query',
         },
         limit: {
           type: 'number',
-          description: 'Max results to return (default: 20)',
-          default: 20,
+          description: 'Max results to return (default: 10)',
+          default: 10,
+        },
+        includeTasks: {
+          type: 'boolean',
+          description: 'Also return matching active tasks',
+          default: false,
         },
       },
       required: ['projectPath', 'query'],
-    },
-  },
-  {
-    name: 'knowledge_context',
-    description: 'Build session context for Claude from linked entities (task, module, spec, ticket) and/or semantic query. When query is provided, returns chunk-level RAG context with Knowledge Graph enrichment. Returns formatted markdown ready for injection.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        projectPath: {
-          type: 'string',
-          description: 'Path to the project directory',
-        },
-        query: {
-          type: 'string',
-          description: 'Semantic query for RAG context (searches knowledge chunks via vector similarity)',
-        },
-        taskId: {
-          type: 'string',
-          description: 'Task ID to get context for',
-        },
-        moduleId: {
-          type: 'string',
-          description: 'Module ID to get context for',
-        },
-        specId: {
-          type: 'string',
-          description: 'Spec/change ID to get context for',
-        },
-        ticketId: {
-          type: 'string',
-          description: 'Ticket ID to get context for',
-        },
-        maxLength: {
-          type: 'number',
-          description: 'Max context length in chars (default: 8000)',
-          default: 8000,
-        },
-      },
-      required: ['projectPath'],
     },
   },
   {
@@ -520,169 +450,74 @@ export async function handleKnowledgeGet(args: {
 export async function handleKnowledgeSearch(args: {
   projectPath: string;
   query: string;
-  type?: DocumentType[];
   limit?: number;
+  includeTasks?: boolean;
 }) {
   try {
     validateProjectPath(args.projectPath);
 
-    // Rate limit check
-    const rateCheck = checkSearchRateLimit(args.projectPath);
-    if (!rateCheck.allowed) {
+    const workspacePath = resolveWorkspacePath(args.projectPath);
+    const projectId = path.basename(workspacePath);
+
+    const sidmemoClient = await getSidMemoClientIfAvailable();
+    if (!sidmemoClient) {
       return {
         success: false,
-        error: `Rate limit exceeded for knowledge_search (${RATE_LIMIT_MAX}/min). Retry after ${rateCheck.retryAfterSeconds} seconds.`,
+        error: 'SidMemo is not available. Semantic search requires SidMemo — check SIDMEMO_API_KEY.',
         query: args.query,
-        total: 0,
-        documents: [],
+        results: [],
       };
     }
 
-    const response = await apiClient.knowledge.search({
-      projectPath: args.projectPath,
-      q: args.query,
-      limit: String(args.limit || 20),
-    });
+    const limit = args.limit || 10;
+    // SidMemo-only search — no keyword fallback
+    const memories = await sidmemoClient.search(args.query, projectId, limit);
 
-    let results = response.results || [];
+    const results = memories.map(m => ({
+      id: m.id,
+      content: m.content,
+      score: m.score,
+      metadata: m.metadata_ as Record<string, unknown> | undefined,
+    }));
 
-    // Apply type filter if provided
-    if (args.type) {
-      results = results.filter((d: any) => args.type!.includes(d.type));
-    }
-
-    // Semantic search via SidMemo (non-blocking, graceful degradation)
-    let semanticMatches: Array<{ content: string; score?: number; metadata?: Record<string, unknown> }> = [];
-    try {
-      const sidmemoClient = await getSidMemoClientIfAvailable();
-      if (sidmemoClient) {
-        const workspacePath = resolveWorkspacePath(args.projectPath);
-        const projectId = path.basename(workspacePath);
-        const memories = await sidmemoClient.search(args.query, projectId, args.limit || 10, { sourceType: 'knowledge_chunk' });
-        semanticMatches = memories.map(m => ({
-          content: m.content,
-          score: m.score,
-          metadata: m.metadata_ as Record<string, unknown> | undefined,
-        }));
-      }
-    } catch {
-      // Non-blocking: keyword results still returned
-    }
-
-    // Deduplicate: remove semantic matches already in keyword results
-    const docIds = new Set(results.map((d: any) => d.id));
-    const uniqueSemanticMatches = semanticMatches.filter(
-      m => !m.metadata?.docId || !docIds.has(m.metadata.docId as string)
-    );
-
-    return {
+    const response: Record<string, unknown> = {
       success: true,
       query: args.query,
-      total: results.length,
-      documents: results.map((d: any) => ({
-        id: d.id,
-        type: d.type,
-        title: d.title,
-        path: d.sourcePath,
-        module: d.module,
-        status: d.status,
-        source: d.source,
-        summary: d.summary ? d.summary.slice(0, 200) + (d.summary.length > 200 ? '...' : '') : undefined,
-        score: d._score,
-      })),
-      ...(uniqueSemanticMatches.length > 0 ? { semanticMatches: uniqueSemanticMatches } : {}),
+      results,
     };
+
+    if (args.includeTasks) {
+      try {
+        const taskResult = await apiClient.tasks.list({ projectId });
+        const allTasks = (taskResult as any).tasks || [];
+        const queryLower = args.query.toLowerCase();
+        response.tasks = allTasks
+          .filter((t: any) =>
+            ['in_progress', 'pending', 'todo'].includes(t.status)
+          )
+          .filter((t: any) =>
+            t.title?.toLowerCase().includes(queryLower)
+          )
+          .slice(0, 5)
+          .map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            progress: t.progress,
+            taskType: t.taskType,
+          }));
+      } catch {
+        response.tasks = [];
+      }
+    }
+
+    return response;
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Search failed',
       query: args.query,
-      total: 0,
-      documents: [],
-    };
-  }
-}
-
-export async function handleKnowledgeContext(args: {
-  projectPath: string;
-  query?: string;
-  taskId?: string;
-  moduleId?: string;
-  specId?: string;
-  ticketId?: string;
-  maxLength?: number;
-}) {
-  validateProjectPath(args.projectPath);
-
-  try {
-    // Build query params for the API call
-    const query: Record<string, string | undefined> = {
-      projectPath: args.projectPath,
-      taskId: args.taskId,
-      moduleId: args.moduleId,
-      maxLength: args.maxLength ? String(args.maxLength) : undefined,
-    };
-
-    const contextResult = await apiClient.knowledge.context(query);
-
-    // Semantic memory overlay via SidMemo (non-blocking, graceful degradation)
-    let semanticSection = '';
-    try {
-      const sidmemoClient = await getSidMemoClientIfAvailable();
-      if (sidmemoClient) {
-        const projectId = path.basename(resolveWorkspacePath(args.projectPath));
-
-        // Build semantic query from context result, not just IDs
-        const ctxText = typeof contextResult === 'string'
-          ? contextResult
-          : (contextResult.context || contextResult.prompt || '');
-        const searchQuery = args.query
-          || (ctxText ? ctxText.substring(0, 200) : '')
-          || args.taskId || args.moduleId || args.specId || 'project context';
-
-        // Single search, partition client-side
-        const allMemories = await sidmemoClient.search(searchQuery, projectId, 10).catch(() => []);
-        const memories = allMemories.filter((m: any) => m.metadata_?.sourceType !== 'validation_failure').slice(0, 5);
-        const failures = allMemories.filter((m: any) => m.metadata_?.sourceType === 'validation_failure').slice(0, 5);
-
-        if (memories.length > 0) {
-          semanticSection += '\n\n## Relevant Knowledge\n';
-          for (const m of memories) {
-            semanticSection += `- ${m.content}\n`;
-          }
-        }
-        if (failures.length > 0) {
-          semanticSection += '\n\n## Past Validation Failures\n';
-          for (const f of failures) {
-            semanticSection += `- ${f.content}\n`;
-          }
-        }
-      }
-    } catch {
-      // Non-blocking
-    }
-
-    // The context API returns the knowledge context object directly
-    // Adapt to the expected MCP response format
-    const contextText = typeof contextResult === 'string'
-      ? contextResult
-      : (contextResult.context || contextResult.prompt || JSON.stringify(contextResult));
-    const fullContext = contextText + semanticSection;
-
-    return {
-      success: true,
-      context: fullContext,
-      entities: contextResult.entities || contextResult.metadata?.entities || [],
-      metadata: {
-        totalLength: fullContext.length,
-        maxLength: args.maxLength || 8000,
-        truncated: fullContext.length >= (args.maxLength || 8000),
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to build context',
+      results: [],
     };
   }
 }

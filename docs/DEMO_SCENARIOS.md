@@ -71,8 +71,7 @@ Step-by-step scenarios showcasing SidStack's key features.
 
 1. **Open Project Hub** (`Cmd+1`)
 2. **View project stats** - module count, active tasks, knowledge documents
-3. **Check OKR progress** - objectives and key results
-4. **Click quick actions** - jump to any feature:
+3. **Click quick actions** - jump to any feature:
    - Task Manager - create and track tasks
    - Knowledge Browser - browse project documentation
    - Ticket Queue - manage external tickets
@@ -83,7 +82,6 @@ Step-by-step scenarios showcasing SidStack's key features.
 ### What to highlight
 - Central dashboard with unified view
 - Quick access to all features
-- OKR progress tracking
 
 ---
 

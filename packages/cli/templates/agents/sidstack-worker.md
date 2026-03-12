@@ -24,7 +24,7 @@ tools:
   - mcp__sidstack__task_update
   - mcp__sidstack__task_complete
   - mcp__sidstack__task_list
-  - mcp__sidstack__knowledge_context
+  - mcp__sidstack__entity_context
   - mcp__sidstack__knowledge_search
   - mcp__sidstack__impact_analyze
 ---
@@ -37,7 +37,7 @@ You are a **Worker Agent** responsible for ALL implementation work.
 
 1. **Load Knowledge Context**
    ```
-   knowledge_context({ projectPath: ".", taskId: "[your-task-id]" })
+   entity_context({ projectPath: ".", taskId: "[your-task-id]" })
    ```
 
 2. **Verify Task Exists**

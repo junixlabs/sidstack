@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.7.1] - 2026-03-12
+
+### Changed
+- **MCP Tools reduced 53 → 42:** Removed 11 niche/overlapping tools from MVP whitelist
+  - Removed: `macro_run`, `session_save/restore`, `desk_health/conflicts/checkout`, `skill_create/list`, `okr_list/okr_update`, `traceability_matrix`
+- **SidMemo full dependency:** `knowledge_search` now SidMemo-only (no keyword fallback)
+- **`entity_context` resilience:** Entity-graph mode no longer requires SidMemo (optional overlay)
+
+### Removed
+- **`context_packs` handler:** Deleted, replaced by `entity_context` RAG mode
+- **`memory_search` handler:** Removed dead code from memory.ts
+- **`knowledge_context` handler:** Logic consolidated into `entity_context`
+- **`quick_context` macro:** Removed from macros.ts
+- **Legacy tool references:** Cleaned up across docs, skills, agents, and templates
+
+### Fixed
+- `entity_context` SidMemo regression — entity-graph mode no longer fails without SidMemo
+- Tool count inconsistencies across documentation (now consistently 42)
+- Missing `knowledge_module_overview` from doc tables
+- Stale `session_launch` references in agent command templates
+- Duplicate `knowledge_search` line in review-workflow template
+
 ## [0.7.0] - 2026-03-06
 
 ### Added

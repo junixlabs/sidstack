@@ -3,8 +3,8 @@
  *
  * Tests 5 flows end-to-end without mocks:
  * - U3: Ticket Queue (create → list → update → convert_to_task)
- * - U4: Knowledge Browser (list → search → context → modules)
- * - U5: Training Room (incident → lesson → skill → rule_check)
+ * - U4: Knowledge Browser (list → search → modules)
+ * - U5: Training Room (incident → lesson → rule_check)
  * - A5: Training Context (training_context_get)
  * - Test Results (create → list → get — file-based)
  *
@@ -29,7 +29,6 @@ const createdTicketIds: string[] = [];
 const createdTaskIds: string[] = [];
 const createdIncidentIds: string[] = [];
 const createdLessonIds: string[] = [];
-const createdSkillIds: string[] = [];
 const createdTestResultIds: string[] = [];
 
 /**
@@ -117,7 +116,7 @@ describe('U3: Ticket Queue (create → list → update → convert)', () => {
 // U4: Knowledge Browser Flow
 // =============================================================================
 
-describe('U4: Knowledge Browser (list → search → context → modules)', () => {
+describe('U4: Knowledge Browser (list → search → modules)', () => {
   it('knowledge_list — lists knowledge documents', async () => {
     const result = await callTool('knowledge_list', {
       projectPath: PROJECT_PATH,
@@ -128,23 +127,18 @@ describe('U4: Knowledge Browser (list → search → context → modules)', () =
     expect(Array.isArray(docs)).toBe(true);
   });
 
-  it('knowledge_search — searches knowledge base', async () => {
+  it('knowledge_search — searches knowledge via SidMemo', async () => {
     const result = await callTool('knowledge_search', {
       projectPath: PROJECT_PATH,
       query: 'task',
     });
 
-    expect(result.success).toBe(true);
-    expect(result.documents).toBeDefined();
-  });
-
-  it('knowledge_context — builds session context', async () => {
-    const result = await callTool('knowledge_context', {
-      projectPath: PROJECT_PATH,
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.context).toBeDefined();
+    // SidMemo may not be available in CI — accept either success or SidMemo error
+    if (result.success) {
+      expect(result.results).toBeDefined();
+    } else {
+      expect(result.error).toContain('SidMemo');
+    }
   });
 
   it('knowledge_modules — lists modules with stats', async () => {
@@ -223,31 +217,6 @@ describe('U5: Training Room (incident → lesson → skill → rule_check)', () 
     expect(Array.isArray(lessons)).toBe(true);
     const found = lessons.find((l) => l.id === lessonId);
     expect(found).toBeDefined();
-  });
-
-  it('skill_create — creates skill from lesson', async () => {
-    const result = await callTool('skill_create', {
-      projectPath: PROJECT_PATH,
-      name: `e2e-test-skill-${Date.now()}`,
-      description: 'E2E test skill',
-      lessonIds: [lessonId],
-      type: 'checklist',
-      content: '- [ ] Step 1\n- [ ] Step 2',
-    });
-
-    expect(result.success).toBe(true);
-    const skill = result.skill as Record<string, unknown>;
-    expect(skill).toBeDefined();
-    if (skill?.id) createdSkillIds.push(skill.id as string);
-  });
-
-  it('skill_list — lists skills', async () => {
-    const result = await callTool('skill_list', {
-      projectPath: PROJECT_PATH,
-    });
-
-    expect(result.success).toBe(true);
-    expect(Array.isArray(result.skills)).toBe(true);
   });
 
   it('rule_check — checks applicable rules', async () => {
@@ -401,40 +370,6 @@ describe('Memory (add → search → list → delete → index_knowledge)', () =
     expect(result.success).toBe(true);
   });
 
-  it('memory_search — finds semantically related content', async () => {
-    const result = await callTool('memory_search', {
-      query: 'how does user sign-in work',
-      projectId: 'sidstack-e2e-test',
-      limit: 5,
-    });
-
-    if (!result.success) return; // mem0 unavailable
-
-    expect(result.success).toBe(true);
-    const memories = result.memories as Array<{ memory: string; score?: number }>;
-    expect(Array.isArray(memories)).toBe(true);
-    expect(memories.length).toBeGreaterThan(0);
-    // Should find the JWT/authentication memory via semantic match
-    const authMemory = memories.find(m => m.memory.toLowerCase().includes('authentication') || m.memory.toLowerCase().includes('jwt'));
-    expect(authMemory).toBeDefined();
-  });
-
-  it('memory_search — risk assessment query finds impact analysis', async () => {
-    const result = await callTool('memory_search', {
-      query: 'risk assessment before code changes',
-      projectId: 'sidstack-e2e-test',
-      limit: 5,
-    });
-
-    if (!result.success) return;
-
-    expect(result.success).toBe(true);
-    const memories = result.memories as Array<{ memory: string; score?: number }>;
-    expect(memories.length).toBeGreaterThan(0);
-    const impactMemory = memories.find(m => m.memory.toLowerCase().includes('impact') || m.memory.toLowerCase().includes('risk'));
-    expect(impactMemory).toBeDefined();
-  });
-
   it('memory_list — lists all memories for project', async () => {
     const result = await callTool('memory_list', {
       projectId: 'sidstack-e2e-test',
@@ -479,57 +414,70 @@ describe('Memory (add → search → list → delete → index_knowledge)', () =
 });
 
 // =============================================================================
-// Knowledge Search with Semantic Enhancement
+// Knowledge Search (SidMemo-only)
 // =============================================================================
 
-describe('Knowledge Search + Semantic (enhanced)', () => {
-  it('knowledge_search — returns semanticMatches when mem0 is available', async () => {
+describe('Knowledge Search (SidMemo-only)', () => {
+  it('knowledge_search — returns SidMemo results or clear error', async () => {
     const result = await callTool('knowledge_search', {
       projectPath: PROJECT_PATH,
       query: 'task management workflow',
     });
 
-    expect(result.success).toBe(true);
-    expect(result.documents).toBeDefined();
-    // semanticMatches may be present if mem0 is running and has indexed data
-    // We just verify the field structure is valid when present
-    if (result.semanticMatches) {
-      const matches = result.semanticMatches as Array<{ memory: string }>;
-      expect(Array.isArray(matches)).toBe(true);
-      for (const m of matches) {
-        expect(typeof m.memory).toBe('string');
-      }
+    // SidMemo may not be available in all environments
+    if (result.success) {
+      expect(result.results).toBeDefined();
+      expect(Array.isArray(result.results)).toBe(true);
+    } else {
+      // Must return clear SidMemo error (no silent fallback)
+      expect(result.error).toContain('SidMemo');
+    }
+  });
+
+  it('knowledge_search — includeTasks returns tasks array', async () => {
+    const result = await callTool('knowledge_search', {
+      projectPath: PROJECT_PATH,
+      query: 'task',
+      includeTasks: true,
+    });
+
+    if (result.success) {
+      expect(result.tasks).toBeDefined();
+      expect(Array.isArray(result.tasks)).toBe(true);
     }
   });
 });
 
 // =============================================================================
-// Graceful Degradation (verify no crashes without mem0)
+// Removed Tools (should return unknown tool)
 // =============================================================================
 
-describe('Graceful Degradation', () => {
-  it('memory_search — returns error message when server unavailable', async () => {
-    // This test validates the error shape; mem0 may actually be running
-    // so we just verify it returns a well-formed response either way
+describe('Removed Tools', () => {
+  it('memory_search — returns unknown tool error', async () => {
     const result = await callTool('memory_search', {
       query: 'test query',
       projectId: 'nonexistent-project',
     });
 
-    // Should never throw, always returns structured response
-    expect(result).toBeDefined();
-    expect(typeof result.success).toBe('boolean');
+    expect(result.success).toBeFalsy();
   });
 
-  it('knowledge_search — still works without mem0 (keyword results)', async () => {
-    const result = await callTool('knowledge_search', {
+  it('knowledge_context — returns unknown tool error', async () => {
+    const result = await callTool('knowledge_context', {
       projectPath: PROJECT_PATH,
-      query: 'governance',
     });
 
-    // Core keyword search must always work regardless of mem0
-    expect(result.success).toBe(true);
-    expect(result.documents).toBeDefined();
+    expect(result.success).toBeFalsy();
+  });
+
+  it('context_pack — returns unknown tool error', async () => {
+    const result = await callTool('context_pack', {
+      projectPath: PROJECT_PATH,
+      projectId: 'sidstack',
+      module: 'test',
+    });
+
+    expect(result.success).toBeFalsy();
   });
 });
 

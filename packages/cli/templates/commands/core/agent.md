@@ -1,6 +1,6 @@
 ---
 name: "SidStack: Agent"
-description: Spawn a governed agent session with role-specific context
+description: Spawn a governed agent with role-specific skills and principles
 category: core
 version: 2.0.0
 tags: [sidstack, agent, spawn, governance]
@@ -8,7 +8,7 @@ tags: [sidstack, agent, spawn, governance]
 
 # SidStack Agent
 
-Spawn governed agent sessions using MCP `session_launch`.
+Spawn governed agents using Claude Code's Agent tool with role-specific context.
 
 ## Usage
 
@@ -30,27 +30,24 @@ From `$ARGUMENTS`:
 
 If role missing, ask user.
 
-### Step 2: Launch Session
+### Step 2: Load Context
 
-Use MCP `session_launch` with role and task:
+1. Fetch active task: `task_list({ preset: "actionable" })`
+2. Load context: `entity_context({ entityType: "task", entityId: taskId })`
+3. Load agent definition from `.claude/agents/sidstack-{role}.md`
 
-```
-session_launch({
-  projectDir: ".",
-  taskId: "[task-id if known]",
-  prompt: "[task description]",
-  mode: "normal"
-})
-```
+### Step 3: Spawn Agent
 
-The session will automatically include:
+Use Claude Code's Agent tool with the role-specific agent definition (`subagent_type: "sidstack-worker"` or `"sidstack-reviewer"`).
+
+The agent will automatically follow:
 - Role-specific skills
 - Governance principles
 - Quality gates
 
-### Step 3: Confirm
+### Step 4: Confirm
 
-Report session launch status to user.
+Report agent spawn status to user.
 
 ## When to Spawn
 

@@ -1,6 +1,6 @@
 {
   "name": "@sidstack/bot-server",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "SidBot bot server - Gemini intent router + Claude Code bridge",
   "license": "MIT",
   "publishConfig": {

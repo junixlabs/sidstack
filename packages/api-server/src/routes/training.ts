@@ -1079,7 +1079,7 @@ function buildTrainingContextPrompt(
   lines.push('| Error could be prevented | Ask: "Create a rule to prevent this?" |');
   lines.push('| Same error occurred before | Ask: "This is recurring. Create a rule?" |');
   lines.push('');
-  lines.push('**How to create:** Use MCP tools `incident_create` → `lesson_create` → `skill_create`');
+  lines.push('**How to create:** Use MCP tools `incident_create` → `lesson_create`');
   lines.push('');
   lines.push('**Keep it lightweight:** Only suggest for valuable lessons, not every minor fix.');
   lines.push('');

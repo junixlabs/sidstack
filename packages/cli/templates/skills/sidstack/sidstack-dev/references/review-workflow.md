@@ -14,7 +14,6 @@ Batch analysis: create solutionPlans for multiple tasks. No implementation.
    a. Read task details: `task_get({ taskId })`
    b. Research context:
       - `mcp__sidstack__knowledge_search({ projectPath: ".", query: "[task topic]" })`
-      - `mcp__sidstack__memory_search({ query: "[task topic]", projectId: "[project]" })`
       - Grep codebase for affected patterns
    c. Link knowledge to task:
       - For each relevant knowledge doc: `mcp__sidstack__entity_link({ sourceType: "task", sourceId: "[taskId]", targetType: "knowledge", targetId: "[docId]", relationship: "requires_context" })`

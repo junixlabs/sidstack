@@ -6,7 +6,6 @@ The Project Hub is your central dashboard for navigating all SidStack features.
 
 When you open a project, the Project Hub shows:
 - **Project stats** - Module count, active tasks, knowledge documents
-- **OKR progress** - Objectives and key results tracking
 - **Quick actions** - Jump to any feature from the sidebar
 
 ## Sidebar Navigation
@@ -19,7 +18,6 @@ When you open a project, the Project Hub shows:
 | Ticket Queue | Cmd+4 | Manage external tickets |
 | Training Room | Cmd+5 | Lessons learned system |
 | Agent Desk | - | Manage isolated agent workspaces |
-| Traceability | - | Spec-task-test coverage matrix |
 | Docs | - | Built-in documentation viewer |
 | Settings | Cmd+, | Project configuration |
 

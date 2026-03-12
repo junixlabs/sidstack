@@ -8,7 +8,7 @@ Welcome to SidStack's documentation. SidStack is an AI-Powered Project Intellige
 
 - **[QUICK_START.md](QUICK_START.md)** - Get from zero to productive
 - **[GETTING_STARTED.md](GETTING_STARTED.md)** - Detailed setup guide with governance
-- **[CLAUDE_CODE_INTEGRATION.md](CLAUDE_CODE_INTEGRATION.md)** - MCP tools reference (49 tools)
+- **[CLAUDE_CODE_INTEGRATION.md](CLAUDE_CODE_INTEGRATION.md)** - MCP tools reference (42 tools)
 - **[API_REFERENCE.md](API_REFERENCE.md)** - REST API documentation
 
 ---

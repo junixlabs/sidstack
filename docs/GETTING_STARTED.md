@@ -26,7 +26,7 @@ Open Claude Code in your project. SidStack tools are available immediately:
 
 ```
 "Search knowledge about the auth module"
-→ Claude calls knowledge_search + knowledge_context
+→ Claude calls knowledge_search + entity_context (RAG mode)
 
 "Create a task to fix the login bug"
 → Claude calls task_create
@@ -53,11 +53,9 @@ SidStack is an **AI-Powered Project Intelligence Platform** for Claude Code.
 | **Task Management** | Track AI work with governance and quality gates |
 | **Impact Analysis** | Assess scope, risks, and blockers before making changes |
 | **Ticket Queue** | Intake external tickets, review, convert to tasks |
-| **Training Room** | Capture lessons from incidents, build reusable skills and rules |
-| **OKRs** | Define project goals, track progress through task completion |
+| **Training Room** | Capture lessons from incidents, build reusable rules |
 | **Agent Desk** | Isolated workspaces for AI agents via git worktrees |
-| **Memory** | Semantic search across project memories (via mem0) |
-| **Traceability** | Spec-task-test coverage matrix |
+| **Memory** | Semantic search across project memories (via SidMemo) |
 
 ---
 
@@ -159,13 +157,12 @@ pnpm install && pnpm packages:build && pnpm tauri:build
 
 | View | Description |
 |------|-------------|
-| **Project Hub** | Central dashboard with project stats, OKR progress, quick actions |
+| **Project Hub** | Central dashboard with project stats and quick actions |
 | **Task Manager** | Kanban, list, timeline views with governance |
 | **Knowledge Browser** | Browse and search project knowledge documents |
 | **Ticket Queue** | External ticket intake, review workflow, convert to tasks |
-| **Training Room** | Incidents, lessons, skills, and enforcement rules |
+| **Training Room** | Incidents, lessons, and enforcement rules |
 | **Agent Desk** | Manage isolated agent workspaces (git worktrees) |
-| **Traceability** | Spec-task-test coverage matrix |
 | **Docs** | Built-in documentation viewer |
 | **Settings** | Per-project configuration |
 

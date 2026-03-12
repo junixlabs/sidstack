@@ -23,9 +23,8 @@ fi
 # Inject workflow reminder
 cat << EOF
 [Task Created: ${TASK_ID}] Before implementation, you MUST:
-1. mcp__sidstack__knowledge_search({ projectPath: ".", query: "${TASK_TITLE}" }) — find relevant docs
-2. mcp__sidstack__memory_search({ query: "${TASK_TITLE}", projectId: "FOLDER_NAME" }) — find past learnings
-3. For each relevant doc found: mcp__sidstack__entity_link({ sourceType: "task", sourceId: "${TASK_ID}", targetType: "knowledge", targetId: "[docId]", relationship: "requires_context" })
+1. mcp__sidstack__knowledge_search({ projectPath: ".", query: "${TASK_TITLE}" }) — find relevant docs and past learnings
+2. For each relevant doc found: mcp__sidstack__entity_link({ sourceType: "task", sourceId: "${TASK_ID}", targetType: "knowledge", targetId: "[docId]", relationship: "requires_context" })
 EOF
 
 exit 0

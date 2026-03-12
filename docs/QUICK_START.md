@@ -3,7 +3,7 @@
 Get from zero to productive in minutes.
 
 SidStack has multiple interfaces - use any combination:
-- **MCP Server** - Use from Claude Code with 49 MCP tools
+- **MCP Server** - Use from Claude Code with MCP tools
 - **Desktop App** - Visual project management (macOS/Linux)
 - **Web UI** - Browser-based access (remote/team)
 - **Docker** - Deploy full stack on a server
@@ -33,16 +33,16 @@ npx @sidstack/cli init
 
 ### 2. Use MCP Tools in Claude Code
 
-Once initialized, Claude Code has access to 53 tools:
+Once initialized, Claude Code has access to MCP tools:
 
 **Knowledge (understand your project)**
 ```
-knowledge_context   - Build context for a task/module
-knowledge_search    - Search across knowledge docs
-knowledge_list      - List available docs
-knowledge_get       - Get single document
-knowledge_modules   - List modules with stats
-knowledge_create    - Create knowledge document
+knowledge_search         - Semantic search across knowledge and memory (SidMemo)
+knowledge_list           - List available docs
+knowledge_get            - Get single document
+knowledge_modules        - List modules with stats
+knowledge_module_overview - Get module architecture overview
+knowledge_create         - Create knowledge document
 knowledge_update    - Update knowledge document
 knowledge_delete    - Delete knowledge document
 knowledge_health    - Check coverage health
@@ -78,16 +78,8 @@ incident_create         - Report an incident
 incident_list           - List incidents
 lesson_create           - Create lesson from incident
 lesson_list             - List lessons
-skill_create            - Create reusable skill
-skill_list              - List skills
 rule_check              - Check rules for context
 training_context_get    - Get training context for session
-```
-
-**OKRs (project goals)**
-```
-okr_list            - List objectives and key results
-okr_update          - Update key result progress
 ```
 
 **Test Results (persist test execution)**
@@ -102,36 +94,23 @@ test_result_get     - Get detailed test result
 desk_create         - Create agent desk (git worktree)
 desk_list           - List all agent desks
 desk_status         - Get desk status
-desk_checkout       - Switch desk to a task
-desk_health         - Check desk health
-desk_conflicts      - Detect merge conflicts
 desk_remove         - Remove agent desk
 ```
 
-**Memory (semantic search via mem0)**
+**Memory (store learnings)**
 ```
 memory_add              - Add a memory entry
-memory_search           - Semantic search across memories
 memory_list             - List memory entries
 memory_delete           - Delete a memory entry
 memory_index_knowledge  - Index knowledge docs into memory
 memory_cleanup          - Clean up stale entries
 ```
 
-**Traceability & Entity References**
+**Entity References**
 ```
-traceability_matrix - Generate spec-task-test coverage matrix
 entity_link         - Link entities (task↔knowledge, etc.)
 entity_references   - Get references for an entity
-entity_context      - Build context from linked entities
-```
-
-**Productivity (v0.7.0)**
-```
-context_pack        - Build comprehensive context pack for a module
-macro_run           - Run composite macros (start_work, finish_work, quick_context)
-session_save        - Save session state for cross-session continuity
-session_restore     - Restore saved session state
+entity_context      - Build context from linked entities (entity mode + RAG mode)
 ```
 
 ### 3. Example Workflow
@@ -144,7 +123,7 @@ session_restore     - Restore saved session state
    → Claude calls impact_analyze, sees risks and blockers
 
 3. "Build context for the api-server module"
-   → Claude calls knowledge_context, gets relevant docs
+   → Claude calls entity_context (RAG mode), gets relevant docs
 
 4. [Implement the feature]
 
@@ -355,7 +334,6 @@ On first launch, the app shows a **Connection Setup** screen. Enter your Server 
 | **Ticket Queue** | `Cmd+4` | External ticket intake, review workflow, convert to tasks |
 | **Training Room** | `Cmd+5` | Capture lessons from incidents, build rules over time |
 | **Agent Desk** | - | Manage isolated agent workspaces (git worktrees) |
-| **Traceability** | - | Spec-task-test coverage matrix |
 | **Docs** | - | Built-in documentation viewer |
 | **Settings** | `Cmd+,` | Project configuration |
 

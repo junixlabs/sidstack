@@ -118,7 +118,7 @@ mcp__sidstack__memory_add({
 })
 ```
 
-This enables future agents to find these learnings via `memory_search` (auto-expires in 90 days).
+This enables future agents to find these learnings via `knowledge_search` (auto-expires in 90 days).
 
 ### Lesson Synthesis
 

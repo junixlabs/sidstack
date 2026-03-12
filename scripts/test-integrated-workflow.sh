@@ -237,31 +237,13 @@ else
 fi
 
 # ============================================================
-step "Phase 6: VERIFY — traceability_matrix"
-# ============================================================
-
-TRACE_RESULT=$(curl -s "$API_URL/api/traceability/matrix?projectId=$PROJECT_ID&projectPath=.")
-if echo "$TRACE_RESULT" | grep -q 'matrix\|specs\|coverage\|tasks'; then
-  TRACE_SUMMARY=$(echo "$TRACE_RESULT" | python3 -c "
-import sys,json
-d=json.load(sys.stdin)
-m = d.get('matrix',{})
-specs = m.get('specs',[]) if isinstance(m, dict) else []
-print(f'Coverage entries: {len(specs)}')
-" 2>/dev/null || echo "response ok")
-  pass "traceability_matrix → $TRACE_SUMMARY"
-else
-  info "traceability_matrix: $(echo "$TRACE_RESULT" | head -c 200)"
-fi
-
-# ============================================================
-step "Phase 7: MCP tool registration check"
+step "Phase 6: MCP tool registration check"
 # ============================================================
 
 TOOLS_CHECK=$(cd /Users/chuongle/tools/sidstack && node -e "
 const { tools } = require('$MCP_DIST/tools/index.js');
 const needed = ['entity_link', 'entity_references', 'entity_context',
-  'memory_add', 'memory_search', 'test_result_create', 'traceability_matrix',
+  'memory_add', 'test_result_create',
   'knowledge_search', 'task_create', 'task_update', 'task_complete'];
 const registered = tools.map(t => t.name);
 const missing = needed.filter(n => !registered.includes(n));

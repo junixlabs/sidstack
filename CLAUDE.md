@@ -22,7 +22,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 Task lifecycle, quality gates, lesson detection: managed by `sidstack-aware` skill. Every request is **classified by intent first** (via Workflow Router + sidstack-aware skill), then routed to the correct workflow. Use `/sidstack-dev` for explicit structured workflows. SidStack MCP tasks (`mcp__sidstack__task_*`) for persistence; built-in tasks for session-local sub-steps only.
 
 **Integrated workflow — always follow this pattern:**
-1. **Before work:** `knowledge_search` + `memory_search` → find context. `entity_link` → link relevant docs to task.
+1. **Before work:** `knowledge_search` → find context. `entity_link` → link relevant docs to task.
 2. **During work:** `entity_context` → get linked context. `task_update` → track progress.
 3. **After work:** `test_result_create` → persist test results. `memory_add` → store learnings. `task_complete` → finish.
 <!-- GOVERNANCE:END -->
@@ -137,7 +137,7 @@ pnpm typecheck            # Type checking
 
 ## Architecture Reference
 
-**MCP Tools:** knowledge (9), tasks (5), impact (3), tickets (4), training (8), OKRs (2), test results (3), agent desk (5), memory (6), traceability (1), entity references (3) — 49 tools.
+**MCP Tools:** knowledge (9), tasks (5), impact (3), tickets (4), training (6), test results (3), agent desk (4), memory (5), entity refs (3) — 42 tools.
 **Agents:** Worker (`sidstack-worker`) for implementation, Reviewer (`sidstack-reviewer`) for verification. Skills auto-trigger per role.
 **Knowledge:** `.sidstack/knowledge/` in 9 categories (`00-context` through `08-incidents`).
 **Impact:** `impact_analyze` → `impact_check_gate`. Gates: `blocked`, `warning`, `clear`.
@@ -159,7 +159,7 @@ pnpm typecheck            # Type checking
 | | `memory_add(content, projectId)` | Store learnings for future |
 | | `lesson_create(...)` | After fixing tricky bugs (ask user first) |
 
-> **Tip:** `entity_context` loads everything linked to a task (knowledge, memory, references) in one call — use it instead of calling `knowledge_search` + `memory_search` + `entity_references` separately.
+> **Tip:** `entity_context` loads everything linked to a task (knowledge, memory, references) in one call — use it instead of calling `knowledge_search` + `entity_references` separately. It also supports RAG mode with `projectPath` + `query`/`moduleId`.
 
 ---
 

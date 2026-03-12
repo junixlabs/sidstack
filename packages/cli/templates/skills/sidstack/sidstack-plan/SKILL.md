@@ -2,7 +2,7 @@
 name: sidstack-plan
 description: "Analyzes pending tasks, writes solution plans, and submits them for human approval before implementation begins. Triggers on: /sidstack-plan, 'review tasks', 'plan tasks', 'what needs planning'. Does NOT implement — only plans."
 argument-hint: "[task-id(s) | pending | review]"
-allowed-tools: mcp__sidstack__task_list, mcp__sidstack__task_get, mcp__sidstack__task_update, mcp__sidstack__knowledge_search, mcp__sidstack__memory_search, mcp__sidstack__entity_link, mcp__sidstack__entity_context, mcp__sidstack__entity_references, mcp__sidstack__impact_analyze
+allowed-tools: mcp__sidstack__task_list, mcp__sidstack__task_get, mcp__sidstack__task_update, mcp__sidstack__knowledge_search, mcp__sidstack__entity_link, mcp__sidstack__entity_context, mcp__sidstack__entity_references, mcp__sidstack__impact_analyze
 ---
 
 # SidStack Plan Review
@@ -44,7 +44,7 @@ If `review`: show `planStatus` and `planReviewNotes` for revision-requested task
 For each task:
 
 1. **Read details**: `task_get({ taskId })` — extract title, description, taskType, acceptanceCriteria
-2. **Search context**: `knowledge_search` + `memory_search` for task topic
+2. **Search context**: `knowledge_search` for task topic
 3. **Research codebase**: Grep/Glob affected code, read key files
 4. **Link knowledge**: `entity_link` each relevant doc to the task
 5. **Impact analysis** (if core modules): `impact_analyze`

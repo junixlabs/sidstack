@@ -19,7 +19,7 @@ tools:
   - mcp__sidstack__task_get
   - mcp__sidstack__task_update
   - mcp__sidstack__task_complete
-  - mcp__sidstack__knowledge_context
+  - mcp__sidstack__entity_context
   - mcp__sidstack__knowledge_search
 disallowedTools:
   - Write
@@ -46,7 +46,7 @@ Before reviewing, check: `task_get({ taskId })` → verify you are not `createdB
 
 2. **Load Knowledge Context**
    ```
-   knowledge_context({ projectPath: ".", taskId: "[task-id]" })
+   entity_context({ projectPath: ".", taskId: "[task-id]" })
    ```
 
 3. **Identify Changed Files** from handoff notes

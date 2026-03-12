@@ -1,7 +1,7 @@
 ---
 name: sidstack-aware
 user-invocable: false
-allowed-tools: mcp__sidstack__task_update, mcp__sidstack__task_list, mcp__sidstack__task_complete, mcp__sidstack__task_get, mcp__sidstack__incident_create, mcp__sidstack__lesson_create, mcp__sidstack__memory_add, mcp__sidstack__memory_search, mcp__sidstack__entity_link, mcp__sidstack__entity_references, mcp__sidstack__knowledge_search, mcp__sidstack__entity_context, mcp__sidstack__training_context_get
+allowed-tools: mcp__sidstack__task_update, mcp__sidstack__task_list, mcp__sidstack__task_complete, mcp__sidstack__task_get, mcp__sidstack__incident_create, mcp__sidstack__lesson_create, mcp__sidstack__memory_add, mcp__sidstack__entity_link, mcp__sidstack__entity_references, mcp__sidstack__knowledge_search, mcp__sidstack__entity_context, mcp__sidstack__training_context_get
 description: "Tracks task progress milestones and guides completion flow with quality gates. Auto-triggers when code changes are made, work nears completion, user queries task status, or a task needs the plan-first gate check before implementation."
 ---
 
@@ -57,7 +57,7 @@ Before creating a new task:
 1. `task_list({ projectId: "FOLDER_NAME", preset: "actionable" })` — is there an existing task for this?
    - YES, matching topic → Resume it. Do not create duplicate.
    - NO → Continue to Step 3.
-2. `memory_search({ query: "[request summary]" })` — any past learnings?
+2. `knowledge_search({ query: "[request summary]" })` — any past learnings?
 3. `training_context_get({ projectId: "FOLDER_NAME" })` — applicable rules?
 
 ### Step 3: Disambiguate
@@ -176,7 +176,7 @@ These steps apply whether you're in `/sidstack-dev` mode or handling a regular p
 
 ### On Task Start (after create or resume)
 1. `entity_context({ entityType: "task", entityId: taskId })` — loads all linked knowledge, memory, references in one call
-2. If entity_context returns no linked docs, fall back to `knowledge_search` + `memory_search`
+2. If entity_context returns no linked docs, fall back to `knowledge_search`
 3. `entity_link` — link any newly discovered relevant docs to the task
 
 ### During Implementation
@@ -252,5 +252,5 @@ Rule: Always create the SidStack MCP task first (governance requires it). Option
 | **Finishing Work** | `mcp__sidstack__task_complete` | After quality checks pass |
 | | `mcp__sidstack__memory_add` | Store learnings for future |
 | | `mcp__sidstack__entity_link` | Link task to knowledge docs, specs |
-| **Fallback** | `mcp__sidstack__memory_search` | When entity_context has no linked docs |
+| **Fallback** | `mcp__sidstack__knowledge_search` | When entity_context has no linked docs |
 | | `mcp__sidstack__entity_references` | Query what's linked to a task |

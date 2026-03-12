@@ -101,7 +101,7 @@ See `docs/USER_GUIDE_VIEW_ONLY_APP.md` for user guide.
 
 | Feature | Status |
 |---------|--------|
-| MCP Server (49 tools) | ✅ Done |
+| MCP Server (42 tools) | ✅ Done |
 | Agent Governance (principles, skills, workflows) | ✅ Done |
 | Simplified Agent Roles (Worker, Reviewer) | ✅ Done |
 | Capability Skills (sidstack-aware, sidstack-dev) | ✅ Done |

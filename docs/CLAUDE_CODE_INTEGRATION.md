@@ -61,17 +61,17 @@ List my SidStack tasks
 
 Claude should use the `task_list` MCP tool.
 
-## Available MCP Tools (53)
+## Available MCP Tools
 
 ### Knowledge (9)
 
 | Tool | Description |
 |------|-------------|
-| `knowledge_context` | Build context for a task/module |
-| `knowledge_search` | Search across knowledge docs |
+| `knowledge_search` | Semantic search across knowledge and memory (SidMemo) |
 | `knowledge_list` | List available docs |
 | `knowledge_get` | Get single document with full content |
 | `knowledge_modules` | List modules with stats |
+| `knowledge_module_overview` | Get module architecture overview |
 | `knowledge_create` | Create knowledge document |
 | `knowledge_update` | Update knowledge document |
 | `knowledge_delete` | Delete knowledge document |
@@ -104,7 +104,7 @@ Claude should use the `task_list` MCP tool.
 | `ticket_update` | Update ticket status |
 | `ticket_convert_to_task` | Convert ticket to task |
 
-### Training (8)
+### Training (6)
 
 | Tool | Description |
 |------|-------------|
@@ -112,17 +112,8 @@ Claude should use the `task_list` MCP tool.
 | `incident_list` | List incidents |
 | `lesson_create` | Create lesson from incident |
 | `lesson_list` | List lessons |
-| `skill_create` | Create reusable skill |
-| `skill_list` | List skills |
 | `rule_check` | Check rules for context |
 | `training_context_get` | Get training context for session |
-
-### OKRs (2)
-
-| Tool | Description |
-|------|-------------|
-| `okr_list` | List objectives and key results |
-| `okr_update` | Update key result progress |
 
 ### Test Results (3)
 
@@ -132,34 +123,24 @@ Claude should use the `task_list` MCP tool.
 | `test_result_list` | List test results with filtering |
 | `test_result_get` | Get detailed test result |
 
-### Agent Desk (7)
+### Agent Desk (4)
 
 | Tool | Description |
 |------|-------------|
 | `desk_create` | Create agent desk (git worktree) |
 | `desk_list` | List all agent desks |
 | `desk_status` | Get desk status and current task |
-| `desk_checkout` | Switch desk to a task |
-| `desk_health` | Check desk health |
-| `desk_conflicts` | Detect merge conflicts |
 | `desk_remove` | Remove agent desk |
 
-### Memory (6)
+### Memory (5)
 
 | Tool | Description |
 |------|-------------|
-| `memory_add` | Add a memory entry (via mem0) |
-| `memory_search` | Semantic search across memories |
+| `memory_add` | Add a memory entry |
 | `memory_list` | List memory entries |
 | `memory_delete` | Delete a memory entry |
 | `memory_index_knowledge` | Index knowledge docs into memory |
 | `memory_cleanup` | Clean up stale memory entries |
-
-### Traceability (1)
-
-| Tool | Description |
-|------|-------------|
-| `traceability_matrix` | Generate spec-task-test coverage matrix |
 
 ### Entity References (3)
 
@@ -167,16 +148,7 @@ Claude should use the `task_list` MCP tool.
 |------|-------------|
 | `entity_link` | Link entities (task↔knowledge, etc.) |
 | `entity_references` | Get references for an entity |
-| `entity_context` | Build context from linked entities |
-
-### Productivity (4) — v0.7.0
-
-| Tool | Description |
-|------|-------------|
-| `context_pack` | Build comprehensive context pack for a module (knowledge + memory + tasks in one call) |
-| `macro_run` | Run composite macros: `start_work`, `finish_work`, `quick_context` |
-| `session_save` | Save session state (decisions, blockers, files, progress) for continuity |
-| `session_restore` | Restore saved session state from previous conversation |
+| `entity_context` | Build context from linked entities (entity mode + RAG mode) |
 
 ### Claude Code Hooks (Quality Gates)
 
@@ -216,7 +188,7 @@ pnpm test       # Must pass
    → task_create (auto-applies governance)
 
 2. "What knowledge do we have about the auth module?"
-   → knowledge_search + knowledge_context
+   → knowledge_search + entity_context (RAG mode)
 
 3. "Analyze the impact of this change"
    → impact_analyze
@@ -257,7 +229,7 @@ pnpm test       # Must pass
    → ticket_convert_to_task
 
 3. "Load context for this task"
-   → knowledge_context
+   → entity_context
 
 4. [Implement the fix]
 
@@ -265,17 +237,3 @@ pnpm test       # Must pass
    → task_complete
 ```
 
-### OKR-Driven Work
-```
-1. "Show our project goals"
-   → okr_list
-
-2. "Create a task for KR-1.1"
-   → task_create
-
-3. [Implement the feature]
-
-4. "Complete the task and update OKR progress"
-   → task_complete
-   → okr_update
-```

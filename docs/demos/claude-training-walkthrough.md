@@ -161,7 +161,7 @@ knowledge_search({ projectPath: "/path/to/project", query: "authentication" })
 
 **Step 3 - Build context for a task:**
 ```
-knowledge_context({
+entity_context({
   projectPath: "/path/to/project",
   taskId: "<task-id>",
   format: "claude"
@@ -245,7 +245,7 @@ training_context_get({ projectId: "your-project" })
 
 **6. Build knowledge context:**
 ```
-knowledge_context({ projectPath: "/path/to/project", taskId: "<task-id>" })
+entity_context({ projectPath: "/path/to/project", taskId: "<task-id>" })
 ```
 
 **7. Implement (task in-progress):**

@@ -79,7 +79,7 @@ Classify every user request before acting. Match **semantic intent**, not keywor
 | | `memory_add(content, projectId)` | Store learnings for future |
 | | `lesson_create(...)` | After fixing tricky bugs (ask user first) |
 
-> **Tip:** `entity_context` loads everything linked to a task (knowledge, memory, references) in one call — use it instead of calling `knowledge_search` + `memory_search` + `entity_references` separately.
+> **Tip:** `entity_context` loads everything linked to a task (knowledge, memory, references) in one call — use it instead of calling `knowledge_search` + `entity_references` separately.
 
 ---
 
